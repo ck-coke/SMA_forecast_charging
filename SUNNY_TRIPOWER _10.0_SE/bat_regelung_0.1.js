@@ -10,16 +10,17 @@ let _debug = getState(tibberDP + 'debug').val == 'null' ? true : false;
 
 //-------------------------------------------------------------------------------------
 const _pvPeak = 13100; // PV-Anlagenleistung in Wp
-const _batteryCapacity = 12800; // Netto Batterie Kapazit‰t in Wh
+const _batteryCapacity = 12800; // Netto Batterie Kapazit√§t in Wh
 const _surplusLimit = 0; // PV-Einspeise-Limit in %
-const _batteryThreshold = 1; // Nutzbare Mindestladung der Batterie (zus‰tzlich zur unteren Entladegrenze des Systems), BYD Batterie regelt selbst
-const _batteryTarget = 100; // Gew¸nschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
+const _batteryThreshold = 1; // Nutzbare Mindestladung der Batterie (zus√§tzlich zur unteren Entladegrenze des Systems), BYD Batterie regelt selbst
+const _batteryTarget = 100; // Gew√ºnschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
 const _baseLoad = 550; // Grundverbrauch in Watt (falls bekannt)
 const _wr_efficiency = 0.9; // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
 const _batteryPower = 5000; // Ladeleistung der Batterie in W (0 = automatisch)
 
+const triggerDP = 'modbus.0.inputRegisters.3.30193_Systemzeit_als_trigger';
 const communicationRegisters = {
-    fedInSpntCom: 'modbus.0.holdingRegisters.3.40151_Kommunikation', // Wirk- und Blindleistungsregelung ¸ber Kommunikation (802 active, 803 inactive)
+    fedInSpntCom: 'modbus.0.holdingRegisters.3.40151_Kommunikation', // Wirk- und Blindleistungsregelung √ºber Kommunikation (802 active, 803 inactive)
     fedInPwrAtCom: 'modbus.0.holdingRegisters.3.40149_Wirkleistungvorgabe', // Wirkleistungsvorgabe
     batChaMaxW: 'modbus.0.holdingRegisters.3.40795_Maximale_Batterieladeleistung', // Maximale Batterieladeleistung
     batDsChaMaxW: 'modbus.0.holdingRegisters.3.40799_Maximale_Batterieentladeleistung', // Maximale Batterieentladeleistung
@@ -28,7 +29,7 @@ const communicationRegisters = {
 };
 
 const inputRegisters = {
-    batSoC: 'modbus.0.inputRegisters.3.30845_Batterie_Prozent', // Batterie-SoC (Selbsterkl‰rend)
+    batSoC: 'modbus.0.inputRegisters.3.30845_Batterie_Prozent', // Batterie-SoC (Selbsterkl√§rend)
     powerOut: 'modbus.0.inputRegisters.3.30867_Aktuelle_Netzeinspeisung', // Aktuelle Einspeiseleistung am Netzanschlusspunkt (BatWR)
     powerAC: 'modbus.0.inputRegisters.3.30775_AC_Leistung', // Power AC
 };
@@ -43,7 +44,7 @@ const    _tibber = true;                //wird _tibber benutzt (dyn. Strompreis)
 let      _gridcharge = true;            // laden mit Netzstrom erlaubt?  kann auch per DP gesetzt werden
 const    _snowmode = false;             //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
 const    _start_charge = 0.21;          //Eigenverbrauchspreis
-const    _lossfactor = 0.75;            //System gesamtverlust in % (Lade+Entlade Effizienz), nur f¸r Awattar Preisberechnung
+const    _lossfactor = 0.75;            //System gesamtverlust in % (Lade+Entlade Effizienz), nur f√ºr Awattar Preisberechnung
 const    _loadfact = 1/_lossfactor;
 const    _stop_discharge = (_start_charge * _loadfact);
 
@@ -56,7 +57,7 @@ const    _stop_discharge = (_start_charge * _loadfact);
     createUserStates(tibberDP1, false, [tibberDP2 + 'debug', { 'name': 'debug', 'type':'boolean', 'read': true, 'write': true, 'role': 'state',  'def':false }], function () {        
         setState(tibberDP + 'debug', _debug, true);
     });
-    createUserStates(tibberDP1, false, [tibberDP2 + 'extra.PV_Ueberschuss', { 'name': 'wie viele Wh ‹berschuss', 'type':'number', 'read': true, 'write': false, 'role': 'state', 'unit': 'Wh', 'def':0 }], function () {        
+    createUserStates(tibberDP1, false, [tibberDP2 + 'extra.PV_Ueberschuss', { 'name': 'wie viele Wh √úberschuss', 'type':'number', 'read': true, 'write': false, 'role': 'state', 'unit': 'Wh', 'def':0 }], function () {        
         setState(tibberDP + 'extra.PV_Ueberschuss', 0, true);
     });  
     createUserStates(tibberDP1, false, [tibberDP2 + 'extra.max_ladeleistung', { 'name': 'max ladeleistung', 'type':'number', 'read': true, 'write': false, 'role': 'state', 'unit': 'Wh', 'def':0 }], function () {        
@@ -106,9 +107,9 @@ function processing() {
     };  
 
     // Lademenge
-    let ChaEnrg_full = Math.ceil((_batteryCapacity * (100 - batsoc) / 100) * (1 / _wr_efficiency));                            //Energiemenge bis vollst‰ndige Ladung
-    let ChaEnrg      = Math.max(Math.ceil((_batteryCapacity * (_batteryTarget - batsoc) / 100) * (1 / _wr_efficiency)), 0);    //ChaEnrg = Energiemenge bis vollst‰ndige Ladung
-    let ChaTm        = ChaEnrg / _batteryPower;                                                                                //Ladezeit = Energiemenge bis vollst‰ndige Ladung / Ladeleistung WR
+    let ChaEnrg_full = Math.ceil((_batteryCapacity * (100 - batsoc) / 100) * (1 / _wr_efficiency));                            //Energiemenge bis vollst√§ndige Ladung
+    let ChaEnrg      = Math.max(Math.ceil((_batteryCapacity * (_batteryTarget - batsoc) / 100) * (1 / _wr_efficiency)), 0);    //ChaEnrg = Energiemenge bis vollst√§ndige Ladung
+    let ChaTm        = ChaEnrg / _batteryPower;                                                                                //Ladezeit = Energiemenge bis vollst√§ndige Ladung / Ladeleistung WR
 
     if (ChaTm <= 0) {
         ChaTm   = 0;
@@ -156,7 +157,7 @@ function processing() {
             console.log('Bat h verbleibend ' + batlefthrs.toFixed(2));
         }
 
-        //wieviel wh kommen in etwa von PV in den n‰chsten 24h
+        //wieviel wh kommen in etwa von PV in den n√§chsten 24h
         let pvwh = 0;
         for (let p = 0; p < hrstorun*2; p++) {
             pvwh = pvwh + (getState(pvforecastDP + + p + '.power').val / 2); // warum teilen
@@ -213,7 +214,7 @@ function processing() {
             }
             
             pvwh = 0
-            //wieviel wh kommen in etwa von PV die verk¸rzt
+            //wieviel wh kommen in etwa von PV die verk√ºrzt
             for (let p = 0; p < hrstorun*2; p++) {
                 pvwh = pvwh + (getState(pvforecastDP + + p + '.power').val/2);
             }
@@ -472,12 +473,12 @@ function processing() {
                     minutes = minutescalc;
                 }
             }
-            get_wh = get_wh + (((pvpower / 2) - ((pvlimit + _baseLoad) / 2)) * (minutes / 30)); // wieviele Wh ‹berschuss???
+            get_wh = get_wh + (((pvpower / 2) - ((pvlimit + _baseLoad) / 2)) * (minutes / 30)); // wieviele Wh √úberschuss???
             setState(tibberDP + 'extra.PV_Ueberschuss', Math.round(get_wh), true);
         }
 
         if (_debug) { 
-            console.log('‹berschuﬂ ' + Math.round(get_wh) + ' Wh');            
+            console.log('√úberschu√ü ' + Math.round(get_wh) + ' Wh');            
         }
 
         let pvlimit_calc = pvlimit;
@@ -565,12 +566,12 @@ function processing() {
 
 processing();
 
-on({id: 'modbus.0.inputRegisters.3.30193_Systemzeit_als_trigger', change: 'any'}, function(obj) {  // aktualisiere laut adapter abfrageintervall
+on({id: triggerDP, change: 'any'}, function(obj) {  // aktualisiere laut adapter abfrageintervall
     _debug      = getState(tibberDP + 'debug').val;
     _gridcharge = getState(tibberDP + 'extra.tibber_laden_erlauben').val;
 
     setTimeout(() => {    
         processing(); /*start processing in interval*/
-    }, 500);           // verzˆgerung zwecks Datenabholung
+    }, 500);           // verz√∂gerung zwecks Datenabholung
 });
 
