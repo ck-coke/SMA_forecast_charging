@@ -1,0 +1,32 @@
+_address	deviceId	name	description	unit	type	len	factor	offset	formula	role	room	cw	isScale
+30053	3	DevTypeId			uint32be	2	1	0		value		false	
+30193	3	Systemzeit als trigger			uint32be	2	1	0		value.time		false	
+30203	3	WR Wirkleistung Max		W	uint32be	2	1	0		value		false	
+30517	3	Tag Verbrauch gesamt		kWh	uint64be	4	1	0	x/1000	value		false	
+30529	3	AC-Gesamtertrag		kWh	uint32be	2	0.001	0		value		false	
+30531	3	AC-Gesamtertrag		kWh	uint32be	2	1	0		value		false	
+30533	3	AC-Gesamtertrag		MWh	uint32be	2	1	0		value		false	
+30581	3	Gekaufte Energie		kWh	uint32be	2	1	0	x/1000	value		false	
+30769	3	DC-Strom 1		A	int32be	2	0.001	0		value		false	
+30771	3	DC-Spannung 1		V	int32be	2	0.01	0		value		false	
+30773	3	DC-Leistung 1		W	int32be	2	1	0	x=(x<0) ? 0:x	value		false	
+30775	3	AC Leistung		W	int32be	2	1	0		value		false	
+30837	3	Wirkleistungsbegrenzung W		W	uint32be	2	1	0		value		false	
+30839	3	Wirkleistungsbegrenzung %		%	uint32be	2	1	0		value		false	
+30845	3	Batterie Prozent		%	uint32be	2	1	0		value		false	
+30847	3	Diagnose Aktuelle Kapazität		%	uint32be	2	1	0		value		false	
+30849	3	Batterie Temperatur		°C	int32be	2	0,1	0		value		false	
+30865	3	Aktueller Netzbezug		kW	uint32be	2	1		x/1000	value		false	
+30867	3	Aktuelle Netzeinspeisung		kW	int32be	2	1	0	x/1000	value		false	
+30953	3	Temperatur WR		°C	int32be	2	0.1	0		value		false	
+30955	3	Batterie Zustand			uint32be	2	1	0		value		false	
+30957	3	DC-Strom 2		A	int32be	2	0.001	0		value		false	
+30959	3	DC-Spannung 2		V	int32be	2	0.01	0		value		false	
+30961	3	DC-Leistung 2		W	int32be	2	1	0	x=(x<0) ? 0:x	value		false	
+31061	3	Steuerung verfügbar			uint32be	2	1	0		value		false	
+31379	3	Batterietyp			uint32be	2	1	0		value		false	
+31391	3	Batterie Status			uint32be	2	1	0		value		false	
+31393	3	Momentane Batterieladung		kW	uint32be	2	1	0	x/1000	value		false	
+31395	3	Momentane Batterieentladung		kW	uint32be	2	1	0	x/1000	value		false	
+32385	3	WR Status			uint32be	2	1	0		value		false	
+32405	3	Verbleibende Lauzeit bis KP Neustart			uint32be	2	1	0		value		false	
