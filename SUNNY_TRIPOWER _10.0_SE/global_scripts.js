@@ -99,7 +99,7 @@ function createUserStates(where, force, statesToCreate, callback = undefined) {
                     }
                     setTimeout(function() {
                         setState(loopParam[0], init, true, function() {
-                            if (LOG_DEBUG) log('[Debug] setState durchgeführt: ' + loopParam[0]);
+                            if (LOG_DEBUG) log('[Debug] setState durchgefÃ¼hrt: ' + loopParam[0]);
                             numStates--;
                             if (numStates === 0) {
                                 if (LOG_DEBUG) log('[Debug] All states processed.');
@@ -135,4 +135,9 @@ function secondstotime(totalSeconds,tage) {
     result += ":" + (seconds < 10 ? "0" + seconds : seconds);
 
     return result;
+}
+
+function getHH() {
+    const holeDate = new Date();
+    return holeDate.getHours();  
 }
