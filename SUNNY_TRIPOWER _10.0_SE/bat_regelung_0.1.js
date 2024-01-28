@@ -99,7 +99,7 @@ function processing() {
         let PwrAtCom = pwrAtCom_def;          //PwrArCom = 11600
         let SpntCom = _SpntCom_def;           //   802: aktiv (Act)    803: inaktiv (Ina)
         let tibber_active = 0;
-        let price0 = getState(tibberDP + '.extra.tibberJetzt').val;
+        let price0 = getState(tibberDP + 'extra.tibberJetzt').val;
 
         // Lademenge
         let ChaEnrg_full = Math.ceil((_batteryCapacity * (100 - batsoc) / 100) * (1 / _wr_efficiency));                            //Energiemenge bis vollständige Ladung
