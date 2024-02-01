@@ -566,8 +566,6 @@ on({id: triggerDP, change: 'any'}, function() {  // aktualisiere laut adapter ab
     _tibber                         = getState(tibberDP  + 'extra.tibber_laden_erlauben').val;
     _snowmode                       = getState(tibberDP1 + '.strom.tibber.extra.PV_Schneebedeckt').val;
 
- // übersteuern
-
     setTimeout(function () {  
         processing(); /*start processing in interval*/
     }, 500);           // verzögerung zwecks Datenabholung
