@@ -1,81 +1,238 @@
 
 const axios = require('axios'); // Import the Axios library
 
-const garten = "xxxxxxxxxxxxxxxxxxxxxxxxxxx";
-const strasse = "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyy";
+const seite1 = "yyyy-yyyy-yyyy-yyyy;
+const seite2 = "zzzz-zzzz-zzzz-zzzz";
 
-const key_id = "zzzzzzzzzzzzzzzzzzzzzzzzzzz";
-let hours = 24;
+const key_id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+
 
 const baseUrl = "https://api.solcast.com.au/rooftop_sites/";
 
-function requestData(seiteUrl) {
+const mainObject = '0_userdata.0.strom.pvforecast';
+const name1 = 'garten';         // name dp1    
+const name2 = 'strasse';        // name dp2
+
+const gesamt = 'gesamt';        // dp für zusammenrechnen
+const abbrechenBei = '00:00';   // ab wieveil Uhr kommt nix mehr
+
+let hours = 24;
+
+
+
+// ------------------------------------------------------------------------------------------------------------------
+
+//  erzeuge einmal in der nacht gesamt
+schedule('0 2 * * *', function () { 
+    initialPV();
+});
+
+schedule('1 5,9 * * *', function () { 
+    const url = `${seite2}/forecasts?format=json&api_key=${key_id}`;
+    requestData(url, name2);
+});
+
+schedule('1 6,12,13,14 * * *', function () {
+    const url2 = `${seite1}/forecasts?format=json&api_key=${key_id}`;
+    requestData(url2, name1);
+});
+
+
+// ------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+/*************** ab hier nix ändern  ***************************** */
+
+async function requestData(seiteUrl, seite) {
     const url = `${baseUrl}${seiteUrl}`
+    const options = { hour12: false, hour: '2-digit', minute: '2-digit' };    
 
+    let response;
 
-    axios
-        .get(url)
-        .then((response) => {
-            if (response.status === 200) {
-                const array = response.data.forecasts;
-                const list = [];
+    try {   
+        response = await axios({
+            timeout: 5000,
+            url: url,
+            method: 'get'
+        });
+    } catch {
+        console.error('too many requests');    
+    }
 
-                for (let i = 0; i < array.length; i++) {
-                const endtime = Date.parse(array[i].period_end);
-                const time = new Date(endtime - 1800000);
-                const readpwr = array[i].pv_estimate;
-                const readpwr90 = array[i].pv_estimate90;
+   // console.warn('PV requestData ' + response.status);
 
-                list[i] = {
-                    time: time / 1000,
-                    watt: Math.round(readpwr * 1000),
-                    watt90: Math.round(readpwr90 * 1000),
-                };
-                }
+    if (response && response.status === 200) {
 
-                for (let a = 0; a < hours * 2; a++) {
-                const start = new Date(list[a].time * 1000);
-                const end = new Date(list[a].time * 1000 + 1800000);
+// lösche und erzeuge neu für die abfrage damit die zeiten zueinander passen  
+  //  console.warn('lösche ' + mainObject + '.' + seite);
+        await deleteObjectAsync(mainObject + '.' + seite, true);            
+        await gesamtAnlegen(seite);    
+        
+        const array = response.data.forecasts;    
 
-                const options = { hour12: false, hour: '2-digit', minute: '2-digit' };
-                const startTime = start.toLocaleTimeString('de-DE', options);
-                const endTime = end.toLocaleTimeString('de-DE', options);
+        //console.warn('response seite ' + seite  + '--> ' +  JSON.stringify(response.data));
 
-                const stateBaseName = "strom.pvforecast." + a + ".";
+        const list = [];
 
-                createUserStates('0_userdata.0', false, [stateBaseName + 'startTime', { 'name': 'Gultigkeitsbeginn (Uhrzeit)', 'type': 'string', 'read': true, 'write': false, 'role': 'state' }], function () {
-                    setState('0_userdata.0.' + stateBaseName + 'startTime', startTime, true);
-                });
+        for (let i = 0; i < array.length; i++) {
+            const endtime = Date.parse(array[i].period_end);
+            const startTime = new Date(endtime - 1800000);
+            const readpwr = array[i].pv_estimate;
+            const readpwr90 = array[i].pv_estimate90;
 
-                createUserStates('0_userdata.0', false, [stateBaseName + 'endTime', { 'name': 'Gultigkeitsende (Uhrzeit)', 'type': 'string', 'read': true, 'write': false, 'role': 'state' }], function () {
-                    setState('0_userdata.0.' + stateBaseName + 'endTime', endTime, true);
-                });
+            list[i] = {
+                time: startTime / 1000,
+                watt: Math.round(readpwr * 1000),
+                watt90: Math.round(readpwr90 * 1000),
+            };         
+        }
+               
+        const startTime = new Date(list[0].time * 1000);        
+        const startDPTime = startTime.toLocaleTimeString('de-DE', options);
 
-                createUserStates('0_userdata.0', false, [stateBaseName + 'power', { 'name': 'power', 'type': 'number', 'read': true, 'write': false, 'role': 'state', 'def': 0 }], function () {
-                    setState('0_userdata.0.' + stateBaseName + 'power', list[a].watt, true);
-                });
+        //console.warn('suche endDPTime ' + startDPTime);
+        let ind = 0;
 
-                createUserStates('0_userdata.0', false, [stateBaseName + 'power90', { 'name': 'power90', 'type': 'number', 'read': true, 'write': false, 'role': 'state', 'def': 0 }], function () {
-                    setState('0_userdata.0.' + stateBaseName + 'power90', list[a].watt90, true);
-                });
-                }
-            }           
-        })
-        .catch((error) => {
-            console.error(error);
-    });
+        // finde startzeit
+        for (ind = 0; ind < hours * 2; ind++) {           
+            const startTime = await getStateAsync(mainObject + '.' + seite + '.' + ind + '.startTime');  
+            if (startDPTime == startTime.val) {                 
+                console.warn('gefunden startTime ' + startTime.val + ' bei index ' + ind);
+                break;       
+            }
+        }
+
+        //console.warn('start ind ' + ind + ' auf seite ' + seite);
+
+        let listenDP = -1;    // dmit ich auf 0 komme bei ersten lauf
+        
+        for (let a = ind; a < hours * 2; a++) {
+            listenDP += 1;
+            const start = new Date(list[listenDP].time * 1000);
+            const end = new Date(list[listenDP].time * 1000 + 1800000);
+            
+            const startTime = start.toLocaleTimeString('de-DE', options);
+            const endTime = end.toLocaleTimeString('de-DE', options);
+
+            if (startTime == abbrechenBei) {   // wir brauchen nur bis mitternacht
+                break;
+            }
+
+            let stateBaseName1      = `${mainObject}.${name1}.${a}.`;
+            let stateBaseName2      = `${mainObject}.${name2}.${a}.`;
+            let stateBaseNameGes    = `${mainObject}.${gesamt}.${a}.`;
+
+            let powerW = list[listenDP].watt;
+            let power90W = list[listenDP].watt90;
+
+            // console.warn(`start ${startTime} end ${endTime} powerW ${powerW} powerW90 ${power90W}`);
+ 
+            if (seite == name1) {
+                setState(stateBaseName1 + 'power', powerW, true);
+                setState(stateBaseName1 + 'power90', power90W, true);
+
+            }
+
+            if (seite == name2) {
+                setState(stateBaseName2 + 'power', powerW, true);
+                setState(stateBaseName2 + 'power90', power90W, true);
+            }
+
+            let powerWName1 = 0;
+            let power90WName1 = 0;
+            let powerWName2 = 0;
+            let powerW90Name2 = 0;
+            let powerWGes = 0;
+            let power90WGes = 0;
+
+            if (seite == name1) {
+                powerWName2 = getState(stateBaseName2 + 'power').val;
+                powerW90Name2 = getState(stateBaseName2 + 'power90').val;
+
+                powerWGes = powerW + powerWName2;
+                power90WGes = power90W + powerW90Name2;
+            }
+
+            if (seite == name2) {
+                powerWName1 = getState(stateBaseName1 + 'power').val;
+                power90WName1 = getState(stateBaseName1 + 'power90').val;
+
+                powerWGes = powerW + powerWName1;
+                power90WGes = power90W + power90WName1;
+            }
+
+            setState(stateBaseNameGes + 'power', powerWGes, true);
+            setState(stateBaseNameGes + 'power90', power90WGes, true);
+
+        }
+    }
+        
 }
-// 10 request sind frei. hier 6 plus die 2 aus adapter
-schedule('1 8,10 * * *', function () {
-    const url = `${strasse}/forecasts?format=json&api_key=${key_id}`;
-//    toLog('Hole PV Strassenseite', true);
-    requestData(url);
-});
 
-schedule('1 11,12,13,14 * * *', function () {
-    const url = `${garten}/forecasts?format=json&api_key=${key_id}`;
-//    toLog('Hole PV Gartenseite', true);
-    requestData(url);
-});
+// --------------------------------------------------------------------
 
+async function initialPV() {
+    await deleteObjectAsync(mainObject + '.' + gesamt, true);
+    await gesamtAnlegen(gesamt);
+}
+
+async function gesamtAnlegen(anlegen) {
+    const stunden = 24;
+    const dp = mainObject + '.' + anlegen + '.';
+    let ind = 0;
+
+    // Schleife zur Generierung der Zeitfolge
+    for (let hour = 0; hour < stunden; hour++) {
+        for (let minute = 0; minute < 60; minute += 30) {
+
+            let stateBaseNameGes = dp + ind + '.';
+
+            if (ind < 48) {
+                createUserStates('0_userdata.0', false, [stateBaseNameGes + 'startTime', { 'name': 'Gultigkeitsbeginn (Uhrzeit)', 'type': 'string', 'read': true, 'write': false, 'role': 'state' }], function () {
+                    setStateAsync(stateBaseNameGes + 'startTime', formatTime(hour, minute), true);
+                });
+            }
+
+            ind += 1;
+        }
+    }
+
+    ind = 0;
+    const startTime = { hour: 0, minute: 30 };
+
+    for (let hour = startTime.hour; hour <= stunden; hour++) {
+        for (let minute = (hour === startTime.hour ? startTime.minute : 0); minute < 60; minute += 30) {
+
+            let stateBaseNameGes = dp + ind + '.';
+
+            if (ind < 48) {
+                if (hour == 24) {
+                    hour = 0;
+                }
+
+                createUserStates('0_userdata.0', false, [stateBaseNameGes + 'endTime', { 'name': 'Gultigkeitsende (Uhrzeit)', 'type': 'string', 'read': true, 'write': false, 'role': 'state' }], function () {
+                    setStateAsync(stateBaseNameGes + 'endTime', formatTime(hour, minute), true);
+                });
+
+                createUserStates('0_userdata.0', false, [stateBaseNameGes + 'power', { 'name': 'power', 'type': 'number', 'read': true, 'write': false, 'role': 'state', 'def': 0 }], function () {
+                    setStateAsync(stateBaseNameGes + 'power', 0, true);
+                });
+
+                createUserStates('0_userdata.0', false, [stateBaseNameGes + 'power90', { 'name': 'power90', 'type': 'number', 'read': true, 'write': false, 'role': 'state', 'def': 0 }], function () {
+                    setStateAsync(stateBaseNameGes + 'power90', 0, true);
+                });
+            }
+
+            ind += 1;
+        }
+    }
+}
+
+
+function formatTime(hour, minute) {
+    return (hour < 10 ? '0' + hour : hour) + ':' + (minute < 10 ? '0' + minute : minute);
+}
 
