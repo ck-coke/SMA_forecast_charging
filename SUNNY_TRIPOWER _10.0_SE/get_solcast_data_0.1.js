@@ -1,7 +1,7 @@
 
 const axios = require('axios'); // Import the Axios library
 
-const seite1 = "yyyy-yyyy-yyyy-yyyy;
+const seite1 = "yyyy-yyyy-yyyy-yyyy";
 const seite2 = "zzzz-zzzz-zzzz-zzzz";
 
 const key_id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
