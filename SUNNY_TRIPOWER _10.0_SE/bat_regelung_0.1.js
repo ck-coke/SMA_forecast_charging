@@ -208,7 +208,7 @@ function processing() {
                 }
                 
                 pvwh = 0
-                //wieviel wh kommen in etwa von PV die verkürzt
+                //wieviel wh kommen in etwa von PV die verkürzt ab 12 uhr
                 for (let p = 24; p < hrstorun*2; p++) {
                     pvwh = pvwh + (getState(pvforecastDP + p + '.power').val/2);
                 }
