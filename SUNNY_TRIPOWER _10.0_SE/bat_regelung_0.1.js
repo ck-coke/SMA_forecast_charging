@@ -567,12 +567,6 @@ on({id: triggerDP, change: 'any'}, function() {  // aktualisiere laut adapter ab
     _snowmode                       = getState(tibberDP1 + '.strom.tibber.extra.PV_Schneebedeckt').val;
 
  // übersteuern
-    const _batterieLadenUebersteuernManuell = getState(tibberDP1 + '.strom.batterieLadenManuell').val;
-
-    if (_batterieLadenUebersteuernManuell && _tibber) {
-        _tibber = false;    
-        setState(tibberDP  + 'extra.tibber_laden_erlauben', _tibber);
-    }
 
     setTimeout(function () {  
         processing(); /*start processing in interval*/
