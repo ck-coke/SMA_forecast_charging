@@ -10,7 +10,7 @@ const datenAnWR = true;
 //-------------------------------------------------------------------------------------
 const _pvPeak = 13100;                      // PV-Anlagenleistung in Wp
 const _batteryCapacity = 12800;             // Netto Batterie Kapazität in Wh
-const _surplusLimit = 1;                    // PV-Einspeise-Limit in %
+const _surplusLimit = 100;                  // PV-Einspeise-Limit in %
 const _batteryThreshold = 1;                // Nutzbare Mindestladung der Batterie (zusätzlich zur unteren Entladegrenze des Systems), BYD Batterie regelt selbst
 const _batteryTarget = 100;                 // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
 const _baseLoad = 600;                      // Grundverbrauch in Watt (falls bekannt)
