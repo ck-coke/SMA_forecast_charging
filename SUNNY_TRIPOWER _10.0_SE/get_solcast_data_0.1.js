@@ -43,7 +43,6 @@ schedule('1 6,12,13,14 * * *', function () {
 
 
 
-
 /*************** ab hier nix ändern  ***************************** */
 
 async function requestData(seiteUrl, seite) {
@@ -59,7 +58,7 @@ async function requestData(seiteUrl, seite) {
             method: 'get'
         });
     } catch {
-        console.error('too many requests');    
+        console.warn('too many requests');    
     }
 
    // console.warn('PV requestData ' + response.status);
@@ -69,11 +68,11 @@ async function requestData(seiteUrl, seite) {
 // lösche und erzeuge neu für die abfrage damit die zeiten zueinander passen  
   //  console.warn('lösche ' + mainObject + '.' + seite);
         await deleteObjectAsync(mainObject + '.' + seite, true);            
-        await gesamtAnlegen(seite);    
+        await seiteAnlegen(seite);    
         
         const array = response.data.forecasts;    
 
-        //console.warn('response seite ' + seite  + '--> ' +  JSON.stringify(response.data));
+        console.warn('response seite ' + seite  + '--> ' +  JSON.stringify(response.data));
 
         const list = [];
 
@@ -87,101 +86,108 @@ async function requestData(seiteUrl, seite) {
                 time: startTime / 1000,
                 watt: Math.round(readpwr * 1000),
                 watt90: Math.round(readpwr90 * 1000),
-            };         
+            };   
         }
                
         const startTime = new Date(list[0].time * 1000);        
         const startDPTime = startTime.toLocaleTimeString('de-DE', options);
 
-        //console.warn('suche endDPTime ' + startDPTime);
+        console.warn('suche startDPTime ' + startDPTime);
+        
         let ind = 0;
-
+        
+        setTimeout(function () {   // warte 5 sekunden falls dp noch nicht angelegt
         // finde startzeit
-        for (ind = 0; ind < hours * 2; ind++) {           
-            const startTime = await getStateAsync(mainObject + '.' + seite + '.' + ind + '.startTime');  
-            if (startDPTime == startTime.val) {                 
-                console.warn('gefunden startTime ' + startTime.val + ' bei index ' + ind);
-                break;       
+            for (ind = 0; ind < hours * 2; ind++) {           
+                const startTimeind = getState(mainObject + '.' + seite + '.' + ind + '.startTime').val;  
+                if (startDPTime == startTimeind) {                 
+                    console.warn('gefunden startTime ' + startTimeind + ' bei index ' + ind);
+                    break;       
+                }
             }
-        }
 
-        //console.warn('start ind ' + ind + ' auf seite ' + seite);
+            console.warn('start ind ' + ind + ' auf seite ' + seite);
 
-        let listenDP = -1;    // dmit ich auf 0 komme bei ersten lauf
-        
-        for (let a = ind; a < hours * 2; a++) {
-            listenDP += 1;
-            const start = new Date(list[listenDP].time * 1000);
-            const end = new Date(list[listenDP].time * 1000 + 1800000);
+            let listenDP = -1;    // dmit ich auf 0 komme bei ersten lauf
             
-            const startTime = start.toLocaleTimeString('de-DE', options);
-            const endTime = end.toLocaleTimeString('de-DE', options);
+            for (let a = ind; a < hours * 2; a++) {
+                listenDP += 1;
 
-            if (startTime == abbrechenBei) {   // wir brauchen nur bis mitternacht
-                break;
+                if (list[listenDP] == undefined) {
+                    break;
+                }
+
+                const start = new Date(list[listenDP].time * 1000);
+                const end = new Date(list[listenDP].time * 1000 + 1800000);
+                
+                const startTime = start.toLocaleTimeString('de-DE', options);
+                const endTime = end.toLocaleTimeString('de-DE', options);
+
+                if (startTime == abbrechenBei) {   // wir brauchen nur bis nachts
+                    break;
+                }
+
+                let stateBaseName1      = `${mainObject}.${name1}.${a}.`;
+                let stateBaseName2      = `${mainObject}.${name2}.${a}.`;
+                let stateBaseNameGes    = `${mainObject}.${gesamt}.${a}.`;
+
+                let powerW = list[listenDP].watt;
+                let power90W = list[listenDP].watt90;
+
+                // console.warn(`start ${startTime} end ${endTime} powerW ${powerW} powerW90 ${power90W}`);
+    
+                if (seite == name1) {
+                    setState(stateBaseName1 + 'power', powerW, true);
+                    setState(stateBaseName1 + 'power90', power90W, true);
+
+                }
+
+                if (seite == name2) {
+                    setState(stateBaseName2 + 'power', powerW, true);
+                    setState(stateBaseName2 + 'power90', power90W, true);
+                }
+
+                let powerWName1 = 0;
+                let power90WName1 = 0;
+                let powerWName2 = 0;
+                let powerW90Name2 = 0;
+                let powerWGes = 0;
+                let power90WGes = 0;
+
+                if (seite == name1) {
+                    powerWName2 = getState(stateBaseName2 + 'power').val;
+                    powerW90Name2 = getState(stateBaseName2 + 'power90').val;
+
+                    powerWGes = powerW + powerWName2;
+                    power90WGes = power90W + powerW90Name2;
+                }
+
+                if (seite == name2) {
+                    powerWName1 = getState(stateBaseName1 + 'power').val;
+                    power90WName1 = getState(stateBaseName1 + 'power90').val;
+
+                    powerWGes = powerW + powerWName1;
+                    power90WGes = power90W + power90WName1;
+                }
+
+                setState(stateBaseNameGes + 'power', powerWGes, true);
+                setState(stateBaseNameGes + 'power90', power90WGes, true);
+
             }
-
-            let stateBaseName1      = `${mainObject}.${name1}.${a}.`;
-            let stateBaseName2      = `${mainObject}.${name2}.${a}.`;
-            let stateBaseNameGes    = `${mainObject}.${gesamt}.${a}.`;
-
-            let powerW = list[listenDP].watt;
-            let power90W = list[listenDP].watt90;
-
-            // console.warn(`start ${startTime} end ${endTime} powerW ${powerW} powerW90 ${power90W}`);
- 
-            if (seite == name1) {
-                setState(stateBaseName1 + 'power', powerW, true);
-                setState(stateBaseName1 + 'power90', power90W, true);
-
-            }
-
-            if (seite == name2) {
-                setState(stateBaseName2 + 'power', powerW, true);
-                setState(stateBaseName2 + 'power90', power90W, true);
-            }
-
-            let powerWName1 = 0;
-            let power90WName1 = 0;
-            let powerWName2 = 0;
-            let powerW90Name2 = 0;
-            let powerWGes = 0;
-            let power90WGes = 0;
-
-            if (seite == name1) {
-                powerWName2 = getState(stateBaseName2 + 'power').val;
-                powerW90Name2 = getState(stateBaseName2 + 'power90').val;
-
-                powerWGes = powerW + powerWName2;
-                power90WGes = power90W + powerW90Name2;
-            }
-
-            if (seite == name2) {
-                powerWName1 = getState(stateBaseName1 + 'power').val;
-                power90WName1 = getState(stateBaseName1 + 'power90').val;
-
-                powerWGes = powerW + powerWName1;
-                power90WGes = power90W + power90WName1;
-            }
-
-            setState(stateBaseNameGes + 'power', powerWGes, true);
-            setState(stateBaseNameGes + 'power90', power90WGes, true);
-
-        }
-    }
-        
+        }, 5000);   
+    } 
 }
 
 // --------------------------------------------------------------------
 
 async function initialPV() {
     await deleteObjectAsync(mainObject + '.' + gesamt, true);
-    await gesamtAnlegen(gesamt);
+    await seiteAnlegen(gesamt);
 }
 
-async function gesamtAnlegen(anlegen) {
+async function seiteAnlegen(seite) {
     const stunden = 24;
-    const dp = mainObject + '.' + anlegen + '.';
+    const dp = mainObject + '.' + seite + '.';
     let ind = 0;
 
     // Schleife zur Generierung der Zeitfolge
@@ -235,4 +241,3 @@ async function gesamtAnlegen(anlegen) {
 function formatTime(hour, minute) {
     return (hour < 10 ? '0' + hour : hour) + ':' + (minute < 10 ? '0' + minute : minute);
 }
-
