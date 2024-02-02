@@ -181,7 +181,7 @@ async function requestData(seiteUrl, seite) {
 // --------------------------------------------------------------------
 
 async function initialPV() {
-    await deleteObjectAsync(mainObject + '.' + gesamt, true);
+   // await deleteObjectAsync(mainObject + '.' + gesamt, true);
     await seiteAnlegen(gesamt);
 }
 
