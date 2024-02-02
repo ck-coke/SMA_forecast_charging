@@ -67,7 +67,7 @@ async function requestData(seiteUrl, seite) {
 
 // lösche und erzeuge neu für die abfrage damit die zeiten zueinander passen  
   //  console.warn('lösche ' + mainObject + '.' + seite);
-        await deleteObjectAsync(mainObject + '.' + seite, true);            
+   //     await deleteObjectAsync(mainObject + '.' + seite, true);            
         await seiteAnlegen(seite);    
         
         const array = response.data.forecasts;    
