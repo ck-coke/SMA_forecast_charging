@@ -72,7 +72,7 @@ async function requestData(seiteUrl, seite) {
         
         const array = response.data.forecasts;    
 
-        console.warn('response seite ' + seite  + '--> ' +  JSON.stringify(response.data));
+     //   console.warn('response seite ' + seite  + '--> ' +  JSON.stringify(response.data));
 
         const list = [];
 
@@ -92,7 +92,7 @@ async function requestData(seiteUrl, seite) {
         const startTime = new Date(list[0].time * 1000);        
         const startDPTime = startTime.toLocaleTimeString('de-DE', options);
 
-        console.warn('suche startDPTime ' + startDPTime);
+    //    console.warn('suche startDPTime ' + startDPTime);
         
         let ind = 0;
         
@@ -101,12 +101,12 @@ async function requestData(seiteUrl, seite) {
             for (ind = 0; ind < hours * 2; ind++) {           
                 const startTimeind = getState(mainObject + '.' + seite + '.' + ind + '.startTime').val;  
                 if (startDPTime == startTimeind) {                 
-                    console.warn('gefunden startTime ' + startTimeind + ' bei index ' + ind);
+       //             console.warn('gefunden startTime ' + startTimeind + ' bei index ' + ind);
                     break;       
                 }
             }
 
-            console.warn('start ind ' + ind + ' auf seite ' + seite);
+      //      console.warn('start ind ' + ind + ' auf seite ' + seite);
 
             let listenDP = -1;    // dmit ich auf 0 komme bei ersten lauf
             
