@@ -9,9 +9,6 @@ setState('modbus.0.holdingRegisters.3.40151_Kommunikation', 803);   // 802 activ
 // debug
 let _debug = getState(tibberDP + 'debug').val == null ? false : getState(tibberDP + 'debug').val;
 
-let datenAnWR = true;
-let indWR = 0;
-
 //-------------------------------------------------------------------------------------
 const _pvPeak               = 13100;            // PV-Anlagenleistung in Wp
 const _batteryCapacity      = 12800;            // Netto Batterie Kapazität in Wh
@@ -48,7 +45,7 @@ let    _lastmaxdischrg  = 0;
 // ab hier tibber Bereich
 let      _tibberNutzenAutomatisch   = true;               //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis) 
 let      _snowmode                  = false;             //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
-const    _start_charge              = 0.17;          //Eigenverbrauchspreis
+const    _start_charge              = 0.18;          //Eigenverbrauchspreis
 const    _lossfactor                = 0.75;            //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
 const    _loadfact                  = 1/_lossfactor;
 const    _stop_discharge            = (_start_charge * _loadfact);
@@ -86,9 +83,6 @@ console.warn('starte ladenNachPrognose mit debug ' + _debug);
 // ab hier Programmcode
 function processing() {
     if (_tibberNutzenAutomatisch) {
-
-        indWR += 1;
-
         let cur_power_out = getState(inputRegisters.powerOut).val * 1000;   //cur_power_out = Einspeisung an SHM    
         let batsoc = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR
         let batminlimit = _batteryThreshold;                                //batminlimit = 10  
@@ -554,11 +548,8 @@ function processing() {
             if (_debug) {
                 console.error('Daten gesendet an WR : comm ' + SpntCom + ' max_ladeleistung : ' + maxchrg + ' , max_entladeleistung ' + maxdischrg);
             }
-
-            if (datenAnWR) {    
-                setState(communicationRegisters.batChaMaxW, maxchrg);        // 40795_Maximale_Batterieladeleistung
-                setState(communicationRegisters.batDsChaMaxW, maxdischrg);   // 40799_Maximale_Batterieentladeleistung
-            }
+            setState(communicationRegisters.batChaMaxW, maxchrg);        // 40795_Maximale_Batterieladeleistung
+            setState(communicationRegisters.batDsChaMaxW, maxdischrg);   // 40799_Maximale_Batterieentladeleistung
         }
 
         _lastmaxchrg = maxchrg;
@@ -568,27 +559,16 @@ function processing() {
             if (_debug) {             
                 console.error('Daten gesendet an WR kommunikation Wirkleistungvorgabe : ' + PwrAtCom + ' comm ' + SpntCom); 
             }
-            if (datenAnWR) {    
-                setState(communicationRegisters.fedInSpntCom, SpntCom);         // 40151_Kommunikation
-                setState(communicationRegisters.fedInPwrAtCom, PwrAtCom);       // 40149_Wirkleistungvorgabe
-            }
+            setState(communicationRegisters.fedInSpntCom, SpntCom);         // 40151_Kommunikation
+            setState(communicationRegisters.fedInPwrAtCom, PwrAtCom);       // 40149_Wirkleistungvorgabe
         }
         
-        _lastSpntCom = SpntCom;
-
-    // sende die daten an den WR alle 60 sek
-        if (indWR > 6) {
-            indWR = 0;
-            datenAnWR =  true;
-        } else {
-            datenAnWR = false;
-        }
-
         if (_debug) { 
             console.error('SpntCom jetzt ' + SpntCom + ' davor war ' + _lastSpntCom);   
-                 
-            console.error('---------------------- ' +  indWR +' ------------------------------------------');    
+            console.error('----------------------------------------------------------------------');    
         }
+
+        _lastSpntCom = SpntCom;    
     }
 }
 
@@ -597,8 +577,8 @@ function processing() {
 on({id: triggerDP, change: 'any'}, function() {  // aktualisiere laut adapter abfrageintervall
     _debug                          = getState(tibberDP  + 'debug').val;   
     _snowmode                       = getState(tibberDP1 + '.strom.tibber.extra.PV_Schneebedeckt').val;
-    _tibberNutzenAutomatisch        = getState(tibberDP  + 'extra.tibberNutzenAutomatisch').val; 
-
+    _tibberNutzenAutomatisch        = getState(tibberDP  + 'extra.tibberNutzenAutomatisch').val;
+    
     setTimeout(function () {  
         processing();             /*start processing in interval*/
     }, 500);           // verzögerung zwecks Datenabholung
