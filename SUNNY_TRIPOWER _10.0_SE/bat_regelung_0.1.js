@@ -42,12 +42,12 @@ let    _lastmaxchrg     = 0;
 let    _lastmaxdischrg  = 0;
 
 // ab hier tibber Bereich
-let      _tibberNutzenAutomatisch = getState(tibberDP  + 'extra.tibberNutzenAutomatisch').val == null ? false : getState(tibberDP  + 'extra.tibberNutzenAutomatisch').val;               //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis) 
-let      _snowmode = false;             //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
-const    _start_charge = 0.17;          //Eigenverbrauchspreis
-const    _lossfactor = 0.75;            //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
-const    _loadfact = 1/_lossfactor;
-const    _stop_discharge = (_start_charge * _loadfact);
+let      _tibberNutzenAutomatisch  = true;             //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis) 
+let      _snowmode                 = false;             //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
+const    _start_charge             = 0.17;          //Eigenverbrauchspreis
+const    _lossfactor               = 0.75;            //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
+const    _loadfact                 = 1/_lossfactor;
+const    _stop_discharge           = (_start_charge * _loadfact);
 
     createUserStates(tibberDP1, false, [tibberDP2 + 'extra.batprice', { 'name': 'stoppe Entladung bei Preis von', 'type':'number', 'read': true, 'write': false, 'role': 'state',  'def':0 }], function () {        
         setState(tibberDP + 'extra.batprice', _stop_discharge, true);
