@@ -331,10 +331,8 @@ function processing() {
                 }
 
                 if (chrglength > 0 && prclow.length > 0) {
-                    if (_debug){
-                        for (let o = 0; o < chrglength ; o++){
-                            console.warn('Nachladezeit: ' + prclow[o][1] +'-'+ prclow[o][2] + ' (' + Math.round(chargewh-curbatwh) + ' Wh)');
-                        }
+                    for (let o = 0; o < chrglength ; o++){
+                        console.warn('Nachladezeit: ' + prclow[o][1] +'-'+ prclow[o][2] + ' (' + Math.round(chargewh-curbatwh) + ' Wh)');
                     }
 
                     if (prclow.length > 0 && chargewh-curbatwh > 0) {
