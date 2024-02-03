@@ -1,32 +1,36 @@
-const tibberDP1 = '0_userdata.0';
-const tibberDP2 = 'strom.tibber.';
-const tibberDP = tibberDP1 + '.' + tibberDP2;
-const pvforecastDP = tibberDP1 + '.strom.pvforecast.gesamt.';
+const tibberDP1     = '0_userdata.0';
+const tibberDP2     = 'strom.tibber.';
+const tibberDP      = tibberDP1 + '.' + tibberDP2;
+const pvforecastDP  = tibberDP1 + '.strom.pvforecast.gesamt.';
+
+// bei start immer initialisieren
+setState('modbus.0.holdingRegisters.3.40151_Kommunikation', 803);   // 802 active, 803 inactive
 
 // debug
 let _debug = getState(tibberDP + 'debug').val == null ? false : getState(tibberDP + 'debug').val;
 
-const datenAnWR = true;
+let datenAnWR = true;
+let indWR = 0;
 
 //-------------------------------------------------------------------------------------
-const _pvPeak = 13100;                      // PV-Anlagenleistung in Wp
-const _batteryCapacity = 12800;             // Netto Batterie Kapazität in Wh
-const _surplusLimit = 100;                  // PV-Einspeise-Limit in %
-const _batteryThreshold = 1;                // Nutzbare Mindestladung der Batterie (zusätzlich zur unteren Entladegrenze des Systems), BYD Batterie regelt selbst
-const _batteryTarget = 100;                 // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
-const _baseLoad = 600;                      // Grundverbrauch in Watt (falls bekannt)
-const _wr_efficiency = 0.9;                 // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
-const _batteryPower = 5000;                 // Ladeleistung der Batterie in W (0 = automatisch)
+const _pvPeak               = 13100;            // PV-Anlagenleistung in Wp
+const _batteryCapacity      = 12800;            // Netto Batterie Kapazität in Wh
+const _surplusLimit         = 100;              // PV-Einspeise-Limit in %
+const _batteryThreshold     = 1;                // Nutzbare Mindestladung der Batterie (zusätzlich zur unteren Entladegrenze des Systems), BYD Batterie regelt selbst
+const _batteryTarget        = 100;              // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
+const _baseLoad             = 600;              // Grundverbrauch in Watt (falls bekannt)
+const _wr_efficiency        = 0.9;              // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
+const _batteryPower         = 5000;             // Ladeleistung der Batterie in W (0 = automatisch)
 
 const triggerDP = 'modbus.0.inputRegisters.3.30193_Systemzeit_als_trigger';
 
 const communicationRegisters = {
-    fedInSpntCom: 'modbus.0.holdingRegisters.3.40151_Kommunikation', // (802 active, 803 inactive)
-    fedInPwrAtCom: 'modbus.0.holdingRegisters.3.40149_Wirkleistungvorgabe',
-    batChaMaxW: 'modbus.0.holdingRegisters.3.40795_Maximale_Batterieladeleistung',
-    batDsChaMaxW: 'modbus.0.holdingRegisters.3.40799_Maximale_Batterieentladeleistung', 
+    fedInSpntCom:   'modbus.0.holdingRegisters.3.40151_Kommunikation', // (802 active, 803 inactive)
+    fedInPwrAtCom:  'modbus.0.holdingRegisters.3.40149_Wirkleistungvorgabe',
+    batChaMaxW:     'modbus.0.holdingRegisters.3.40795_Maximale_Batterieladeleistung',
+    batDsChaMaxW:   'modbus.0.holdingRegisters.3.40799_Maximale_Batterieentladeleistung', 
     //wMaxCha: 'modbus.0.holdingRegisters.3.40189_max_Ladeleistung_BatWR', // Max Ladeleistung BatWR
-    wMaxDsch: 'modbus.0.holdingRegisters.3.40191_max_Entladeleistung_BatWR', 
+    wMaxDsch:       'modbus.0.holdingRegisters.3.40191_max_Entladeleistung_BatWR', 
 }
 
 const inputRegisters = {
@@ -42,12 +46,12 @@ let    _lastmaxchrg     = 0;
 let    _lastmaxdischrg  = 0;
 
 // ab hier tibber Bereich
-let      _tibberNutzenAutomatisch  = true;             //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis) 
-let      _snowmode                 = false;             //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
-const    _start_charge             = 0.17;          //Eigenverbrauchspreis
-const    _lossfactor               = 0.75;            //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
-const    _loadfact                 = 1/_lossfactor;
-const    _stop_discharge           = (_start_charge * _loadfact);
+let      _tibberNutzenAutomatisch   = true;               //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis) 
+let      _snowmode                  = false;             //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
+const    _start_charge              = 0.17;          //Eigenverbrauchspreis
+const    _lossfactor                = 0.75;            //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
+const    _loadfact                  = 1/_lossfactor;
+const    _stop_discharge            = (_start_charge * _loadfact);
 
     createUserStates(tibberDP1, false, [tibberDP2 + 'extra.batprice', { 'name': 'stoppe Entladung bei Preis von', 'type':'number', 'read': true, 'write': false, 'role': 'state',  'def':0 }], function () {        
         setState(tibberDP + 'extra.batprice', _stop_discharge, true);
@@ -76,10 +80,15 @@ const    _stop_discharge           = (_start_charge * _loadfact);
 
 // Ende tibber
 
+console.warn('starte ladenNachPrognose mit debug ' + _debug);
+
 
 // ab hier Programmcode
 function processing() {
     if (_tibberNutzenAutomatisch) {
+
+        indWR += 1;
+
         let cur_power_out = getState(inputRegisters.powerOut).val * 1000;   //cur_power_out = Einspeisung an SHM    
         let batsoc = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR
         let batminlimit = _batteryThreshold;                                //batminlimit = 10  
@@ -124,7 +133,7 @@ function processing() {
         for (let t = 0; t < 12 ; t++) {
             poi[t] = [getState(tibberDP + t + '.price').val, getState(tibberDP + t + '.startTime').val, getState(tibberDP + t + '.endTime').val];
         }
-        
+
         poi.sort(function(a, b, c){
             return a[0] - b[0];
         });
@@ -156,10 +165,10 @@ function processing() {
                 pvwh = pvwh + (getState(pvforecastDP + p + '.power').val / 2); 
             }
 
-            setState(tibberDP + 'extra.PV_Prognose', Math.round(pvwh), true);
+            setState(tibberDP + 'extra.PV_Prognose', Math.round(pvwh), true);           
 
             if (_debug) { 
-                console.error('PV_Prognose ' + Math.round(pvwh));
+                console.error('Erwarte ca ' + (pvwh/1000).toFixed(1) + ' kWh von PV');
             }
 
             if (pvwh > (_baseLoad*hrstorun/2) && !_snowmode) {
@@ -212,15 +221,15 @@ function processing() {
                 
                 pvwh = 0
                 //wieviel wh kommen in etwa von PV die verkürzt
-                for (let p = 24; p < hrstorun*2; p++) {
-                    pvwh = pvwh + (getState(pvforecastDP + p + '.power').val/2);
+                for (let p = 0; p < hrstorun*2; p++) {
+                    pvwh = pvwh + (getState(pvforecastDP + p + '.power').val / 2);
                 }
 
                 setState(tibberDP + 'extra.PV_Prognose_kurz', Math.round(pvwh), true);
-            }
-            
-            if (_debug) { 
-                console.error('Erwarte ca ' + (pvwh/1000).toFixed(1) + ' kWh von PV');
+                
+                if (_debug) { 
+                    console.error('Erwarte ca ' + (pvwh/1000).toFixed(1) + ' kWh von PV verkürtzt');
+                }
             }
             
             let poihigh = [];        
@@ -488,9 +497,10 @@ function processing() {
                 if ((ChaTm * 2) <= pvfc.length) {
                     ChaTm = pvfc.length / 2;                          //entzerren des Ladevorganges
                 }
-
-                pvlimit_calc = Math.max((Math.round(pvlimit - ((ChaEnrg - get_wh) / ChaTm))), 0); //virtuelles reduzieren des pvlimits
-                min_pwr = Math.max(Math.round((ChaEnrg - get_wh) / ChaTm), 0);
+                if (tibber_active == 0) {
+                    pvlimit_calc = Math.max((Math.round(pvlimit - ((ChaEnrg - get_wh) / ChaTm))), 0); //virtuelles reduzieren des pvlimits
+                    min_pwr = Math.max(Math.round((ChaEnrg - get_wh) / ChaTm), 0);
+                }
 
                 get_wh = ChaEnrg; 
                 
@@ -502,11 +512,12 @@ function processing() {
             if (get_wh >= ChaEnrg && ChaEnrg > 0) {
                 ChaTm = pvfc.length / 2;
                 const current_pwr_diff = 100 - pvlimit_calc + cur_power_out;  //bleibe 100W unter dem Limit (PV-WR Trigger)
-
-                max_pwr = Math.round(power_ac + current_pwr_diff);
-                
-                if (power_ac <= 0 && current_pwr_diff < 0) {
-                    max_pwr = 0;
+                if (tibber_active == 0) {
+                    max_pwr = Math.round(power_ac + current_pwr_diff);
+                    
+                    if (power_ac <= 0 && current_pwr_diff < 0) {
+                        max_pwr = 0;
+                    }
                 }
 
                 //aus der begrenzung holen...
@@ -514,6 +525,10 @@ function processing() {
                     max_pwr = Math.round(pvfc[0][1] - pvlimit_calc);
                     if (current_pwr_diff > max_pwr) {
                         max_pwr = Math.round(current_pwr_diff);
+                        if (tibber_active == 1) {
+                            SpntCom = _SpntCom_Aus;
+                            PwrAtCom = PwrAtCom_def;
+                        }
                     }
                 }
             }
@@ -523,6 +538,7 @@ function processing() {
             for (let h = 0; h < (ChaTm * 2); h++) {
                 if ((compareTime(pvfc[h][3], pvfc[h][4], 'between')) || (cur_power_out + power_ac) >= (pvlimit - 100)) {
                     maxchrg = max_pwr;
+                    SpntCom = _SpntCom_An;
                 }
             }
 
@@ -531,35 +547,47 @@ function processing() {
         }
 // ---------------------------------------------------- Ende der PV Prognose Sektion
 
+        
 
 // ----------------------------------------------------           write data
-        if (datenAnWR) {
-            if (maxchrg != _batteryPower || maxchrg != _lastmaxchrg || maxdischrg != maxdischrg_def || maxdischrg != _lastmaxdischrg) {
-                if (_debug) {
-                    console.error('Daten gesendet an WR : comm ' + SpntCom + ' max_ladeleistung : ' + maxchrg + ' , max_entladeleistung ' + maxdischrg);
-                }
-                setState(communicationRegisters.batChaMaxW, maxchrg);        // 40795_Maximale_Batterieladeleistung
-                setState(communicationRegisters.batDsChaMaxW, maxdischrg);   // 40799_Maximale_Batterieentladeleistung
-
+        if (maxchrg != _batteryPower || maxchrg != _lastmaxchrg || maxdischrg != maxdischrg_def || maxdischrg != _lastmaxdischrg) {
+            if (_debug) {
+                console.error('Daten gesendet an WR : comm ' + SpntCom + ' max_ladeleistung : ' + maxchrg + ' , max_entladeleistung ' + maxdischrg);
             }
 
-            _lastmaxchrg = maxchrg;
-            _lastmaxdischrg = maxdischrg;
-            
+            if (datenAnWR) {    
+                setState(communicationRegisters.batChaMaxW, maxchrg);        // 40795_Maximale_Batterieladeleistung
+                setState(communicationRegisters.batDsChaMaxW, maxdischrg);   // 40799_Maximale_Batterieentladeleistung
+            }
+        }
 
-            if (SpntCom != _SpntCom_Aus || SpntCom != _lastSpntCom) {
-                if (_debug) {             
-                    console.error('Daten gesendet an WR kommunikation Wirkleistungvorgabe : ' + PwrAtCom + ' comm ' + SpntCom); 
-                }
+        _lastmaxchrg = maxchrg;
+        _lastmaxdischrg = maxdischrg;
+        
+        if (SpntCom == _SpntCom_An || SpntCom != _lastSpntCom) {
+            if (_debug) {             
+                console.error('Daten gesendet an WR kommunikation Wirkleistungvorgabe : ' + PwrAtCom + ' comm ' + SpntCom); 
+            }
+            if (datenAnWR) {    
                 setState(communicationRegisters.fedInSpntCom, SpntCom);         // 40151_Kommunikation
                 setState(communicationRegisters.fedInPwrAtCom, PwrAtCom);       // 40149_Wirkleistungvorgabe
             }
-            _lastSpntCom = SpntCom;
+        }
+        
+        _lastSpntCom = SpntCom;
 
-            if (_debug) { 
-                console.error('SpntCom jetzt ' + SpntCom + ' davor war ' + _lastSpntCom);        
-                console.error('----------------------------------------------------------------');    
-            }
+    // sende die daten an den WR alle 60 sek
+        if (indWR > 6) {
+            indWR = 0;
+            datenAnWR =  true;
+        } else {
+            datenAnWR = false;
+        }
+
+        if (_debug) { 
+            console.error('SpntCom jetzt ' + SpntCom + ' davor war ' + _lastSpntCom);   
+                 
+            console.error('---------------------- ' +  indWR +' ------------------------------------------');    
         }
     }
 }
@@ -569,6 +597,7 @@ function processing() {
 on({id: triggerDP, change: 'any'}, function() {  // aktualisiere laut adapter abfrageintervall
     _debug                          = getState(tibberDP  + 'debug').val;   
     _snowmode                       = getState(tibberDP1 + '.strom.tibber.extra.PV_Schneebedeckt').val;
+    _tibberNutzenAutomatisch        = getState(tibberDP  + 'extra.tibberNutzenAutomatisch').val; 
 
     setTimeout(function () {  
         processing();             /*start processing in interval*/
