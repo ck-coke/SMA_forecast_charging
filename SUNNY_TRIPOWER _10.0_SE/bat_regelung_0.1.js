@@ -15,11 +15,10 @@ let _debug = getState(tibberDP + 'debug').val == null ? false : getState(tibberD
 const _pvPeak               = 13100;            // PV-Anlagenleistung in Wp
 const _batteryCapacity      = 12800;            // Netto Batterie Kapazität in Wh
 const _surplusLimit         = 100;              // PV-Einspeise-Limit in %
-const _batteryThreshold     = 1;                // Nutzbare Mindestladung der Batterie (zusätzlich zur unteren Entladegrenze des Systems), BYD Batterie regelt selbst
 const _batteryTarget        = 100;              // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
 const _baseLoad             = 600;              // Grundverbrauch in Watt (falls bekannt)
 const _wr_efficiency        = 0.9;              // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
-const _batteryPower         = 5000;             // Ladeleistung der Batterie in W (0 = automatisch)
+const _batteryPower         = 5000;             // Ladeleistung der Batterie in W 
 const _Mindischrg           = 1;                // 0 geht nicht da sonst max entladung .. also die kleinste mögliche Einheit
 
 const triggerDP = 'modbus.0.inputRegisters.3.30193_Systemzeit_als_trigger';
@@ -89,7 +88,6 @@ function processing() {
     if (_tibberNutzenAutomatisch) {
         let cur_power_out = getState(inputRegisters.powerOut).val * 1000;   //cur_power_out = Einspeisung an SHM    
         let batsoc = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR
-        let batminlimit = _batteryThreshold;                                //batminlimit = 10  
 
         if (_debug) { 
             console.warn('Ladeleistung Batterie ' + _batteryPower + ' W'); 
@@ -449,7 +447,7 @@ function processing() {
         let max_pwr = _batteryPower;
 
         // verschieben des Ladevorgangs in den Bereich der PV Limitierung.
-        if (ChaTm > 0 && (ChaTm * 2) <= pvfc.length && batsoc >= batminlimit) {
+        if (ChaTm > 0 && (ChaTm * 2) <= pvfc.length) {
             // Bugfix zur behebung der array interval von 30min und update interval 1h
             if ((compareTime(latesttime, null, '<=', null)) && tibber_active == 0) {
                 maxchrg = 0;
