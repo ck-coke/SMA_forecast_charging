@@ -3,6 +3,8 @@ const tibberDP2     = 'strom.tibber.';
 const tibberDP      = tibberDP1 + '.' + tibberDP2;
 const pvforecastDP  = tibberDP1 + '.strom.pvforecast.gesamt.';
 
+const options       = { hour12: false, hour: '2-digit', minute: '2-digit' };
+
 // bei start immer initialisieren
 setState('modbus.0.holdingRegisters.3.40151_Kommunikation', 803);   // 802 active, 803 inactive
 
@@ -41,6 +43,7 @@ const  _SpntCom_An      = 802;
 let    _lastSpntCom     = 0;
 let    _lastmaxchrg     = 0;
 let    _lastmaxdischrg  = 0;
+let    _ticker          = 0;
 
 // ab hier tibber Bereich
 let      _tibberNutzenAutomatisch   = true;               //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis) 
@@ -335,6 +338,7 @@ function processing() {
                         console.warn('Nachladezeit: ' + prclow[o][1] +'-'+ prclow[o][2] + ' (' + Math.round(chargewh-curbatwh) + ' Wh)');
                     }
 
+
                     if (prclow.length > 0 && chargewh-curbatwh > 0) {
                         for (let n = 0; n < chrglength ; n++) {
                             if (compareTime(prclow[n][1],prclow[n][2],'between')) {
@@ -463,9 +467,7 @@ function processing() {
                 
                 if (compareTime(pvfc[k][3], pvfc[k][4], 'between')) {
                     //rechne restzeit aus
-                    const now           = new Date();
-                    const options       = { hour12: false, hour: '2-digit', minute: '2-digit' }
-                    // @ts-ignore
+                    const now           = new Date();                                   
                     const nowTime       = now.toLocaleTimeString('de-DE', options);
                     const startsplit    = nowTime.split(':');
                     const endsplit      = pvfc[k][4].split(':');
@@ -519,7 +521,7 @@ function processing() {
                         max_pwr = Math.round(current_pwr_diff);
                         if (tibber_active == 1) {
                             SpntCom = _SpntCom_Aus;
-                            PwrAtCom = PwrAtCom_def;
+                            PwrAtCom = pwrAtCom_def;
                         }
                     }
                 }
@@ -539,11 +541,15 @@ function processing() {
         }
 // ---------------------------------------------------- Ende der PV Prognose Sektion
 
-        
+        _ticker += 1;   // min nach einer stunde nochmal senden
 
 // ----------------------------------------------------           write data
         // if (maxchrg != _batteryPower || maxchrg != _lastmaxchrg || maxdischrg != maxdischrg_def || maxdischrg != _lastmaxdischrg) {
-        if (maxchrg != _lastmaxchrg || maxdischrg != _lastmaxdischrg) {
+        if (maxchrg != _lastmaxchrg || maxdischrg != _lastmaxdischrg || _ticker > 360) {
+            
+        //    console.error('maxchrg ' + maxchrg + ' _batteryPower ' +_batteryPower + ' _lastmaxchrg ' + _lastmaxchrg);
+        //    console.error('maxdischrg ' + maxdischrg + ' _lastmaxdischrg ' + _lastmaxdischrg);            
+            
             if (_debug) {
                 console.warn('Daten gesendet an WR : comm ' + SpntCom + ' max_ladeleistung : ' + maxchrg + ' , max_entladeleistung ' + maxdischrg);
             }
@@ -555,12 +561,14 @@ function processing() {
         _lastmaxdischrg = maxdischrg;
         
         //if (SpntCom == _SpntCom_An || SpntCom != _lastSpntCom) {
-        if (SpntCom != _lastSpntCom) {
+        if (SpntCom != _lastSpntCom || _ticker > 360) {
             if (_debug) {             
                 console.warn('Daten gesendet an WR kommunikation Wirkleistungvorgabe : ' + PwrAtCom + ' comm ' + SpntCom); 
             }
             setState(communicationRegisters.fedInSpntCom, SpntCom);         // 40151_Kommunikation
             setState(communicationRegisters.fedInPwrAtCom, PwrAtCom);       // 40149_Wirkleistungvorgabe
+
+            _ticker = 0;
         }
         
         if (_debug) { 
