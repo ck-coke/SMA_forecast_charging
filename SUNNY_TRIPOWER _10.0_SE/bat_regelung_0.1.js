@@ -20,6 +20,7 @@ const _batteryTarget        = 100;              // Gewünschtes Ladeziel der Reg
 const _baseLoad             = 600;              // Grundverbrauch in Watt (falls bekannt)
 const _wr_efficiency        = 0.9;              // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
 const _batteryPower         = 5000;             // Ladeleistung der Batterie in W (0 = automatisch)
+const _Mindischrg           = 1;                // 0 geht nicht da sonst max entladung .. also die kleinste mögliche Einheit
 
 const triggerDP = 'modbus.0.inputRegisters.3.30193_Systemzeit_als_trigger';
 
@@ -46,10 +47,10 @@ let    _lastmaxdischrg  = 0;
 let    _ticker          = 0;
 
 // ab hier tibber Bereich
-let      _tibberNutzenAutomatisch   = true;               //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis) 
+let      _tibberNutzenAutomatisch   = true;              //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis) 
 let      _snowmode                  = false;             //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
-const    _start_charge              = 0.18;          //Eigenverbrauchspreis
-const    _lossfactor                = 0.75;            //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
+const    _start_charge              = 0.18;              //Eigenverbrauchspreis
+const    _lossfactor                = 0.75;              //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
 const    _loadfact                  = 1/_lossfactor;
 const    _stop_discharge            = (_start_charge * _loadfact);
 
@@ -343,7 +344,7 @@ function processing() {
                         for (let n = 0; n < chrglength ; n++) {
                             if (compareTime(prclow[n][1],prclow[n][2],'between')) {
                                 maxchrg =  _batteryPower;
-                                maxdischrg = 1;
+                                maxdischrg = 0;
                                 SpntCom = _SpntCom_An;
                                 PwrAtCom = pwrAtCom_def * -1;
                             }
@@ -363,7 +364,7 @@ function processing() {
 
             if (lefthrs > 0 && lefthrs < hrstorun*2 && pvwh < _baseLoad*24*_wr_efficiency) {
                 if (batlefthrs*2 <= lefthrs) {
-                    maxdischrg = 1;
+                    maxdischrg = _Mindischrg;
                     for (let d = 0; d < lefthrs; d++) {
                         if (poihigh[d][0] > _stop_discharge){
                             if (_debug) {
@@ -381,8 +382,8 @@ function processing() {
                 if ( _debug) { 
                     console.warn('Stoppe Entladung, Preis jetzt ' + price0 + ' unter Batterieschwelle von ' + _stop_discharge.toFixed(2) + ' ct/kWh');
                 }
-                SpntCom = _SpntCom_An;   // arteck
-                maxdischrg = 1;  
+                SpntCom = _SpntCom_An;   
+                maxdischrg = _Mindischrg;  
                 PwrAtCom = 0;          
             }
             //ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
@@ -393,7 +394,7 @@ function processing() {
 
             if (price0 < _start_charge) {
                 maxchrg = 0;
-                maxdischrg = 1;
+                maxdischrg = _Mindischrg;
                 tibber_active = 1;
 
                 let length = Math.ceil(ChaTm);
@@ -403,7 +404,7 @@ function processing() {
                 for (let i = 0; i < length; i++) {
                     if (compareTime(lowprice[i][1], lowprice[i][2], 'between')) {
                     maxchrg =  _batteryPower;
-                    maxdischrg = 1;
+                    maxdischrg = 0;
                     SpntCom = _SpntCom_An;
                     PwrAtCom = pwrAtCom_def * -1;
                     }
@@ -586,7 +587,7 @@ on({id: triggerDP, change: 'any'}, function() {  // aktualisiere laut adapter ab
     _debug                          = getState(tibberDP  + 'debug').val;   
     _snowmode                       = getState(tibberDP1 + '.strom.tibber.extra.PV_Schneebedeckt').val;
     _tibberNutzenAutomatisch        = getState(tibberDP  + 'extra.tibberNutzenAutomatisch').val;
-
+    
     setTimeout(function () {  
         processing();             /*start processing in interval*/
     }, 500);           // verzögerung zwecks Datenabholung
