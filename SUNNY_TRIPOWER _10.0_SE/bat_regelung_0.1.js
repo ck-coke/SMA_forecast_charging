@@ -16,9 +16,9 @@ const _pvPeak               = 13100;            // PV-Anlagenleistung in Wp
 const _batteryCapacity      = 12800;            // Netto Batterie Kapazität in Wh
 const _surplusLimit         = 100;              // PV-Einspeise-Limit in %
 const _batteryTarget        = 100;              // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
-const _baseLoad             = 600;              // Grundverbrauch in Watt (falls bekannt)
+const _baseLoad             = 600;              // Grundverbrauch in Watt
 const _wr_efficiency        = 0.9;              // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
-const _batteryPower         = 5000;             // Ladeleistung der Batterie in W 
+const _batteryPower         = 5000;             // Ladeleistung der Batterie in W, BYD mehr geht nicht
 const _Mindischrg           = 1;                // 0 geht nicht da sonst max entladung .. also die kleinste mögliche Einheit
 
 const triggerDP = 'modbus.0.inputRegisters.3.30193_Systemzeit_als_trigger';
