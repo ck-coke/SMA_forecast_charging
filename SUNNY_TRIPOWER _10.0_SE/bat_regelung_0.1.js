@@ -96,7 +96,7 @@ function processing() {
 
         let maxdischrg_def = getState(communicationRegisters.wMaxDsch).val;
         let pwrAtCom_def = _batteryPower * (253 / 230);              //max power bei 253V 
-        let power_ac = getState(inputRegisters.powerAC).val * -1;    //power_ac = -(Einspeisung an SHM)
+        let power_ac = getState(inputRegisters.powerAC).val * -1000;    //power_ac = -(Einspeisung an SHM)
         let pvlimit = (_pvPeak / 100 * _surplusLimit);               //pvlimit = 12000/100*0,9 = 5940
         
 
