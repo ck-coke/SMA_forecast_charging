@@ -13,15 +13,15 @@ const mainObjectTomorrow = '0_userdata.0.strom.pvforecast.tomorrow';
 
 let hours = 24;
 
-// darf angepasst werden
+// -----------      ab hier darf angepasst werden
+const summeDpAnlegen = false;   // einmalig für 24h auf true setzten, es werden summen Dp's angelegt
+
 const name1 = 'garten';         // name dp1    
 const name2 = 'strasse';        // name dp2
 const gesamt = 'gesamt';        // dp für zusammenrechnen
 const abbrechenBei = '00:00';   // ab wieviel Uhr kommt nix mehr
-const summeDpAnlegen = false;   // einmalig für 24h auf true setzten, es werden summen Dp's angelegt
 
-
-// ------------------------------------------------------------------------------------------------------------------
+// bis hier ------------------------------------------------------------------------------------------------------------------
 
 //  initialisiere einmal in der nacht gesamt
 schedule('0 2 * * *', function () {
