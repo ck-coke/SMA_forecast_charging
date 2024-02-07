@@ -14,7 +14,7 @@ let _debug = getState(tibberDP + 'debug').val == null ? false : getState(tibberD
 //-------------------------------------------------------------------------------------
 const _pvPeak = 13100;            // PV-Anlagenleistung in Wp
 const _batteryCapacity = 12800;            // Netto Batterie Kapazität in Wh
-const _surplusLimit = 100;              // PV-Einspeise-Limit in %
+const _surplusLimit = 1;              // PV-Einspeise-Limit in %
 const _batteryTarget = 100;              // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
 const _baseLoad = 600;              // Grundverbrauch in Watt
 const _wr_efficiency = 0.9;              // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
