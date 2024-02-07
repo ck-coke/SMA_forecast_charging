@@ -73,8 +73,10 @@ async function requestData(seiteUrl, seite) {
 
         const array = response.data.forecasts;
 
-        const jsonGraphData = [];
-        const jsonGraphLabels = [];
+        const jsonGraphDataToday = [];
+        const jsonGraphLabelsToday = [];
+        const jsonGraphDataTomorrow = [];
+        const jsonGraphLabelsTomorrow = [];
         const list = [];
         let todaySum = 0;
         let tomorrowSum = 0;
@@ -140,11 +142,11 @@ async function requestData(seiteUrl, seite) {
                         posiA = -1;
 
                         if (name1Sum > 0) {
-                            setState(`${mainObjectToday}.${seite}.today_kW`, Math.round(parseInt(name1Sum / 1000).toFixed(3)), true);
+                            setState(`${mainObjectToday}.${seite}.today_kW`, parseInt((name1Sum / 1000).toFixed(3)), true);
                         }
 
                         if (name2Sum > 0) {
-                            setState(`${mainObjectToday}.${seite}.today_kW`, Math.round(parseInt(name2Sum / 1000).toFixed(3)), true);
+                            setState(`${mainObjectToday}.${seite}.today_kW`, parseInt((name2Sum / 1000).toFixed(3)), true);
                         }
 
                         name1Sum = 0;
@@ -203,48 +205,53 @@ async function requestData(seiteUrl, seite) {
                     power90WGes = power90W + power90WName1;
                 }
 
-                setState(stateBaseNameGes + 'power', Math.round(parseInt(powerWGes).toFixed(3)), true);
-                setState(stateBaseNameGes + 'power90', Math.round(parseInt(power90WGes).toFixed(3)), true);
-
-
-                // für graphen
+                setState(stateBaseNameGes + 'power', parseInt((powerWGes).toFixed(3)), true);
+                setState(stateBaseNameGes + 'power90', parseInt((power90WGes).toFixed(3)), true);
+                
                 if (heute) {
-                    todaySum = todaySum + powerWGes / 1000;
+                    todaySum = todaySum + powerWGes;
                 } else {
-                    tomorrowSum = tomorrowSum + powerWGes / 1000;
+                    tomorrowSum = tomorrowSum + powerWGes;
                 }
-
+    
+    // für graphen
                 const timeMoment = moment(start);
                 const timeInCustomFormat = timeMoment.format('HH:mm');
 
                 if (heute && powerWGes > 0) {
-                    jsonGraphLabels.push(timeInCustomFormat);
-                    jsonGraphData.push(powerWGes / 1000);
+                    jsonGraphLabelsToday.push(timeInCustomFormat);
+                    jsonGraphDataToday.push(powerWGes / 1000);
                 }
 
-                setState(`${mainObjectToday}.${gesamt}.today_kW`, Math.round(parseInt(todaySum).toFixed(3)), true);
-                setState(`${mainObjectTomorrow}.${gesamt}.tomorrow_kW`, Math.round(parseInt(tomorrowSum).toFixed(3)), true);
+                if (!heute && powerWGes > 0) {
+                    jsonGraphLabelsTomorrow.push(timeInCustomFormat);
+                    jsonGraphDataTomorrow.push(powerWGes / 1000);
+                }
+
+                setState(`${mainObjectToday}.${gesamt}.today_kW`, parseInt((todaySum / 1000).toFixed(3)), true);
+                setState(`${mainObjectTomorrow}.${gesamt}.tomorrow_kW`, parseInt((tomorrowSum / 1000).toFixed(3)), true);
             }
 
             if (name1Sum > 0) {
-                setState(`${mainObjectTomorrow}.${seite}.tomorrow_kW`, Math.round(parseInt(name1Sum / 1000).toFixed(3)), true);
+                setState(`${mainObjectTomorrow}.${seite}.tomorrow_kW`, parseInt((name1Sum / 1000).toFixed(3)), true);
             }
 
             if (name2Sum > 0) {
-                setState(`${mainObjectTomorrow}.${seite}.tomorrow_kW`, Math.round(parseInt(name2Sum / 1000).toFixed(3)), true);
+                setState(`${mainObjectTomorrow}.${seite}.tomorrow_kW`, parseInt((name2Sum / 1000).toFixed(3)), true);
             }
 
-            genGraph(jsonGraphLabels, jsonGraphData);
+            genGraph(jsonGraphLabelsToday, jsonGraphDataToday, mainObjectToday);
+            genGraph(jsonGraphLabelsTomorrow, jsonGraphDataTomorrow,mainObjectTomorrow);
 
         }, 5000);
         await setStateAsync(`${mainObject}.lastUpdated`, { val: moment().valueOf(), ack: true });
     }
 }
-
 // --------------------------------------------------------------------
 
 async function initialPV() {
-  await seiteAnlegen(gesamt);
+    // await deleteObjectAsync(mainObject + '.' + gesamt, true);
+    await seiteAnlegen(gesamt);
 }
 
 
@@ -350,10 +357,8 @@ async function seiteAnlegen(seite) {
             ind += 1;
         }
     }
-    
-    if (kwAnlegen) {
-      await kWAnlegen(seite);
-    }
+
+    // await kWAnlegen(seite);
 }
 
 async function kWAnlegen(seite) {
@@ -391,7 +396,7 @@ function formatTime(hour, minute) {
 
 //------------ graph
 
-async function genGraph(jsonGraphLabels, jsonGraphData) {
+async function genGraph(jsonGraphLabels, jsonGraphData, whichDay) {
     let globalunit = 1000;
 
     // https://github.com/Scrounger/ioBroker.vis-materialdesign/blob/master/README.md
@@ -422,6 +427,6 @@ async function genGraph(jsonGraphLabels, jsonGraphData) {
         yAxis_maximumDigits: 3,
     };
 
-    await this.setStateAsync(`${mainObjectToday}.JSONGraph`, { val: JSON.stringify({ 'graphs': [jsonGraph], 'axisLabels': jsonGraphLabels }, null, 2), ack: true });
+    await this.setStateAsync(`${whichDay}.JSONGraph`, { val: JSON.stringify({ 'graphs': [jsonGraph], 'axisLabels': jsonGraphLabels }, null, 2), ack: true });
 }
 
