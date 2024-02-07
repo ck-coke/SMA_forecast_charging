@@ -10,8 +10,7 @@ const baseUrl = "https://api.solcast.com.au/rooftop_sites/";
 const mainObject = '0_userdata.0.strom.pvforecast';
 const mainObjectToday = '0_userdata.0.strom.pvforecast.today';
 const mainObjectTomorrow = '0_userdata.0.strom.pvforecast.tomorrow';
-
-let hours = 24;
+const hours = 24;
 
 // -----------      ab hier darf angepasst werden
 const summeDpAnlegen = false;   // einmalig für 24h auf true setzten, es werden summen Dp's angelegt
