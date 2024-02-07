@@ -251,11 +251,8 @@ async function requestData(seiteUrl, seite) {
 // --------------------------------------------------------------------
 
 async function initialPV() {
-    // await deleteObjectAsync(mainObject + '.' + gesamt, true);
     await seiteAnlegen(gesamt);
 }
-
-
 
 async function seiteAnlegen(seite) {
     const stunden = 24;
@@ -263,20 +260,20 @@ async function seiteAnlegen(seite) {
     let dp = mainObjectToday + '.' + seite + '.';
     let ind = 0;
 
-    // Schleife zur Generierung der Zeitfolge
+    // Schleife zur Generierung der Zeitfolge today
+    if (summeDpAnlegen) {
+        for (let hour = 0; hour < stunden; hour++) {
+            for (let minute = 0; minute < 60; minute += 30) {
 
-    for (let hour = 0; hour < stunden; hour++) {
-        for (let minute = 0; minute < 60; minute += 30) {
+                let stateBaseNameGes = dp + ind + '.';
 
-            let stateBaseNameGes = dp + ind + '.';
-
-            if (ind < 48) {
-                createUserStates('0_userdata.0', false, [stateBaseNameGes + 'startTime', { 'name': 'Gultigkeitsbeginn (Uhrzeit)', 'type': 'string', 'read': true, 'write': false, 'role': 'state' }], function () {
-                    setStateAsync(stateBaseNameGes + 'startTime', formatTime(hour, minute), true);
-                });
+                if (ind < 48) {    
+                    createUserStates('0_userdata.0', false, [stateBaseNameGes + 'startTime', { 'name': 'Gultigkeitsbeginn (Uhrzeit)', 'type': 'string', 'read': true, 'write': false, 'role': 'state' }], function () {
+                        setStateAsync(stateBaseNameGes + 'startTime', formatTime(hour, minute), true);
+                    });                
+                }
+                ind += 1;
             }
-
-            ind += 1;
         }
     }
 
@@ -291,10 +288,11 @@ async function seiteAnlegen(seite) {
                 if (hour == 24) {
                     hour = 0;
                 }
-
-                createUserStates('0_userdata.0', false, [stateBaseNameGes + 'endTime', { 'name': 'Gultigkeitsende (Uhrzeit)', 'type': 'string', 'read': true, 'write': false, 'role': 'state' }], function () {
-                    setStateAsync(stateBaseNameGes + 'endTime', formatTime(hour, minute), true);
-                });
+                if (summeDpAnlegen) {
+                    createUserStates('0_userdata.0', false, [stateBaseNameGes + 'endTime', { 'name': 'Gultigkeitsende (Uhrzeit)', 'type': 'string', 'read': true, 'write': false, 'role': 'state' }], function () {
+                        setStateAsync(stateBaseNameGes + 'endTime', formatTime(hour, minute), true);
+                    });
+                }
 
                 createUserStates('0_userdata.0', false, [stateBaseNameGes + 'power', { 'name': 'power', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0, 'unit': 'W' }], function () {
                     setStateAsync(stateBaseNameGes + 'power', 0, true);
@@ -304,29 +302,27 @@ async function seiteAnlegen(seite) {
                     setStateAsync(stateBaseNameGes + 'power90', 0, true);
                 });
             }
-
             ind += 1;
         }
     }
-
-
 
     dp = mainObjectTomorrow + '.' + seite + '.';
-    ind = 0;
 
-    // Schleife zur Generierung der Zeitfolge
-    for (let hour = 0; hour < stunden; hour++) {
-        for (let minute = 0; minute < 60; minute += 30) {
+    // Schleife zur Generierung der Zeitfolge tomorrow
+    if (summeDpAnlegen) {
+        ind = 0;
+        for (let hour = 0; hour < stunden; hour++) {
+            for (let minute = 0; minute < 60; minute += 30) {
 
-            let stateBaseNameGes = dp + ind + '.';
+                let stateBaseNameGes = dp + ind + '.';
 
-            if (ind < 48) {
-                createUserStates('0_userdata.0', false, [stateBaseNameGes + 'startTime', { 'name': 'Gultigkeitsbeginn (Uhrzeit)', 'type': 'string', 'read': true, 'write': false, 'role': 'state' }], function () {
-                    setStateAsync(stateBaseNameGes + 'startTime', formatTime(hour, minute), true);
-                });
+                if (ind < 48) {
+                    createUserStates('0_userdata.0', false, [stateBaseNameGes + 'startTime', { 'name': 'Gultigkeitsbeginn (Uhrzeit)', 'type': 'string', 'read': true, 'write': false, 'role': 'state' }], function () {
+                        setStateAsync(stateBaseNameGes + 'startTime', formatTime(hour, minute), true);
+                    });
+                }
+                ind += 1;
             }
-
-            ind += 1;
         }
     }
 
@@ -341,10 +337,11 @@ async function seiteAnlegen(seite) {
                 if (hour == 24) {
                     hour = 0;
                 }
-
-                createUserStates('0_userdata.0', false, [stateBaseNameGes + 'endTime', { 'name': 'Gultigkeitsende (Uhrzeit)', 'type': 'string', 'read': true, 'write': false, 'role': 'state' }], function () {
-                    setStateAsync(stateBaseNameGes + 'endTime', formatTime(hour, minute), true);
-                });
+                if (summeDpAnlegen) {
+                    createUserStates('0_userdata.0', false, [stateBaseNameGes + 'endTime', { 'name': 'Gultigkeitsende (Uhrzeit)', 'type': 'string', 'read': true, 'write': false, 'role': 'state' }], function () {
+                        setStateAsync(stateBaseNameGes + 'endTime', formatTime(hour, minute), true);
+                    });
+                }
 
                 createUserStates('0_userdata.0', false, [stateBaseNameGes + 'power', { 'name': 'power', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0, 'unit': 'W' }], function () {
                     setStateAsync(stateBaseNameGes + 'power', 0, true);
@@ -358,7 +355,7 @@ async function seiteAnlegen(seite) {
             ind += 1;
         }
     }
-    
+
     if (summeDpAnlegen) {
         await kWAnlegen(seite);
     }   
