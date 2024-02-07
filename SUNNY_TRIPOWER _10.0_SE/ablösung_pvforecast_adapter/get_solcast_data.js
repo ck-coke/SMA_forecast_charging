@@ -17,7 +17,7 @@ const gesamt = 'gesamt';        // dp für zusammenrechnen
 const abbrechenBei = '00:00';   // ab wieviel Uhr kommt nix mehr
 
 let hours = 24;
-const kwAnlegen = false;       // einmalig für 24h auf true setzen um die Datenpunkte zu erzeugen
+const summeDpAnlegen = false;   // einmalig für 24h auf true setzten, es werden summen Dp's angelegt
 
 // ------------------------------------------------------------------------------------------------------------------
 
@@ -357,8 +357,10 @@ async function seiteAnlegen(seite) {
             ind += 1;
         }
     }
-
-    // await kWAnlegen(seite);
+    
+    if (summeDpAnlegen) {
+        await kWAnlegen(seite);
+    }   
 }
 
 async function kWAnlegen(seite) {
