@@ -1,39 +1,41 @@
 const moment = require('moment');
 const axios = require('axios'); 
+const options = { hour12: false, hour: '2-digit', minute: '2-digit' };
 
-const seite1 = "yyyy-yyyy-yyyy-yyyy";
-const seite2 = "zzzz-zzzz-zzzz-zzzz";
+// zum ändern ab hier
 
-const key_id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
-const baseUrl = "https://api.solcast.com.au/rooftop_sites/";
+const summeDpAnlegen = false;   // einmalig manuell für 24h auf true setzten, es werden summen Dp's angelegt   <<<<<<<<-----------------------------------  wichtig
+
+const seite1 = "xxxx-xxxx-xxxx-xxxx";
+const seite2 = "yyyy-yyyy-yyyy-yyyy";
+const key_id = "zzzzzzzzzzzzzzzzzzzzzzzzzzzzz";
+const name1 = 'garten';         // name dp1    
+const name2 = 'strasse';        // name dp2
+const gesamt = 'gesamt';        // dp für zusammenrechnen muss in bat_regelung angepasst werden wenn hier geändert am besten so lassen
 
 const mainObject = '0_userdata.0.strom.pvforecast';
 const mainObjectToday = '0_userdata.0.strom.pvforecast.today';
 const mainObjectTomorrow = '0_userdata.0.strom.pvforecast.tomorrow';
+const abbrechenBei = '00:00';   // ab wieviel Uhr kommt nix mehr, kann so bleiben
+// bis hier
+
+const baseUrl = "https://api.solcast.com.au/rooftop_sites/";
 const hours = 24;
+// ------------------------------------------------------------------------------------------------------------------
 
-// -----------      ab hier darf angepasst werden
-const summeDpAnlegen = false;   // einmalig für 24h auf true setzten, es werden summen Dp's angelegt
-
-const name1 = 'garten';         // name dp1    
-const name2 = 'strasse';        // name dp2
-const gesamt = 'gesamt';        // dp für zusammenrechnen
-const abbrechenBei = '00:00';   // ab wieviel Uhr kommt nix mehr
-
-// bis hier ------------------------------------------------------------------------------------------------------------------
-
-//  initialisiere einmal in der nacht gesamt
+//  erzeuge einmal in der nacht gesamt
 schedule('0 2 * * *', function () {
     initialPV();
 });
 
-schedule('1 5,9 * * *', function () {
+// 10 request sind frei bei solcast.com
+schedule('1 5,7,9 * * *', function () {
     const url = `${seite2}/forecasts?format=json&api_key=${key_id}`;
     toLog(`Hole PV ${name2}`, true);
     requestData(url, name2);
 });
 
-schedule('1 6,12,13,14 * * *', function () {
+schedule('1 6,8,12,13,14 * * *', function () {
     const url2 = `${seite1}/forecasts?format=json&api_key=${key_id}`;
     toLog(`Hole PV ${name1}`, true);
     requestData(url2, name1);
@@ -42,14 +44,10 @@ schedule('1 6,12,13,14 * * *', function () {
 // ------------------------------------------------------------------------------------------------------------------
 
 
-
-
-
 /*************** ab hier nix ändern  ***************************** */
 
 async function requestData(seiteUrl, seite) {
-    const url = `${baseUrl}${seiteUrl}`
-    const options = { hour12: false, hour: '2-digit', minute: '2-digit' };
+    const url = `${baseUrl}${seiteUrl}`;   
 
     let response;
 
@@ -63,14 +61,11 @@ async function requestData(seiteUrl, seite) {
         console.warn('too many requests');
     }
 
-    // console.warn('PV requestData ' + response.status);
-
     if (response && response.status === 200) {
-
-        // lösche und erzeuge neu für die abfrage damit die zeiten zueinander passen  
-        //  console.warn('lösche ' + mainObject + '.' + seite);
-        //    await deleteObjectAsync(mainObject + '.' + seite, true);            
+        //   initialisiere die seite
         await seiteAnlegen(seite);
+
+    //    console.warn('response ' + JSON.stringify(response.data));
 
         const array = response.data.forecasts;
 
@@ -120,6 +115,9 @@ async function requestData(seiteUrl, seite) {
             let listenDP = -1;    // damit ich auf 0 komme bei ersten lauf
             let posiA = ind - 1;
             let schonGebucht = false;
+            
+            let powerWGes = 0;
+            let power90WGes = 0;
 
             for (let a = 0; a < hours * 4; a++) {
                 listenDP += 1;
@@ -143,11 +141,11 @@ async function requestData(seiteUrl, seite) {
                         posiA = -1;
 
                         if (name1Sum > 0) {
-                            setState(`${mainObjectToday}.${seite}.today_kW`, parseInt((name1Sum / 1000).toFixed(3)), true);
+                            setState(`${mainObjectToday}.${seite}.today_kW`, Number(Math.round(name1Sum * 100)/100)/1000, true);
                         }
 
                         if (name2Sum > 0) {
-                            setState(`${mainObjectToday}.${seite}.today_kW`, parseInt((name2Sum / 1000).toFixed(3)), true);
+                            setState(`${mainObjectToday}.${seite}.today_kW`, Number(Math.round(name2Sum * 100)/100)/1000, true);
                         }
 
                         name1Sum = 0;
@@ -168,8 +166,8 @@ async function requestData(seiteUrl, seite) {
                     stateBaseNameGes = `${mainObjectTomorrow}.${gesamt}.${posiA}.`;
                 }
 
-                let powerW = list[listenDP].watt;
-                let power90W = list[listenDP].watt90;
+                const powerW = list[listenDP].watt;
+                const power90W = list[listenDP].watt90;
 
                 if (seite == name1) {
                     setState(stateBaseName1 + 'power', powerW, true);
@@ -181,26 +179,19 @@ async function requestData(seiteUrl, seite) {
                     setState(stateBaseName2 + 'power', powerW, true);
                     setState(stateBaseName2 + 'power90', power90W, true);
                     name2Sum = name2Sum + powerW;
-                }
-
-                let powerWName1 = 0;
-                let power90WName1 = 0;
-                let powerWName2 = 0;
-                let powerW90Name2 = 0;
-                let powerWGes = 0;
-                let power90WGes = 0;
+                }               
 
                 if (seite == name1) {
-                    powerWName2 = getState(stateBaseName2 + 'power').val;
-                    powerW90Name2 = getState(stateBaseName2 + 'power90').val;
+                    const powerWName2 = getState(stateBaseName2 + 'power').val;
+                    const powerW90Name2 = getState(stateBaseName2 + 'power90').val;
 
                     powerWGes = powerW + powerWName2;
                     power90WGes = power90W + powerW90Name2;
                 }
 
                 if (seite == name2) {
-                    powerWName1 = getState(stateBaseName1 + 'power').val;
-                    power90WName1 = getState(stateBaseName1 + 'power90').val;
+                    const powerWName1 = getState(stateBaseName1 + 'power').val;
+                    const power90WName1 = getState(stateBaseName1 + 'power90').val;
 
                     powerWGes = powerW + powerWName1;
                     power90WGes = power90W + power90WName1;
@@ -218,28 +209,27 @@ async function requestData(seiteUrl, seite) {
     // für graphen
                 const timeMoment = moment(start);
                 const timeInCustomFormat = timeMoment.format('HH:mm');
-
-                if (heute && powerWGes > 0) {
-                    jsonGraphLabelsToday.push(timeInCustomFormat);
-                    jsonGraphDataToday.push(powerWGes / 1000);
+                if (heute && powerWGes > 0) {     
+                    jsonGraphLabelsToday.push(timeInCustomFormat);               
+                    jsonGraphDataToday.push(Number(Math.round(powerWGes * 100)/100)/1000);
                 }
 
                 if (!heute && powerWGes > 0) {
                     jsonGraphLabelsTomorrow.push(timeInCustomFormat);
-                    jsonGraphDataTomorrow.push(powerWGes / 1000);
-                }
-
-                setState(`${mainObjectToday}.${gesamt}.today_kW`, parseInt((todaySum / 1000).toFixed(3)), true);
-                setState(`${mainObjectTomorrow}.${gesamt}.tomorrow_kW`, parseInt((tomorrowSum / 1000).toFixed(3)), true);
+                    jsonGraphDataTomorrow.push(Number(Math.round(powerWGes * 100)/100)/1000);
+                }                           
             }
 
             if (name1Sum > 0) {
-                setState(`${mainObjectTomorrow}.${seite}.tomorrow_kW`, parseInt((name1Sum / 1000).toFixed(3)), true);
+                setState(`${mainObjectTomorrow}.${seite}.tomorrow_kW`, Number(Math.round(name1Sum * 100)/100)/1000, true);
             }
 
             if (name2Sum > 0) {
-                setState(`${mainObjectTomorrow}.${seite}.tomorrow_kW`, parseInt((name2Sum / 1000).toFixed(3)), true);
+                setState(`${mainObjectTomorrow}.${seite}.tomorrow_kW`, Number(Math.round(name2Sum * 100)/100)/1000, true);
             }
+
+            setState(`${mainObjectToday}.${gesamt}.today_kW`, Number(Math.round(todaySum * 100)/100)/1000, true);
+            setState(`${mainObjectTomorrow}.${gesamt}.tomorrow_kW`, Number(Math.round(tomorrowSum * 100)/100)/1000, true);     
 
             genGraph(jsonGraphLabelsToday, jsonGraphDataToday, mainObjectToday);
             genGraph(jsonGraphLabelsTomorrow, jsonGraphDataTomorrow,mainObjectTomorrow);
@@ -248,6 +238,7 @@ async function requestData(seiteUrl, seite) {
         await setStateAsync(`${mainObject}.lastUpdated`, { val: moment().valueOf(), ack: true });
     }
 }
+
 // --------------------------------------------------------------------
 
 async function initialPV() {
