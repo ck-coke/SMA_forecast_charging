@@ -30,6 +30,8 @@ createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberLevelNächsteStun
   setState(_tibberDP + 'extra.tibberLevelNächsteStunde', 'NORMAL', true);
 }); 
 
+holePreis(heute,heute);
+aktualisiereStunde();
 
 function holePreis(preisHeute,preisMorgen) {
     let preise = [];
