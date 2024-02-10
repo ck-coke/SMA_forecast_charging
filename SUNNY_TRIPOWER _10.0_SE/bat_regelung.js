@@ -644,8 +644,7 @@ async function processing() {
 on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisiere laut adapter abfrageintervall
     _debug = getState(tibberDP + 'debug').val;
     _snowmode = getState(tibberDP1 + '.strom.tibber.extra.PV_Schneebedeckt').val;
-    _tibberNutzenAutomatisch = getState(tibberDP + 'extra.tibberNutzenAutomatisch').val; // aus dem DP kommrnd sollte true sein
-    _bydDirectSOC = getState(bydDirectSOCDP).val;
+    _tibberNutzenAutomatisch = getState(tibberDP + 'extra.tibberNutzenAutomatisch').val; // aus dem DP kommend sollte true sein
     
     setTimeout(function () {
         processing();             /*start processing in interval*/
@@ -653,6 +652,7 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
 });
 
 async function notLadungCheck() {
+    _bydDirectSOC = getState(bydDirectSOCDP).val;
     if (!_batterieLadenUebersteuernManuell) {
         if (_ticker > 350) {      
             if (_debug) {
