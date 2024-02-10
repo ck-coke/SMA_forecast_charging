@@ -31,7 +31,8 @@ const communicationRegisters = {
 const inputRegisters = {
     batSoC: 'modbus.0.inputRegisters.3.30845_Batterie_Prozent',
     powerOut: 'alias.0.usv.pv.30867_Aktuelle_Netzeinspeisung',      // in KW
-    powerAC: 'modbus.0.inputRegisters.3.30775_AC_Leistung', 
+    //powerAC: 'modbus.0.inputRegisters.3.30775_AC_Leistung', 
+    powerAC: 'modbus.0.inputRegisters.3.30865_Aktueller_Netzbezug', 
     triggerDP: 'modbus.0.inputRegisters.3.30193_Systemzeit_als_trigger',
     betriebszustandBatterie: 'modbus.0.inputRegisters.3.30955_Batterie_Zustand',
 }
@@ -395,10 +396,10 @@ async function processing() {
         }
 
         if (lefthrs > 0 && lefthrs < hrstorun * 2 && pvwh < _baseLoad * 24 * _wr_efficiency) {
-//            if (batlefthrs * 2 <= lefthrs) {
+            if (batlefthrs * 2 <= lefthrs) {
                 maxdischrg = _Mindischrg;
                 SpntCom = _SpntCom_An;
-                PwrAtCom = 0;
+            
                 for (let d = 0; d < lefthrs; d++) {           // schaue in der batterielaufzeit nach höchsten preisen
                     if (poihigh[d][0] > _stop_discharge) {
                         if (_debug) {
@@ -406,12 +407,13 @@ async function processing() {
                         }                        
                         if (compareTime(poihigh[d][1], poihigh[d][2], 'between')) {                            
                             // maxdischrg = maxdischrg_def;
-                            SpntCom = _SpntCom_Aus;          // passt in der Zeit also reset
+                            PwrAtCom = 0;
+                            SpntCom = _SpntCom_An;          // passt in der Zeit also reset
                             break;
                         }
                     }
                 }
-//            }
+            }
         }
 
         //entladung stoppen wenn preisschwelle erreicht
