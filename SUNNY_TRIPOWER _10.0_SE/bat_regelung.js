@@ -396,19 +396,19 @@ async function processing() {
         }
 
         if (lefthrs > 0 && lefthrs < hrstorun * 2 && pvwh < _baseLoad * 24 * _wr_efficiency) {
-            if (batlefthrs * 2 <= lefthrs) {
+            if (batlefthrs * 2 <= lefthrs) {  
+                console.warn('batlefthrs ' + batlefthrs * 2 + ' lefthrs ' +  lefthrs);            
                 maxdischrg = _Mindischrg;
-                SpntCom = _SpntCom_An;
-            
+                
                 for (let d = 0; d < lefthrs; d++) {           // schaue in der batterielaufzeit nach höchsten preisen
                     if (poihigh[d][0] > _stop_discharge) {
                         if (_debug) {
                             console.warn('Entladezeit: ' + poihigh[d][1] + '-' + poihigh[d][2] + ' zum Preis ' + poihigh[d][0]);
                         }                        
                         if (compareTime(poihigh[d][1], poihigh[d][2], 'between')) {                            
-                            // maxdischrg = maxdischrg_def;
-                            PwrAtCom = 0;
-                            SpntCom = _SpntCom_An;          // passt in der Zeit also reset
+                            maxdischrg = maxdischrg_def;
+                            PwrAtCom = 0;                               
+                            SpntCom = _SpntCom_An;                             
                             break;
                         }
                     }
