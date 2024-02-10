@@ -647,10 +647,6 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
     _tibberNutzenAutomatisch = getState(tibberDP + 'extra.tibberNutzenAutomatisch').val; // aus dem DP kommrnd sollte true sein
     _bydDirectSOC = getState(bydDirectSOCDP).val;
     
-      if (_bydDirectSOC < 6) {        
-        _tibberNutzenAutomatisch = false;
-    }           
-
     setTimeout(function () {
         processing();             /*start processing in interval*/
     }, 500);           // verzögerung zwecks Datenabholung
@@ -658,7 +654,11 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
 
 async function notLadungCheck() {
     if (!_batterieLadenUebersteuernManuell) {
-        if (_ticker > 350) {            
+        if (_ticker > 350) {      
+            if (_debug) {
+                console.warn('Check Batterie bydDirectSOC ' + _bydDirectSOC + ' %');
+            }
+
             if (_bydDirectSOC > 6 || _ticker > 370) {
                 _lastSpntCom = 0;
             } 
