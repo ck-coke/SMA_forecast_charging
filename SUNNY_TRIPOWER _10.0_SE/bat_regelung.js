@@ -22,8 +22,6 @@ const _Mindischrg = 1;                // 0 geht nicht da sonst max entladung .. 
 const communicationRegisters = {
     fedInSpntCom: 'modbus.0.holdingRegisters.3.40151_Kommunikation', // (802 active, 803 inactive)
     fedInPwrAtCom: 'modbus.0.holdingRegisters.3.40149_Wirkleistungvorgabe',
-    batChaMaxW: 'modbus.0.holdingRegisters.3.40795_Maximale_Batterieladeleistung',
-    batDsChaMaxW: 'modbus.0.holdingRegisters.3.40799_Maximale_Batterieentladeleistung',
     wMaxCha: 'modbus.0.holdingRegisters.3.40189_max_Ladeleistung_BatWR',        // Max Ladeleistung BatWR
 }
 
