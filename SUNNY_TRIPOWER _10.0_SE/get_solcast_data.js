@@ -375,7 +375,7 @@ function genGraphAnlegen(today) {
             jsonGraphData.push(powerWGesamt/2);
 
             if (influxDb) {
-                influxDdOutput(startTime, powerWGesamt/2);                
+                influxDdOutput(startTime, powerWGesamt);                
             }
         }       
     }
