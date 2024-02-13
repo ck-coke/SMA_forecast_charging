@@ -26,8 +26,8 @@ _address	deviceId	name	description	unit	type	len	factor	offset	formula	role	room
 31061	3	Steuerung verfügbar			uint32be	2	1	0		value		false	false
 31379	3	Batterietyp			uint32be	2	1	0		value		false	false
 31391	3	Batterie Status			uint32be	2	1	0		value		false	false
-31393	3	Momentane Batterieladung		kW	uint32be	2	1	0	value		false	false
-31395	3	Momentane Batterieentladung		kW	uint32be	2	1	0	value		false	false
+31393	3	Momentane Batterieladung		kW	uint32be	2	1	0		value		false	false
+31395	3	Momentane Batterieentladung		kW	uint32be	2	1	0		value		false	false
 31397	3	Batterieladung		Wh	uint64be	4	1	0		value		false	false
 31401	3	Batterieentladung		Wh	uint64be	4	1	0		value		false	false
 32385	3	WR Status			uint32be	2	1	0		value		false	false
