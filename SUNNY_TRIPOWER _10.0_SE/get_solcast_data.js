@@ -11,11 +11,14 @@ const seite2 = "yyyy-yyyy-yyyy-yyyy";
 const key_id = "zzzzzzzzzzzzzzzzzzzzzzzzzzzzz";
 const name1 = 'garten';         // name dp1    
 const name2 = 'strasse';        // name dp2
-const gesamt = 'gesamt';        // dp für zusammenrechnen muss in bat_regelung angepasst werden wenn hier geändert am besten so lassen
+const gesamt = 'gesamt';        // dp für zusammenrechnen muss in ladenNachPrognose angepasst werden wenn hier geändert
+
+const influxDb = true;        // wenn grafana output erwünscht benötigt wird eine influx.0 instanz
 
 const mainObject = '0_userdata.0.strom.pvforecast';
 const mainObjectToday = '0_userdata.0.strom.pvforecast.today';
 const mainObjectTomorrow = '0_userdata.0.strom.pvforecast.tomorrow';
+const summeDpAnlegen = false;   // einmalig für 24h auf true setzten, es werden summen Dp's angelegt
 const abbrechenBei = '00:00';   // ab wieviel Uhr kommt nix mehr, kann so bleiben
 // bis hier
 
@@ -29,20 +32,19 @@ schedule('0 2 * * *', function () {
 });
 
 // 10 request sind frei bei solcast.com
-schedule('1 5,7,9 * * *', function () {
+schedule('1 5,7,9,10 * * *', function () {
     const url = `${seite2}/forecasts?format=json&api_key=${key_id}`;
     toLog(`Hole PV ${name2}`, true);
     requestData(url, name2);
 });
 
-schedule('1 6,8,12,13,14 * * *', function () {
+schedule('1 6,8,12,13,14 15 * *', function () {
     const url2 = `${seite1}/forecasts?format=json&api_key=${key_id}`;
     toLog(`Hole PV ${name1}`, true);
     requestData(url2, name1);
 });
 
 // ------------------------------------------------------------------------------------------------------------------
-
 
 /*************** ab hier nix ändern  ***************************** */
 
@@ -62,20 +64,11 @@ async function requestData(seiteUrl, seite) {
     }
 
     if (response && response.status === 200) {
-        //   initialisiere die seite
-        await seiteAnlegen(seite);
 
     //    console.warn('response ' + JSON.stringify(response.data));
 
         const array = response.data.forecasts;
-
-        const jsonGraphDataToday = [];
-        const jsonGraphLabelsToday = [];
-        const jsonGraphDataTomorrow = [];
-        const jsonGraphLabelsTomorrow = [];
-        const list = [];
-        let todaySum = 0;
-        let tomorrowSum = 0;
+        const list = [];     
 
         let name1Sum = 0;
         let name2Sum = 0;
@@ -141,11 +134,11 @@ async function requestData(seiteUrl, seite) {
                         posiA = -1;
 
                         if (name1Sum > 0) {
-                            setState(`${mainObjectToday}.${seite}.today_kW`, Number(Math.round(name1Sum * 100)/100)/1000, true);
+                            setState(`${mainObjectToday}.${seite}.today_kW`, Number(Math.round((name1Sum/2) * 100)/100)/1000, true);
                         }
 
                         if (name2Sum > 0) {
-                            setState(`${mainObjectToday}.${seite}.today_kW`, Number(Math.round(name2Sum * 100)/100)/1000, true);
+                            setState(`${mainObjectToday}.${seite}.today_kW`, Number(Math.round((name2Sum/2) * 100)/100)/1000, true);
                         }
 
                         name1Sum = 0;
@@ -166,8 +159,8 @@ async function requestData(seiteUrl, seite) {
                     stateBaseNameGes = `${mainObjectTomorrow}.${gesamt}.${posiA}.`;
                 }
 
-                const powerW = list[listenDP].watt;
-                const power90W = list[listenDP].watt90;
+                const powerW = list[listenDP].watt / 2;      // es kommen 2 DP pro stunde also teilen
+                const power90W = list[listenDP].watt90 / 2;
 
                 if (seite == name1) {
                     setState(stateBaseName1 + 'power', powerW, true);
@@ -200,39 +193,20 @@ async function requestData(seiteUrl, seite) {
                 setState(stateBaseNameGes + 'power', parseInt((powerWGes).toFixed(3)), true);
                 setState(stateBaseNameGes + 'power90', parseInt((power90WGes).toFixed(3)), true);
                 
-                if (heute) {
-                    todaySum = todaySum + powerWGes;
-                } else {
-                    tomorrowSum = tomorrowSum + powerWGes;
-                }
-    
-    // für graphen
-                const timeMoment = moment(start);
-                const timeInCustomFormat = timeMoment.format('HH:mm');
-                if (heute && powerWGes > 0) {     
-                    jsonGraphLabelsToday.push(timeInCustomFormat);               
-                    jsonGraphDataToday.push(Number(Math.round(powerWGes * 100)/100)/1000);
-                }
-
-                if (!heute && powerWGes > 0) {
-                    jsonGraphLabelsTomorrow.push(timeInCustomFormat);
-                    jsonGraphDataTomorrow.push(Number(Math.round(powerWGes * 100)/100)/1000);
-                }                           
+               
             }
 
             if (name1Sum > 0) {
-                setState(`${mainObjectTomorrow}.${seite}.tomorrow_kW`, Number(Math.round(name1Sum * 100)/100)/1000, true);
+                setState(`${mainObjectTomorrow}.${seite}.tomorrow_kW`, Number(Math.round((name1Sum/2) * 100)/100)/1000, true);
             }
 
             if (name2Sum > 0) {
-                setState(`${mainObjectTomorrow}.${seite}.tomorrow_kW`, Number(Math.round(name2Sum * 100)/100)/1000, true);
+                setState(`${mainObjectTomorrow}.${seite}.tomorrow_kW`, Number(Math.round((name2Sum/2) * 100)/100)/1000, true);
             }
 
-            setState(`${mainObjectToday}.${gesamt}.today_kW`, Number(Math.round(todaySum * 100)/100)/1000, true);
-            setState(`${mainObjectTomorrow}.${gesamt}.tomorrow_kW`, Number(Math.round(tomorrowSum * 100)/100)/1000, true);     
+            genGraphAnlegen(true);    // erzeuge today
+            genGraphAnlegen(false);   // erzeuge tomorrow
 
-            genGraph(jsonGraphLabelsToday, jsonGraphDataToday, mainObjectToday);
-            genGraph(jsonGraphLabelsTomorrow, jsonGraphDataTomorrow,mainObjectTomorrow);
 
         }, 5000);
         await setStateAsync(`${mainObject}.lastUpdated`, { val: moment().valueOf(), ack: true });
@@ -242,6 +216,8 @@ async function requestData(seiteUrl, seite) {
 // --------------------------------------------------------------------
 
 async function initialPV() {
+    await seiteAnlegen(name1);
+    await seiteAnlegen(name2);
     await seiteAnlegen(gesamt);
 }
 
@@ -387,6 +363,65 @@ function formatTime(hour, minute) {
 
 //------------ graph
 
+
+
+function genGraphAnlegen(today) {
+    let mainObjectGraph = '';
+    let tagTag = '';
+
+    if (!today) {
+        mainObjectGraph = mainObjectTomorrow;
+        tagTag = 'tomorrow_kW';
+    } else {
+        mainObjectGraph = mainObjectToday;
+        tagTag = 'today_kW'
+    }
+    const jsonGraphData = [];
+    const jsonGraphLabels = [];
+
+    let powerWGes = 0;
+    //let power90WGes = 0;
+    
+    for (let posiA = 0; posiA < hours * 2; posiA++) {
+    
+        let stateBaseNameGes = `${mainObjectGraph}.${gesamt}.${posiA}.`;
+
+        const startTime = getState(stateBaseNameGes + 'startTime').val;
+        let powerW = getState(stateBaseNameGes + 'power').val / 2;
+        //const power90W = getState(stateBaseNameGes + 'power90').val / 2;
+
+        powerWGes = powerWGes + powerW;
+        //power90WGes = power90WGes + power90W;
+    
+        if (powerW > 0) {     
+            jsonGraphLabels.push(startTime);                           
+            powerW = Number(Math.round(powerW * 100)/100)/1000;
+            jsonGraphData.push(powerW);
+
+            if (influxDb) {
+                influxDdOutput(startTime, powerW);                
+            }
+        }       
+    }
+
+    setState(`${mainObjectGraph}.${gesamt}.${tagTag}`, Number(Math.round((powerWGes) * 100)/100)/1000, true);
+    genGraph(jsonGraphLabels, jsonGraphData, mainObjectGraph);
+}
+
+async function influxDdOutput(startTime, powerW) {
+    const stTime = startTime + ':00';
+    var currentDate = new Date();
+
+    // Function to add leading zeros to single-digit numbers
+    function addLeadingZero(number) {
+    return number < 10 ? '0' + number : number;
+    }
+
+    let formattedDate = currentDate.getFullYear() + '-' + addLeadingZero(currentDate.getMonth() + 1) + '-' + addLeadingZero(currentDate.getDate()) + ' ' + stTime;
+
+    await addToInfluxDB('pvforecast.0.summary.power', moment(formattedDate).valueOf(), powerW);
+}
+
 async function genGraph(jsonGraphLabels, jsonGraphData, whichDay) {
     let globalunit = 1000;
 
@@ -420,4 +455,24 @@ async function genGraph(jsonGraphLabels, jsonGraphData, whichDay) {
 
     await this.setStateAsync(`${whichDay}.JSONGraph`, { val: JSON.stringify({ 'graphs': [jsonGraph], 'axisLabels': jsonGraphLabels }, null, 2), ack: true });
 }
+
+async function addToInfluxDB(datapoint, timestamp, value) {
+    try {
+        let influxInstance = 'influxdb.0';
+
+        const result = await this.sendToAsync(influxInstance, 'storeState', {
+            id: datapoint,
+            state: {
+                ts: timestamp,
+                val: value,
+                ack: true,
+                from: `system.adapter.javascript`,
+                //q: 0
+            }
+        });			
+    } catch (err) {
+        console.warn(`[addToInfluxDB] storeState error: ${err}`);
+    }
+}
+
 
