@@ -28,7 +28,7 @@ const baseUrl = "https://api.solcast.com.au/rooftop_sites/";
 const hours = 24;
 // ------------------------------------------------------------------------------------------------------------------
 
-//  erzeuge einmal in der nacht gesamt
+//  initialisiere einmal in den nacht um 2 Uhr
 schedule('0 2 * * *', function () {
     initialPV();
 });
