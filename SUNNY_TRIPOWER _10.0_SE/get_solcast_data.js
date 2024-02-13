@@ -66,13 +66,10 @@ async function requestData(seiteUrl, seite) {
 
     if (response && response.status === 200) {
 
-    //    console.warn('response ' + JSON.stringify(response.data));
+        console.warn('response ' + JSON.stringify(response.data));
 
         const array = response.data.forecasts;
         const list = [];     
-
-        let name1Sum = 0;
-        let name2Sum = 0;
 
         let heute = true;
 
@@ -132,18 +129,7 @@ async function requestData(seiteUrl, seite) {
                     }
                     if (!schonGebucht) {
                         heute = false;
-                        posiA = -1;
-
-                        if (name1Sum > 0) {
-                            setState(`${mainObjectToday}.${seite}.today_kW`, Number(Math.round((name1Sum/2) * 100)/100)/1000, true);
-                        }
-
-                        if (name2Sum > 0) {
-                            setState(`${mainObjectToday}.${seite}.today_kW`, Number(Math.round((name2Sum/2) * 100)/100)/1000, true);
-                        }
-
-                        name1Sum = 0;
-                        name2Sum = 0;
+                        posiA = -1;                     
                         schonGebucht = true;
                     }
                 }
@@ -166,13 +152,11 @@ async function requestData(seiteUrl, seite) {
                 if (seite == name1) {
                     setState(stateBaseName1 + 'power', powerW, true);
                     setState(stateBaseName1 + 'power90', power90W, true);
-                    name1Sum = name1Sum + powerW;
                 }
 
                 if (seite == name2) {
                     setState(stateBaseName2 + 'power', powerW, true);
                     setState(stateBaseName2 + 'power90', power90W, true);
-                    name2Sum = name2Sum + powerW;
                 }               
 
                 if (seite == name1) {
@@ -192,22 +176,11 @@ async function requestData(seiteUrl, seite) {
                 }
 
                 setState(stateBaseNameGes + 'power', parseInt((powerWGes).toFixed(3)), true);
-                setState(stateBaseNameGes + 'power90', parseInt((power90WGes).toFixed(3)), true);
-                
-               
-            }
-
-            if (name1Sum > 0) {
-                setState(`${mainObjectTomorrow}.${seite}.tomorrow_kW`, Number(Math.round((name1Sum/2) * 100)/100)/1000, true);
-            }
-
-            if (name2Sum > 0) {
-                setState(`${mainObjectTomorrow}.${seite}.tomorrow_kW`, Number(Math.round((name2Sum/2) * 100)/100)/1000, true);
+                setState(stateBaseNameGes + 'power90', parseInt((power90WGes).toFixed(3)), true);               
             }
 
             genGraphAnlegen(true);    // erzeuge today
             genGraphAnlegen(false);   // erzeuge tomorrow
-
 
         }, 5000);
         await setStateAsync(`${mainObject}.lastUpdated`, { val: moment().valueOf(), ack: true });
@@ -358,13 +331,8 @@ async function kWAnlegen(seite) {
 
 }
 
-function formatTime(hour, minute) {
-    return (hour < 10 ? '0' + hour : hour) + ':' + (minute < 10 ? '0' + minute : minute);
-}
 
 //------------ graph
-
-
 
 function genGraphAnlegen(today) {
     let mainObjectGraph = '';
@@ -381,44 +349,59 @@ function genGraphAnlegen(today) {
     const jsonGraphLabels = [];
 
     let powerWGes = 0;
+    let powerWGesName1 = 0;
+    let powerWGesName2 = 0;
     //let power90WGes = 0;
     
     for (let posiA = 0; posiA < hours * 2; posiA++) {
     
         let stateBaseNameGes = `${mainObjectGraph}.${gesamt}.${posiA}.`;
+        let stateBaseName1 = `${mainObjectGraph}.${name1}.${posiA}.`;
+        let stateBaseName2 = `${mainObjectGraph}.${name2}.${posiA}.`;
 
         const startTime = getState(stateBaseNameGes + 'startTime').val;
-        let powerW = getState(stateBaseNameGes + 'power').val / 2;
+
+        let powerWGesamt  = getState(stateBaseNameGes + 'power').val;
+        let powerWName1   = getState(stateBaseName1 + 'power').val;
+        let powerWName2   = getState(stateBaseName2 + 'power').val;
+         
         //const power90W = getState(stateBaseNameGes + 'power90').val / 2;
 
-        powerWGes = powerWGes + powerW;
+        powerWGes = powerWGes + powerWGesamt;
+        powerWGesName1 = powerWGesName1 + powerWName1;
+        powerWGesName2 = powerWGesName2 + powerWName2;
         //power90WGes = power90WGes + power90W;
     
-        if (powerW > 0) {     
+        if (powerWGesamt > 0) {     
             jsonGraphLabels.push(startTime);                           
-            powerW = Number(Math.round(powerW * 100)/100)/1000;
-            jsonGraphData.push(powerW);
+            powerWGesamt = Number(Math.round((powerWGesamt * 100)/100)/1000);      
+            jsonGraphData.push(powerWGesamt/2);
 
             if (influxDb) {
-                influxDdOutput(startTime, powerW);                
+                influxDdOutput(startTime, powerWGesamt/2);                
             }
         }       
     }
 
-    setState(`${mainObjectGraph}.${gesamt}.${tagTag}`, Number(Math.round((powerWGes) * 100)/100)/1000, true);
+    setState(`${mainObjectGraph}.${name1}.${tagTag}`,  Number((Math.round(powerWGesName1 /2)/1000).toFixed(3)), true);
+    setState(`${mainObjectGraph}.${name2}.${tagTag}`,  Number((Math.round(powerWGesName2 /2)/1000).toFixed(3)), true);
+    setState(`${mainObjectGraph}.${gesamt}.${tagTag}`, Number((Math.round(powerWGes /2)/1000).toFixed(3)), true);
     genGraph(jsonGraphLabels, jsonGraphData, mainObjectGraph);
+}
+
+
+function formatTime(hour, minute) {
+    return (hour < 10 ? '0' + hour : hour) + ':' + (minute < 10 ? '0' + minute : minute);
+}
+
+function addLeadingZero(number) {
+    return number < 10 ? '0' + number : number;
 }
 
 async function influxDdOutput(startTime, powerW) {
     const stTime = startTime + ':00';
     let currentDate = new Date();
-
-    function addLeadingZero(number) {
-        return number < 10 ? '0' + number : number;
-    }
-
     let formattedDate = currentDate.getFullYear() + '-' + addLeadingZero(currentDate.getMonth() + 1) + '-' + addLeadingZero(currentDate.getDate()) + ' ' + stTime;
-
     await addToInfluxDB(moment(formattedDate).valueOf(), powerW);
 }
 
@@ -474,4 +457,3 @@ async function addToInfluxDB(timestamp, value) {
         console.warn(`[addToInfluxDB] storeState error: ${err}`);
     }
 }
-
