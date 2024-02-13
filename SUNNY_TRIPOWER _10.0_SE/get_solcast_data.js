@@ -149,17 +149,10 @@ async function requestData(seiteUrl, seite) {
                 const powerW = list[listenDP].watt / 2;      // es kommen 2 DP pro stunde also teilen
                 const power90W = list[listenDP].watt90 / 2;
 
-                if (seite == name1) {
+                 if (seite == name1) {
                     setState(stateBaseName1 + 'power', powerW, true);
                     setState(stateBaseName1 + 'power90', power90W, true);
-                }
-
-                if (seite == name2) {
-                    setState(stateBaseName2 + 'power', powerW, true);
-                    setState(stateBaseName2 + 'power90', power90W, true);
-                }               
-
-                if (seite == name1) {
+                    
                     const powerWName2 = getState(stateBaseName2 + 'power').val;
                     const powerW90Name2 = getState(stateBaseName2 + 'power90').val;
 
@@ -168,12 +161,15 @@ async function requestData(seiteUrl, seite) {
                 }
 
                 if (seite == name2) {
+                    setState(stateBaseName2 + 'power', powerW, true);
+                    setState(stateBaseName2 + 'power90', power90W, true);
+
                     const powerWName1 = getState(stateBaseName1 + 'power').val;
                     const power90WName1 = getState(stateBaseName1 + 'power90').val;
 
                     powerWGes = powerW + powerWName1;
                     power90WGes = power90W + power90WName1;
-                }
+                }                             
 
                 setState(stateBaseNameGes + 'power', parseInt((powerWGes).toFixed(3)), true);
                 setState(stateBaseNameGes + 'power90', parseInt((power90WGes).toFixed(3)), true);               
