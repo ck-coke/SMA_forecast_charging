@@ -13,8 +13,9 @@ const name1 = 'garten';         // name dp1
 const name2 = 'strasse';        // name dp2
 const gesamt = 'gesamt';        // dp für zusammenrechnen muss in ladenNachPrognose angepasst werden wenn hier geändert
 
-const influxDb = true;   // wenn grafana output erwünscht benötigt wird eine influx.0 instanz
+const influxDb = true;   // wenn influxDB output erwünscht für grafana 
 const influxDbMeasurement = 'pvforecast.0.summary.power';
+const influxInstance = 'influxdb.0';
 
 const mainObject = '0_userdata.0.strom.pvforecast';
 const mainObjectToday = '0_userdata.0.strom.pvforecast.today';
@@ -437,8 +438,6 @@ async function genGraph(jsonGraphLabels, jsonGraphData, whichDay) {
 
 async function addToInfluxDB(timestamp, value) {
     try {
-        let influxInstance = 'influxdb.0';
-
         const result = await this.sendToAsync(influxInstance, 'storeState', {
             id: influxDbMeasurement,
             state: {
