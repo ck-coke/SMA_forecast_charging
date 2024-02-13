@@ -16,8 +16,8 @@ _address	deviceId	name	description	unit	type	len	factor	offset	formula	role	room
 30845	3	Batterie Prozent		%	uint32be	2	1	0		value		false	false
 30847	3	Diagnose Aktuelle Kapazität		%	uint32be	2	1	0		value		false	false
 30849	3	Batterie Temperatur		°C	int32be	2	0,1	0		value		false	false
-30865	3	Aktueller Netzbezug		kW	uint32be	2	1		x/1000	value		false	false
-30867	3	Aktuelle Netzeinspeisung		kW	int32be	2	1	0	x/1000	value		false	false
+30865	3	Aktueller Netzbezug		W	uint32be	2	1		0	value		false	false
+30867	3	Aktuelle Netzeinspeisung		W	int32be	2	1	0	0	value		false	false
 30953	3	Temperatur WR		°C	int32be	2	0.1	0		value		false	false
 30955	3	Batterie Zustand			uint32be	2	1	0		value		false	false
 30957	3	DC-Strom 2		A	int32be	2	0.001	0		value		false	false
