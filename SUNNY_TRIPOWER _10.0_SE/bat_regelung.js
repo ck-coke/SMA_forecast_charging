@@ -59,10 +59,10 @@ const _loadfact = 1 / _lossfactor;      /// 1,33
 const _stop_discharge = (_start_charge * _loadfact);    /// 0.18 * 1.33 = 0.239 €
 
 createUserStates(userDataDp, false, [tibberStromDP + 'extra.schwellenwert_Entladung', { 'name': 'stoppe Entladung bei Preis von', 'type': 'number', 'read': true, 'write': false, 'role': 'state', 'def': 0 }], function () {
-    setState(tibberDP + 'extra.Schwellenwert_Entladung', _stop_discharge, true);
+    setState(tibberDP + 'extra.schwellenwert_Entladung', _stop_discharge, true);
 });
 createUserStates(userDataDp, false, [tibberStromDP + 'extra.schwellenwert_Ladung', { 'name': 'starte Ladung mit Strom bei Preis von', 'type': 'number', 'read': true, 'write': false, 'role': 'state', 'def': 0 }], function () {
-    setState(tibberDP + 'extra.Schwellenwert_Ladung', _start_charge, true);
+    setState(tibberDP + 'extra.schwellenwert_Ladung', _start_charge, true);
 });
 createUserStates(userDataDp, false, [tibberStromDP + 'debug', { 'name': 'debug', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
     setState(tibberDP + 'debug', _debug, true);
