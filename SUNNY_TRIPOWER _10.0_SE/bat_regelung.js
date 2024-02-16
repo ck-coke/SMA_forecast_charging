@@ -57,6 +57,7 @@ let _tibberNutzenAutomatisch = _tibberNutzenSteuerung;
 // für prognose
 let _prognoseNutzenSteuerung = true;    //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis)
 let _prognoseNutzenAutomatisch = _prognoseNutzenSteuerung; //wird _prognoseNutzenAutomatisch benutzt
+let _batterieLadenUebersteuernManuell = false;
 
 // tibber Preis Bereich
 let _snowmode = false;                  //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
