@@ -10,7 +10,7 @@ _address	deviceId	name	description	unit	type	len	factor	offset	formula	role	room
 30769	3	DC-Strom 1		A	int32be	2	0.001	0		value		false	false
 30771	3	DC-Spannung 1		V	int32be	2	0.01	0		value		false	false
 30773	3	DC-Leistung 1		W	int32be	2	1	0	x=(x<0) ? 0:x	value		false	false
-30775	3	AC Leistung		kW	int32be	2	1	0	x/1000	value		false	false
+30775	3	AC-Leistung		W	int32be	2	1	0		value		false	false
 30837	3	Wirkleistungsbegrenzung W		W	uint32be	2	1	0		value		false	false
 30839	3	Wirkleistungsbegrenzung %		%	uint32be	2	1	0		value		false	false
 30845	3	Batterie Prozent		%	uint32be	2	1	0		value		false	false
