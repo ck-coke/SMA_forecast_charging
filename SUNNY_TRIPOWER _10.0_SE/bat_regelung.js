@@ -730,15 +730,7 @@ async function processing() {
         }
 
         _lastSpntCom = _SpntCom;
-    } else {
-        if (_SpntCom != _lastSpntCom) {
-            console.warn('Tibber und Prognose sind aus');
-            _SpntCom = _InitCom_Aus;
-            setState(communicationRegisters.fedInSpntCom, _SpntCom);        // 40151_Kommunikation
-            setState(SpntComCheck, _SpntCom);                               // check DP für vis
-            _lastSpntCom = _SpntCom;
-        }
-    }
+    } 
 }
 
 
