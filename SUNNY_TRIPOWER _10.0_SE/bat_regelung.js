@@ -20,7 +20,7 @@ const _baseLoad = 750;                                  // Grundverbrauch in Wat
 const _wr_efficiency = 0.9;                             // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
 const _batteryLadePower = 5000;                         // Ladeleistung der Batterie in W, BYD mehr geht nicht
 const _batteryPowerEmergency = -5000;                   // Ladeleistung der Batterie in W notladung
-const _Mindischrg = 1;                                  // 0 geht nicht da sonst max entladung .. also die kleinste mögliche Einheit 1
+const _mindischrg = 1;                                  // 0 geht nicht da sonst max entladung .. also die kleinste mögliche Einheit 1
 const _pwrAtCom_def = _batteryLadePower * (253 / 230);  // max power bei 253V = 5500 W 
 
 
@@ -46,7 +46,7 @@ const inputRegisters = {
 }
 
 const bydDirectSOCDP = 'bydhvs.0.State.SOC';                            // battSOC netto direkt von der Batterie
-const maxdischrg_def = getState(communicationRegisters.wMaxCha).val;    // 10600
+const _maxdischrg_def = getState(communicationRegisters.wMaxCha).val;    // 10600
 
 const _InitCom_Aus = 803;
 const _InitCom_An = 802;
@@ -57,7 +57,7 @@ let _bydDirectSOC = 5;
 let _batsoc = 0;
 let _macheNix = false;
 let _entladung_zeitfenster = false;
-let _max_pwr = maxdischrg_def;
+let _max_pwr = _maxdischrg_def;
 
 
 // für tibber
@@ -129,8 +129,8 @@ if (_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) {
 }
 
 
-setState(communicationRegisters.maxchrg, maxdischrg_def);
-setState(communicationRegisters.maxdischrg, maxdischrg_def);
+setState(communicationRegisters.maxchrg, _maxdischrg_def);
+setState(communicationRegisters.maxdischrg, _maxdischrg_def);
 
 
 
@@ -140,7 +140,7 @@ async function processing() {
 
     _macheNix = false;
     _SpntCom = _InitCom_Aus;
-    _max_pwr = maxdischrg_def;
+    _max_pwr = _maxdischrg_def;
 
     let pvlimit = (_pvPeak / 100 * _surplusLimit);                       //pvlimit = 12000/100*0 = 0
     let cur_power_out = getState(inputRegisters.powerOut).val;                 //cur_power_out = Einspeisung  in W
@@ -434,7 +434,7 @@ async function processing() {
                             if (poihigh[d][0] > _stop_discharge) {
                                 _entladung_zeitfenster = false;
                                 _SpntCom = _InitCom_An;
-                                _max_pwr = _Mindischrg;
+                                _max_pwr = _mindischrg;
 
                                 if (_debug) {
                                     console.warn('Entladezeiten: ' + poihigh[d][1] + '-' + poihigh[d][2] + ' Preis ' + poihigh[d][0]);
@@ -450,12 +450,10 @@ async function processing() {
                                     break;
                                 }
                                 // wenn noch rest sonne
-                                if (dc_now > 0 && dc_now > verbrauchJetzt) {
-                                    _max_pwr = dc_now - 100 - verbrauchJetzt; // 100 W reserve
-                                    if (_max_pwr > 0) {
-                                        _max_pwr = _max_pwr * -1
-                                    } else {
-                                        _max_pwr = _Mindischrg;
+                                if (dc_now > verbrauchJetzt) {
+                                    _max_pwr = (dc_now - 100 - verbrauchJetzt) * -1; // 100 W reserve
+                                    if (_max_pwr <= 0) {                                    
+                                        _max_pwr = _mindischrg;
                                     }
                                 }
                             }
@@ -481,7 +479,7 @@ async function processing() {
                         console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + _stop_discharge.toFixed(2) + ' ct/kWh');
                     }
                     _SpntCom = _InitCom_An;
-                    _max_pwr = _Mindischrg;
+                    _max_pwr = _mindischrg;
                     _macheNix = true;
                     isTibber_active = 3;
                 }
@@ -489,7 +487,7 @@ async function processing() {
                 //ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
                 if (lowprice.length > 0 && ChaTm <= lowprice.length) {
                     _SpntCom = _InitCom_An;
-                    _max_pwr = _Mindischrg;
+                    _max_pwr = _mindischrg;
                     isTibber_active = 4;
                     _macheNix = true;
                 }
@@ -580,7 +578,7 @@ async function processing() {
         if (ChaTm > 0 && (ChaTm * 2) <= pvfc.length) {
             // Bugfix zur behebung der array interval von 30min und update interval 1h
             if ((compareTime(latesttime, null, '<=', null)) && isTibber_active == 0) {
-                _max_pwr = _Mindischrg;
+                _max_pwr = _mindischrg;
             }
             //berechnung zur entzerrung entlang der pv kurve, oberhalb des einspeiselimits
             let get_wh = 0;
@@ -643,8 +641,6 @@ async function processing() {
 
             let current_pwr_diff = 0;
 
-            // oder doch mit powerAC
-
             if (get_wh >= ChaEnrg && ChaEnrg > 0) {
                 ChaTm = pvfc.length / 2;
                 current_pwr_diff = 100 - pvlimit_calc + cur_power_out;  //bleibe 100W unter dem Limit (PV-WR Trigger)
@@ -674,17 +670,15 @@ async function processing() {
                 }
             }
 
-            if (_debug) {
-                console.warn('-->> nach berechnungn 1 ' + _max_pwr);
+            if (_debug) {               
+                console.warn('_max_pwr 1 : ' + _max_pwr + ' min_pwr ' + min_pwr + ' _batteryLadePower ' + _batteryLadePower);
             }
 
-            //if (_SpntCom == _InitCom_An) {  // dann kommst der von oben direkt
-            if (_debug) {
-                console.warn('_max_pwr : ' + _max_pwr + ' min_pwr ' + min_pwr + ' _batteryLadePower ' + _batteryLadePower);
-            }
+            _max_pwr = Math.round(Math.min(Math.max(_max_pwr, min_pwr), _batteryLadePower)); //abfangen negativer werte, limitiere auf min_pwr
 
-            _max_pwr = Math.max(_max_pwr, min_pwr);   // suche min Wert
-            _max_pwr = Math.round(Math.min(_max_pwr, _batteryLadePower)); //abfangen negativer werte, limitiere auf min_pwr
+            if (_debug) {               
+                console.warn('_max_pwr 2 : ' + _max_pwr);
+            }
 
             if (dc_now > verbrauchJetzt) {                                       // laden nur dann wenn überschuss auch da egal was die vorhersage sagt
                 for (let h = 0; h < (ChaTm * 2); h++) {
@@ -716,11 +710,9 @@ async function processing() {
 
     }
 
-
-
     PwrAtCom = _max_pwr;
 
-    if (_tibberNutzenSteuerung || _prognoseNutzenSteuerung) {   // doppelt hält besser
+    if (_tibberNutzenSteuerung || _prognoseNutzenSteuerung) {               // doppelt hält besser
         // ----------------------------------------------------           write data
 
         if (_SpntCom == _InitCom_An || _SpntCom != _lastSpntCom) {
@@ -728,8 +720,8 @@ async function processing() {
                 console.warn('Daten gesendet an WR kommunikation Wirkleistungvorgabe : ' + PwrAtCom + ' comm ' + _SpntCom);
             }
             setState(communicationRegisters.fedInPwrAtCom, PwrAtCom);       // 40149_Wirkleistungvorgabe
-            setState(communicationRegisters.fedInSpntCom, _SpntCom);         // 40151_Kommunikation
-            setState(SpntComCheck, _SpntCom);
+            setState(communicationRegisters.fedInSpntCom, _SpntCom);        // 40151_Kommunikation
+            setState(SpntComCheck, _SpntCom);                               // check DP für vis
         }
 
         if (_debug) {
@@ -738,6 +730,14 @@ async function processing() {
         }
 
         _lastSpntCom = _SpntCom;
+    } else {
+        if (_SpntCom != _lastSpntCom) {
+            console.warn('Tibber und Prognose sind aus');
+            _SpntCom = _InitCom_Aus;
+            setState(communicationRegisters.fedInSpntCom, _SpntCom);        // 40151_Kommunikation
+            setState(SpntComCheck, _SpntCom);                               // check DP für vis
+            _lastSpntCom = _SpntCom;
+        }
     }
 }
 
@@ -766,23 +766,22 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
         console.warn(' _tibberNutzenAutomatisch ' + _tibberNutzenAutomatisch + ' _prognoseNutzenAutomatisch ' + _prognoseNutzenAutomatisch);
     }
 
-    if (_tibberNutzenAutomatisch || _prognoseNutzenAutomatisch) {
-        // ---          notladung 
-        const checkNotladung = notLadungCheck();
+    // ---     check ob notladung nötig
+    const checkNotladung = notLadungCheck();
 
-        if (checkNotladung) {
-            _tibberNutzenSteuerung = false;
-            _prognoseNutzenSteuerung = false;
-        }
-
-        if (_debug) {
-            console.warn(' _tibberNutzenSteuerung ' + _tibberNutzenSteuerung + ' _prognoseNutzenSteuerung ' + _prognoseNutzenSteuerung);
-        }
-
-        setTimeout(function () {
-            processing();             /*start processing in interval*/
-        }, 400);                        // verzögerung zwecks Datenabholung
+    if (checkNotladung) {
+        _tibberNutzenSteuerung = false;
+        _prognoseNutzenSteuerung = false;
     }
+
+    if (_debug) {
+        console.warn(' _tibberNutzenSteuerung ' + _tibberNutzenSteuerung + ' _prognoseNutzenSteuerung ' + _prognoseNutzenSteuerung);
+    }
+
+    setTimeout(function () {
+        processing();             /*start processing in interval*/
+    }, 400);                        // verzögerung zwecks Datenabholung
+
 });
 
 function notLadungCheck() {
