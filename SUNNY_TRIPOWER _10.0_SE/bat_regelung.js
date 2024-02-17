@@ -58,6 +58,7 @@ let _batsoc = 0;
 let _macheNix = false;
 let _entladung_zeitfenster = false;
 let _max_pwr = _maxdischrg_def;
+let _notLadung = false;
 
 
 // für tibber
@@ -730,7 +731,17 @@ async function processing() {
         }
 
         _lastSpntCom = _SpntCom;
-    } 
+    }  else {
+        if (!_notLadung) {
+            if (_SpntCom != _lastSpntCom) {
+                console.warn('Tibber und Prognose sind aus');
+                _SpntCom = _InitCom_Aus;
+                setState(communicationRegisters.fedInSpntCom, _SpntCom);        // 40151_Kommunikation
+                setState(SpntComCheck, _SpntCom);                               // check DP für vis
+                _lastSpntCom = _SpntCom;
+            }
+        }
+    }
 }
 
 
@@ -759,9 +770,9 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
     }
 
     // ---     check ob notladung nötig
-    const checkNotladung = notLadungCheck();
+    _notLadung = notLadungCheck();
 
-    if (checkNotladung) {
+    if (_notLadung) {
         _tibberNutzenSteuerung = false;
         _prognoseNutzenSteuerung = false;
     }
@@ -789,9 +800,9 @@ function notLadungCheck() {
         if (_bydDirectSOC < 5) {
             console.warn(' -----------------    Batterie NOTLADEN ');
             setState(communicationRegisters.fedInPwrAtCom, _batteryPowerEmergency);
-            const SpntCom = _InitCom_An;
-            setState(communicationRegisters.fedInSpntCom, SpntCom);
-            setState(SpntComCheck, SpntCom);
+            _SpntCom = _InitCom_An;
+            setState(communicationRegisters.fedInSpntCom, _SpntCom);
+            setState(SpntComCheck, _SpntCom);
             _lastSpntCom = 0;
             isNotladung = true;
         }
