@@ -57,7 +57,7 @@ let _bydDirectSOC = 5;
 let _batsoc = 0;
 let _macheNix = false;
 let _entladung_zeitfenster = false;
-let _max_pwr = _maxdischrg_def;
+let _max_pwr = 0;
 let _notLadung = false;
 
 
@@ -134,14 +134,11 @@ setState(communicationRegisters.maxchrg, _maxdischrg_def);
 setState(communicationRegisters.maxdischrg, _maxdischrg_def);
 
 
-
-
 // ab hier Programmcode
 async function processing() {
 
     _macheNix = false;
     _SpntCom = _InitCom_Aus;
-    _max_pwr = _maxdischrg_def;
 
     let pvlimit = (_pvPeak / 100 * _surplusLimit);                       //pvlimit = 12000/100*0 = 0
     let cur_power_out = getState(inputRegisters.powerOut).val;                 //cur_power_out = Einspeisung  in W
@@ -153,7 +150,7 @@ async function processing() {
     let powerSupply = getState(inputRegisters.powerSupply).val;
     let powerAC = getState(inputRegisters.powerAC).val * -1;
 
-    let verbrauchJetzt = dc_now + battOut + powerSupply - cur_power_out - battIn;        // verbrauch in W 
+    let verbrauchJetzt = 10 + dc_now + battOut + powerSupply - cur_power_out - battIn;        // verbrauch in W , 10W reserve obendruaf
 
     /* Default Werte setzen*/
     let battStatus = getState(inputRegisters.betriebszustandBatterie).val;
@@ -162,6 +159,13 @@ async function processing() {
     let isTibber_active = 0;
     _tibberPreisJetzt = getState(tibberPreisJetztDP).val;
     _tomorrow_kW = getState(tomorrow_kWDP).val;
+
+    if (dc_now > verbrauchJetzt) {
+        _max_pwr = (dc_now - verbrauchJetzt) * -1;   // vorbelegung zum laden
+    } else {
+        _max_pwr = _mindischrg;
+    }
+    
 
     // Lademenge
     let ChaEnrg_full = Math.ceil((_batteryCapacity * (100 - _batsoc) / 100) * (1 / _wr_efficiency));                            //Energiemenge bis vollständige Ladung
@@ -173,15 +177,16 @@ async function processing() {
         ChaEnrg = ChaEnrg_full;
     }
     if (_debug) {
-        console.warn('Verbrauch jetzt       ' + verbrauchJetzt + ' W');
-        console.warn('Ladeleistung Batterie ' + _batteryLadePower + ' W');
-        console.warn('Einspeiseleistung     ' + cur_power_out + ' W');
-        console.warn('Batt_SOC              ' + _batsoc + ' %');
+        console.warn('Verbrauch jetzt_________________ ' + verbrauchJetzt + ' W');
+        console.warn('PV Produktion___________________ ' + dc_now + ' W');
+        console.warn('Ladeleistung Batterie___________ ' + _batteryLadePower + ' W');
+        console.warn('Einspeiseleistung_______________ ' + cur_power_out + ' W');
+        console.warn('Batt_SOC________________________ ' + _batsoc + ' %');
         const battsts = battStatus == 2291 ? 'Batterie Standby' : battStatus == 3664 ? 'Notladebetrieb' : battStatus == 2292 ? 'Batterie laden' : battStatus == 2293 ? 'Batterie entladen' : 'Aus';
-        console.warn('Batt_Status           ' + battsts + ' = ' + battStatus);
-        console.warn('Lademenge bis voll ChaEnrg_full ' + ChaEnrg_full + ' Wh');
-        console.warn('Lademenge          ChaEnrg      ' + ChaEnrg + ' Wh');
-        console.warn('Restladezeit       ChaTm        ' + ChaTm.toFixed(2) + ' h');
+        console.warn('Batt_Status_____________________ ' + battsts + ' = ' + battStatus);
+        console.warn('ChaEnrg_full__Lademenge bis voll ' + ChaEnrg_full + ' Wh');
+        console.warn('ChaEnrg_______Lademenge_________ ' + ChaEnrg + ' Wh');
+        console.warn('ChaTm_________Restladezeit______ ' + ChaTm.toFixed(2) + ' h');
     }
 
     if (_tibberNutzenSteuerung) {
@@ -435,8 +440,7 @@ async function processing() {
                             if (poihigh[d][0] > _stop_discharge) {
                                 _entladung_zeitfenster = false;
                                 _SpntCom = _InitCom_An;
-                                _max_pwr = _mindischrg;
-
+                                
                                 if (_debug) {
                                     console.warn('Entladezeiten: ' + poihigh[d][1] + '-' + poihigh[d][2] + ' Preis ' + poihigh[d][0]);
                                 }
@@ -449,13 +453,6 @@ async function processing() {
                                     isTibber_active = 2;
                                     _entladung_zeitfenster = true;
                                     break;
-                                }
-                                // wenn noch rest sonne
-                                if (dc_now > verbrauchJetzt) {
-                                    _max_pwr = (dc_now - 100 - verbrauchJetzt) * -1; // 100 W reserve
-                                    if (_max_pwr <= 0) {                                    
-                                        _max_pwr = _mindischrg;
-                                    }
                                 }
                             }
                         }
@@ -572,11 +569,16 @@ async function processing() {
         //      _max_pwr = _batteryLadePower;
 
         // verschieben des Ladevorgangs in den Bereich der PV Limitierung. batterie ist nicht in notladebetrieb
-        if (_debug && latesttime) {
+        if (_debug) {
             console.warn('pvfc.length ' + pvfc.length + ' ChaTm ' + ChaTm);
+            console.warn('dc_now ' + dc_now + ' verbrauchJetzt ' + verbrauchJetzt);
+            
         }
 
-        if (ChaTm > 0 && (ChaTm * 2) <= pvfc.length) {
+        if (ChaTm > 0 && (ChaTm * 2) <= pvfc.length) {  // ab hier bei sonne 
+
+            console.warn('los gehts ');
+
             // Bugfix zur behebung der array interval von 30min und update interval 1h
             if ((compareTime(latesttime, null, '<=', null)) && isTibber_active == 0) {
                 _max_pwr = _mindischrg;
@@ -699,13 +701,13 @@ async function processing() {
             }
             //}
         } else {  //  sonne ballert volle kanne und die reststunden sind kleiner als das was in der forcast
-            if (isTibber_active == 0 && pvfc.length > 0 && dc_now > 0 && dc_now > verbrauchJetzt + 10) {
+            if (isTibber_active == 99 && dc_now > 0 && dc_now > verbrauchJetzt) {
                 _SpntCom = _InitCom_Aus;
             }
         }
         // ---------------------------------------------------- Ende der PV Prognose Sektion
     
-        if (isTibber_active == 3 && dc_now > verbrauchJetzt + 10) {   // nutze rest sonne
+        if (isTibber_active == 3 && dc_now > verbrauchJetzt) {   // nutze rest sonne
             _SpntCom = _InitCom_Aus;
         }
 
