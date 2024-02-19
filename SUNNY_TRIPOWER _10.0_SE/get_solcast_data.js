@@ -40,7 +40,7 @@ schedule('1 5,7,9,10 * * *', function () {
     requestData(url, name2);
 });
 
-schedule('1 6,8,12,13,14 15 * *', function () {
+schedule('1 6,8,12,13,14 15 * * *', function () {
     const url2 = `${seite1}/forecasts?format=json&api_key=${key_id}`;
     toLog(`Hole PV ${name1}`, true);
     requestData(url2, name1);
