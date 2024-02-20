@@ -576,9 +576,6 @@ async function processing() {
         }
 
         if (ChaTm > 0 && (ChaTm * 2) <= pvfc.length) {  // ab hier bei sonne 
-
-            console.warn('los gehts ');
-
             // Bugfix zur behebung der array interval von 30min und update interval 1h
             if ((compareTime(latesttime, null, '<=', null)) && isTibber_active == 0) {
                 _max_pwr = _mindischrg;
@@ -694,17 +691,17 @@ async function processing() {
                         break;
                     }
                 }
+            }           
+
+            if (isTibber_active == 0 && (_max_pwr * -1) > dc_now) {
+                _max_pwr = (dc_now - verbrauchJetzt) * -1;  
             }
 
             if (_debug) {
-                console.warn('max_ladeleistung : ' + _SpntCom + ' _max_pwr ' + _max_pwr);
+                console.warn('max_ladeleistung 1 : ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' verbrauchJetzt ' + verbrauchJetzt);
             }
-            //}
-        } else {  //  sonne ballert volle kanne und die reststunden sind kleiner als das was in der forcast
-            if (isTibber_active == 99 && dc_now > 0 && dc_now > verbrauchJetzt) {
-                _SpntCom = _InitCom_Aus;
-            }
-        }
+
+        } 
         // ---------------------------------------------------- Ende der PV Prognose Sektion
     
         if (isTibber_active == 3 && dc_now > verbrauchJetzt) {   // nutze rest sonne
@@ -733,6 +730,7 @@ async function processing() {
         }
 
         _lastSpntCom = _SpntCom;
+        
     }  else {
         if (!_notLadung) {
             if (_SpntCom != _lastSpntCom) {
