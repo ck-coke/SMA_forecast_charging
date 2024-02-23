@@ -59,7 +59,6 @@ let _macheNix = false;
 let _entladung_zeitfenster = false;
 let _max_pwr = 0;
 let _notLadung = false;
-let _bingoUeberschuss = false;
 
 
 // für tibber
@@ -482,13 +481,6 @@ async function processing() {
                     _max_pwr = _mindischrg;                    
                     isTibber_active = 3;
                 }
-
-                //ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
-                if (lowprice.length > 0 && ChaTm <= lowprice.length) {
-                    _SpntCom = _InitCom_An;
-                    _max_pwr = _mindischrg;
-                    isTibber_active = 4;
-                }
      
                 // starte die ladung
                 if (_tibberPreisJetzt < _start_charge) {
@@ -512,7 +504,17 @@ async function processing() {
                             break;
                         }
                     }
-                }               
+                } 
+
+                     //ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
+                if (lowprice.length > 0 && ChaTm <= lowprice.length && isTibber_active == 5) {
+                    if (_debug) {
+                        console.warn('Stoppe Ladung, lowprice.length ' + lowprice.length);
+                    }
+                    _SpntCom = _InitCom_An;
+                    _max_pwr = _mindischrg;
+                    isTibber_active = 4;
+                }              
             }
         }
 
@@ -626,13 +628,12 @@ async function processing() {
                 if (isTibber_active == 0) {
                     pvlimit_calc = Math.max((Math.round(pvlimit - ((ChaEnrg - get_wh) / ChaTm))), 0); //virtuelles reduzieren des pvlimits
                     min_pwr = Math.max(Math.round((ChaEnrg - get_wh) / ChaTm), 0);
-                } else {
-                //daran liegts ??
-                    get_wh = ChaEnrg;
+                } else {               
+                    get_wh = ChaEnrg;       //daran liegts ??
                 }
 
                 if (_debug) {
-                    console.warn('Verschiebe Einspeiselimit auf ' + pvlimit_calc + ' W' + ' mit mindestens ' + min_pwr + ' W,  isTibber_active ' + isTibber_active + ' get_wh ' + get_wh);
+                    console.warn('Verschiebe Einspeiselimit auf pvlimit_calc ' + pvlimit_calc + ' W' + ' mit mindestens ' + min_pwr + ' W,  isTibber_active ' + isTibber_active + ' get_wh ' + get_wh);
                 }
             }
 
@@ -651,11 +652,11 @@ async function processing() {
                 }
 
                 if (_debug) {
-                    console.warn('-->> einspeisung ' + cur_power_out + ' verbrauchJetzt ' + verbrauchJetzt + ' powerAC ' + powerAC + ' current_pwr_diff ' + current_pwr_diff);
+                    console.warn('-->> Einspeisung   cur_power_out ' + cur_power_out + ' verbrauchJetzt ' + verbrauchJetzt + ' powerAC ' + powerAC + ' current_pwr_diff ' + current_pwr_diff);
                     console.warn('-->> aus der begrenzung holen... ' + _max_pwr);
                 }
                 
-                //aus der begrenzung holen..
+                //aus der begrenzung holen.. her evtl. 
                 if (powerAC <= 10 && current_pwr_diff > 0 && isTibber_active == 0) {
                     _max_pwr = Math.round(pvfc[0][1] - pvlimit_calc);
 
@@ -672,42 +673,43 @@ async function processing() {
             _max_pwr = Math.round(Math.min(Math.max(_max_pwr, min_pwr), _batteryLadePower)); //abfangen negativer werte, limitiere auf min_pwr orginal
             
             if (_debug) {               
-                console.warn('_max_pwr 2 : ' + _max_pwr);
+                console.warn('_max_pwr 2 : ' + _max_pwr + ' isTibber_active ' + isTibber_active);
             }
 
-            _bingoUeberschuss = false;
-
-            if (dc_now > verbrauchJetzt) {                                       // laden nur dann wenn überschuss auch da egal was die vorhersage sagt
+      //      if (dc_now > verbrauchJetzt) {                                       // laden nur dann wenn überschuss auch da egal was die vorhersage sagt
                 for (let h = 0; h < (ChaTm * 2); h++) {
                     if ((compareTime(pvfc[h][3], pvfc[h][4], 'between')) || (cur_power_out + powerAC) >= (pvlimit - 100)) {
                         if (_debug) {
+                            console.warn('-->> Bingo ladezeit ' + (cur_power_out + powerAC) + ' ' + (pvlimit - 100));
                             console.warn('-->> Bingo ladezeit mit überschuss ' + pvfc[h][0]);
                         }     
-                        _bingoUeberschuss = true;
+
+                        if ((dc_now - verbrauchJetzt) > pvfc[h][0]) {
+                            _max_pwr = pvfc[h][0];
+                        } else {
+                            _max_pwr = (dc_now - verbrauchJetzt);
+                        }
+                        
                         _max_pwr = _max_pwr * -1;
                         _SpntCom = _InitCom_An;
+                        
+                        if (isTibber_active == 3) { // sonne reicht nicht aus
+                            _max_pwr = _mindischrg;
+                        } else {
+                            isTibber_active = 0;  // mal schauen wohin damit                                   
+                        }
+
                         break;
                     }
                 }
             }           
-
-            if (isTibber_active == 0) {
-                if (_bingoUeberschuss){ 
-                    if ((_max_pwr * -1) > dc_now) {
-                        _max_pwr = (dc_now - verbrauchJetzt) * -1;  
-                    }
-                } else {                    
-                    if (_max_pwr > dc_now) {
-                        _max_pwr = (dc_now - verbrauchJetzt) * -1;  
-                    }
-                }
-            }
-            
-        } 
+      //  } 
         // ---------------------------------------------------- Ende der PV Prognose Sektion
     
-        if (isTibber_active == 3 && dc_now > verbrauchJetzt) {   // nutze rest sonne
-            _SpntCom = _InitCom_Aus;
+        if (isTibber_active == 3 || isTibber_active == 4) {
+            if (dc_now > verbrauchJetzt) {   // nutze rest sonne
+                _SpntCom = _InitCom_Aus;
+            }
         }
 
     }
@@ -728,7 +730,7 @@ async function processing() {
 
         if (_debug) {
             console.warn('SpntCom jetzt ' + _SpntCom + ' davor war ' + _lastSpntCom + ' Wirkleistungvorgabe ' + PwrAtCom + ' verbrauchJetzt ' + verbrauchJetzt + ' pv_jetzt ' + dc_now + ' isTibber_active ' + isTibber_active);
-            console.warn('------------------------------------------------------------------------------------------------------------');
+            console.warn('----------------------------------------------------------------------------------');
         }
 
         _lastSpntCom = _SpntCom;
