@@ -145,6 +145,8 @@ async function processing() {
         inputRegisters.powerOut = _sma_em + ".psurplus" /*aktuelle Einspeiseleistung am Netzanschlußpunkt, SMA-EM Adapter*/
     }
 
+    let dt = new Date();
+
     let pvlimit = (_pvPeak / 100 * _surplusLimit);                       //pvlimit = 12000/100*0 = 0
     let cur_power_out = Math.round(getState(inputRegisters.powerOut).val);                 //cur_power_out = Einspeisung  in W
     _batsoc = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR         
@@ -212,15 +214,11 @@ async function processing() {
                 lowprice[x] = poi[x];
             }
         }
-
-        let dt = new Date();
-        let nowhalfhr = dt.getHours() + ':' + ('0' + Math.round(dt.getMinutes() / 60) * 30).slice(-2);
+        
+        let nowhalfhr = getHH() + ':00';
+        
         let batlefthrs = ((_batteryCapacity / 100) * _batsoc) / (_baseLoad / Math.sqrt(_lossfactor));    /// 12800 / 100 * 30
-        let hrstorun = 24;
-
-        if (Number(nowhalfhr.split(':')[0]) < 10) {
-            nowhalfhr = '0' + nowhalfhr;
-        }
+        let hrstorun = 24;     
 
         if (_debug) {
             console.warn('Bat h verbleibend ' + batlefthrs.toFixed(2));
@@ -329,7 +327,7 @@ async function processing() {
         // ggf nachladen?
         let prclow = [];
         let prchigh = [];
-        const ladeZeitenArray = [];
+        let ladeZeitenArray = [];
 
         if (batlefthrs < hrstorun) {
             let pricelimit = 0;
@@ -481,8 +479,7 @@ async function processing() {
                         console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + _stop_discharge.toFixed(2) + ' ct/kWh');
                     }
                     _SpntCom = _InitCom_An;
-                    _max_pwr = _mindischrg;
-                    _macheNix = true;
+                    _max_pwr = _mindischrg;                    
                     isTibber_active = 3;
                 }
 
@@ -491,34 +488,31 @@ async function processing() {
                     _SpntCom = _InitCom_An;
                     _max_pwr = _mindischrg;
                     isTibber_active = 4;
-                    _macheNix = true;
                 }
+     
+                // starte die ladung
+                if (_tibberPreisJetzt < _start_charge) {
+                    let length = Math.ceil(ChaTm);
 
-                if (!_macheNix) {
-                    // starte die ladung
-                    if (_tibberPreisJetzt < _start_charge) {
-                        let length = Math.ceil(ChaTm);
-
-                        if (length > lowprice.length) {
-                            length = lowprice.length;
-                            if (_debug) {
-                                console.warn('Starte Ladung : ' + JSON.stringify(lowprice));
-                            }
-                        }
-                        for (let i = 0; i < length; i++) {
-                            ladeZeitenArray.push(lowprice[i]);
-                            if (compareTime(lowprice[i][1], lowprice[i][2], 'between')) {
-                                if (_debug) {
-                                    console.warn('Starte Ladung: ' + lowprice[i][1] + '-' + lowprice[i][2] + ' Preis ' + lowprice[i][0]);
-                                }
-                                _SpntCom = _InitCom_An;
-                                _max_pwr = _pwrAtCom_def * -1;
-                                isTibber_active = 5;
-                                break;
-                            }
+                    if (length > lowprice.length) {
+                        length = lowprice.length;
+                        if (_debug) {
+                            console.warn('Starte Ladung : ' + JSON.stringify(lowprice));
                         }
                     }
-                }
+                    for (let i = 0; i < length; i++) {
+                        ladeZeitenArray.push(lowprice[i]);
+                        if (compareTime(lowprice[i][1], lowprice[i][2], 'between')) {
+                            if (_debug) {
+                                console.warn('Starte Ladung: ' + lowprice[i][1] + '-' + lowprice[i][2] + ' Preis ' + lowprice[i][0]);
+                            }
+                            _SpntCom = _InitCom_An;
+                            _max_pwr = _pwrAtCom_def * -1;
+                            isTibber_active = 5;
+                            break;
+                        }
+                    }
+                }               
             }
         }
 
@@ -530,15 +524,16 @@ async function processing() {
 
     // ----------------------------------------------------  Start der PV Prognose Sektion
 
+    if (_debug) {
+        console.error('-->> Start der PV Prognose Sektion : _SpntCom ' + _SpntCom + ' ,_max_pwr ' + _max_pwr + ' _macheNix ' + _macheNix + ' isTibber_active ' + isTibber_active);
+    }
 
     if (_prognoseNutzenSteuerung) {
-        if (_debug) {
-            console.error('-->> Start der PV Prognose Sektion : _SpntCom ' + _SpntCom + ' ,_max_pwr ' + _max_pwr + ' _macheNix ' + _macheNix + ' isTibber_active ' + isTibber_active);
-        }
-
+    
         let latesttime;
         let pvfc = [];
         let f = 0;
+        
         for (let p = 0; p < 48; p++) { /* 48 = 24h a 30min Fenster*/
             let pvpower50 = getState(pvforecastDP + p + '.power').val;
             let pvpower90 = getState(pvforecastDP + p + '.power90').val;
@@ -659,15 +654,13 @@ async function processing() {
                     console.warn('-->> einspeisung ' + cur_power_out + ' verbrauchJetzt ' + verbrauchJetzt + ' powerAC ' + powerAC + ' current_pwr_diff ' + current_pwr_diff);
                     console.warn('-->> aus der begrenzung holen... ' + _max_pwr);
                 }
-
-                if (powerAC <= 10 && current_pwr_diff > 0) {
+                
+                //aus der begrenzung holen..
+                if (powerAC <= 10 && current_pwr_diff > 0 && isTibber_active == 0) {
                     _max_pwr = Math.round(pvfc[0][1] - pvlimit_calc);
 
                     if (current_pwr_diff > _max_pwr) {
-                        _max_pwr = Math.round(current_pwr_diff);
-                        if (isTibber_active > 0) {
-                            _SpntCom = _InitCom_Aus;
-                        }
+                        _max_pwr = Math.round(current_pwr_diff);                       
                     }
                 }
             }
@@ -676,12 +669,7 @@ async function processing() {
                 console.warn('_max_pwr 1 : ' + _max_pwr + ' min_pwr ' + min_pwr + ' _batteryLadePower ' + _batteryLadePower);
             }
 
-// hier ewtl abfrage 
-    //        if (_max_pwr < 0) {
-                _max_pwr = Math.round(Math.min(Math.max(_max_pwr, min_pwr), _batteryLadePower)); //abfangen negativer werte, limitiere auf min_pwr orginal
-    //        } else {
-    //            _max_pwr = Math.round(Math.min(Math.min(_max_pwr, min_pwr), _batteryLadePower)); //abfangen negativer werte, limitiere auf min_pwr
-    //        }
+            _max_pwr = Math.round(Math.min(Math.max(_max_pwr, min_pwr), _batteryLadePower)); //abfangen negativer werte, limitiere auf min_pwr orginal
             
             if (_debug) {               
                 console.warn('_max_pwr 2 : ' + _max_pwr);
