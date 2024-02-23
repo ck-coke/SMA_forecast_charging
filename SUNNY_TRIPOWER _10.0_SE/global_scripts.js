@@ -138,6 +138,11 @@ function secondstotime(totalSeconds,tage) {
 }
 
 function getHH() {
-    const holeDate = new Date();
-    return holeDate.getHours();  
+    const datNow = new Date();
+    let HHNow =  datNow.getHours();
+    
+    if (Number(HHNow < 10)) {
+        HHNow = '0' + HHNow;
+    }       
+    return HHNow;  
 }
