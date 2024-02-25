@@ -152,7 +152,7 @@ function startZeit(preiseKurz) {
 }
 
 function aktualisiereStunde() {
-    let stunde = getHH();
+    let stunde = Number(getHH());
 
     setState(_tibberDP + 'extra.tibberPreisJetzt' , getState(_tibberDP + stunde + '.price'/*Preis*/).val, true);
     setState(_tibberDP + 'extra.tibberLevelJetzt' , getState(_tibberDP + stunde + '.level'/*level*/).val, true);
