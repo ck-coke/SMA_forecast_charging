@@ -372,7 +372,7 @@ function genGraphAnlegen(today) {
         if (powerWGesamt > 0) {     
             jsonGraphLabels.push(startTime);                           
             powerWGesamt = Number(Math.round((powerWGesamt * 100)/100)/1000);      
-            jsonGraphData.push(powerWGesamt/2);
+            jsonGraphData.push(powerWGesamt);
 
             if (influxDb) {
                 influxDdOutput(startTime, powerWGesamt);                
