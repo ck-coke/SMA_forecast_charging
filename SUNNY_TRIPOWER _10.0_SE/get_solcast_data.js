@@ -9,18 +9,17 @@ const summeDpAnlegen = false;   // einmalig manuell für 24h auf true setzten, e
 const seite1 = "xxxx-xxxx-xxxx-xxxx";
 const seite2 = "yyyy-yyyy-yyyy-yyyy";
 const key_id = "zzzzzzzzzzzzzzzzzzzzzzzzzzzzz";
-const name1 = 'garten';         // name dp1    
-const name2 = 'strasse';        // name dp2
+const name1 = 'garten';         // name dp1  frei wählbar  
+const name2 = 'strasse';        // name dp2  frei wählbar
 const gesamt = 'gesamt';        // dp für zusammenrechnen muss in ladenNachPrognose angepasst werden wenn hier geändert
 
-const influxDb = true;   // wenn influxDB output erwünscht für grafana 
+const influxDb = true;   // wenn grafana output erwünscht benötigt wird eine influx.0 instanz
 const influxDbMeasurement = 'pvforecast.0.summary.power';
 const influxInstance = 'influxdb.0';
 
 const mainObject = '0_userdata.0.strom.pvforecast';
 const mainObjectToday = '0_userdata.0.strom.pvforecast.today';
 const mainObjectTomorrow = '0_userdata.0.strom.pvforecast.tomorrow';
-const summeDpAnlegen = false;   // einmalig für 24h auf true setzten, es werden summen Dp's angelegt
 const abbrechenBei = '00:00';   // ab wieviel Uhr kommt nix mehr, kann so bleiben
 // bis hier
 
@@ -40,12 +39,12 @@ schedule('1 5,7,9,10 * * *', function () {
     requestData(url, name2);
 });
 
-schedule('1 6,8,12,13,14,15 * * *', function () {
+schedule('2 5,6,8,12,13,15 * * *', function () {
     const url2 = `${seite1}/forecasts?format=json&api_key=${key_id}`;
     toLog(`Hole PV ${name1}`, true);
     requestData(url2, name1);
 });
-
+ 
 // ------------------------------------------------------------------------------------------------------------------
 
 /*************** ab hier nix ändern  ***************************** */
@@ -67,7 +66,7 @@ async function requestData(seiteUrl, seite) {
 
     if (response && response.status === 200) {
 
-        console.warn('response ' + JSON.stringify(response.data));
+        //console.warn('response ' + JSON.stringify(response.data));
 
         const array = response.data.forecasts;
         const list = [];     
@@ -150,7 +149,7 @@ async function requestData(seiteUrl, seite) {
                 const powerW = list[listenDP].watt / 2;      // es kommen 2 DP pro stunde also teilen
                 const power90W = list[listenDP].watt90 / 2;
 
-                 if (seite == name1) {
+                if (seite == name1) {
                     setState(stateBaseName1 + 'power', powerW, true);
                     setState(stateBaseName1 + 'power90', power90W, true);
                     
@@ -327,7 +326,6 @@ async function kWAnlegen(seite) {
     });
 
 }
-
 
 //------------ graph
 
