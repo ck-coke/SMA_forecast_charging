@@ -377,10 +377,11 @@ function genGraphAnlegen(today) {
             }
         }       
     }
+    
+    setState(`${mainObjectGraph}.${name1}.${dayTag}`,  Number(Math.round((powerWGesName1 /2/1000)*100)/100), true);
+    setState(`${mainObjectGraph}.${name2}.${dayTag}`,  Number(Math.round((powerWGesName2 /2/1000)*100)/100), true);
+    setState(`${mainObjectGraph}.${gesamt}.${dayTag}`, Number(Math.round((powerWGes /2/1000)*100)/100), true);
 
-    setState(`${mainObjectGraph}.${name1}.${tagTag}`,  Number((Math.round(powerWGesName1)/1000).toFixed(3)), true);
-    setState(`${mainObjectGraph}.${name2}.${tagTag}`,  Number((Math.round(powerWGesName2)/1000).toFixed(3)), true);
-    setState(`${mainObjectGraph}.${gesamt}.${tagTag}`, Number((Math.round(powerWGes)/1000).toFixed(3)), true);
     genGraph(jsonGraphLabels, jsonGraphData, mainObjectGraph);
 }
 
