@@ -272,7 +272,8 @@ async function processing() {
             }
         }
         
-        let nowhalfhr = getHH() + ':00';
+        const hhJetzt = getHH(); 
+        let nowhalfhr = hhJetzt + ':00';
         
         let batlefthrs = ((_batteryCapacity / 100) * _batsoc) / (_baseLoad / Math.sqrt(_lossfactor));    /// 12800 / 100 * 30
         let hrstorun = 24;     
@@ -296,38 +297,25 @@ async function processing() {
         if (pvwh > (_baseLoad * hrstorun / 2) && !_snowmode) {
             let sunup = getAstroDate('sunriseEnd').getHours() + ':' + getAstroDate('sunriseEnd').getMinutes();
             let sundown = getAstroDate('sunsetStart').getHours() + ':' + getAstroDate('sunsetStart').getMinutes();
-            let dtmonth = '' + (dateNow.getMonth() + 1);
-            let dtday = '' + dateNow.getDate();
-            let dtyear = dateNow.getFullYear();
 
-            if (dtmonth.length < 2) {
-                dtmonth = '0' + dtmonth;
-            }
+            for (let sd = 47; sd >= 0; sd--) {
+                const pow = getState(pvforecastDP + sd + '.power').val;
 
-            if (dtday.length < 2) {
-                dtday = '0' + dtday;
-            }
-
-            let dateF = [dtyear, dtmonth, dtday];
-
-            for (let sd = 0; sd < hrstorun * 2; sd++) {
-                if (getState(pvforecastDP + sd + '.power').val <= _baseLoad) {
+                if (pow <= 750 && pow != 0) {
                     sundown = getState(pvforecastDP + sd + '.startTime').val;
-                    for (let su = sd; su < hrstorun * 2; su++) {
+
+                    for (let su = 0; su < 48; su++) {
                         if (getState(pvforecastDP + su + '.power').val >= _baseLoad) {
                             sunup = getState(pvforecastDP + su + '.startTime').val;
-                            su = hrstorun * 2;
                             break;
                         }
-                    }
-                    sd = hrstorun * 2;
+                    }                    
                     break;
                 }
             }
 
-            
-            let sunriseend = getDateObject(dateF + ' ' + sunup + ':00').getTime();
-            let sundownend = getDateObject(dateF + ' ' + sundown + ':00').getTime();
+            let sundownend = datumTimestamp(sundown, 0);
+            let sunriseend = datumTimestamp(sunup, 1);
 
             let sundownhr = sundown;
 
@@ -343,7 +331,7 @@ async function processing() {
             hrstorun = Math.min(((sunriseend - sundownend) / 3600000), 24);
 
             if (_debug) {
-                console.warn('Nachtfenster:' + sundownhr + '-' + sunup + ' (' + hrstorun.toFixed(2) + ' h)');
+                console.warn('Nachtfenster:' + sundownhr + '-' + sunup + ' hrstorun (' + hrstorun.toFixed(2) + ' h)');
             }
 
             pvwh = 0;
@@ -360,6 +348,7 @@ async function processing() {
         }
 
         let poihigh = [];
+
         let pricehrs = hrstorun;
 
         //neue Preisdaten ab 14 Uhr
@@ -369,11 +358,15 @@ async function processing() {
                 pricehrs = remainhrs;
             }
         }
+        
+        if (_debug) {
+            console.warn('Batterielaufzeit pricehrs: ' + pricehrs );
+        }
 
-        let tti = 0;
+        let tti = 0;        
 
-        for (let t = 0; t < pricehrs; t++) {
-            let hrparse = getState(tibberDP + t + '.startTime').val.split(':')[0];
+        for (let t = hhJetzt; t < 24; t++) {     // nimm alle stunden ab laufender stunde 
+            let hrparse  = getState(tibberDP + t + '.startTime').val.split(':')[0];
             let prcparse = getState(tibberDP + t + '.price').val;
 
             poihigh[tti] = [prcparse, hrparse + ':00', hrparse + ':30'];
@@ -386,16 +379,21 @@ async function processing() {
             tti++;
         }
 
+
+        if (_debug) {
+            console.warn('poihigh vor nachladen: ' + JSON.stringify(poihigh) );
+        }
+
         // ggf nachladen?
         let prclow = [];
         let prchigh = [];
         let ladeZeitenArray = [];
 
-        if (batlefthrs < hrstorun) {
+        if (batlefthrs < hrstorun) {          
             let pricelimit = 0;
             let m = 0;
 
-            for (let h = 0; h < poihigh.length; h++) {
+            for (let h = hhJetzt; h < poihigh.length; h++) {
                 pricelimit = (poihigh[h][0] * _loadfact);
                 for (let l = h; l < poihigh.length; l++) {
                     if (poihigh[l][0] > pricelimit && poihigh[l][0] > _stop_discharge) {
@@ -436,7 +434,7 @@ async function processing() {
             let poitmp = [];
             m = 0;
 
-            for (let l = 0; l < poihigh.length; l++) {
+            for (let l = hhJetzt; l < poihigh.length; l++) {
                 poitmp[m] = poihigh[l];
                 m++;
                 if (prclow.length > 0) {
@@ -454,9 +452,11 @@ async function processing() {
                 }
             }
 
-            poihigh = [];
-            poihigh = poitmp;
-
+            if (poitmp.length > 0) {
+                poihigh = [];
+                poihigh = poitmp;
+            }
+            
             if (chrglength > prclow.length) {
                 chrglength = prclow.length;
             }
@@ -492,6 +492,10 @@ async function processing() {
             poihigh.sort(function (a, b) {      // sortiert höchster preis zuerst            
                 return b[0] - a[0];
             });
+            
+            if (_debug) {
+                console.warn('poihigh.length '+ poihigh.length + ' poihigh sortiert ' + JSON.stringify(poihigh));
+            }
 
             let lefthrs = batlefthrs * 2;             // batterie laufzeit in stunden initial
 
@@ -500,22 +504,22 @@ async function processing() {
             }
 
             if (_debug) {
-                console.warn('lefthrs: ' + lefthrs);
+                console.warn('batlefthrs ' + batlefthrs + ' lefthrs ' + lefthrs);
             }
 
             let entladeZeitenArray = [];
 
             if (_batsoc > 0) {
                 if (lefthrs > 0 && lefthrs < hrstorun * 2 && pvwh < _baseLoad * 24 * _wr_efficiency) {
-                    if (batlefthrs * 2 <= lefthrs) {
+                   // if (batlefthrs * 2 <= lefthrs) {
                         for (let d = 0; d < lefthrs; d++) {
                             if (poihigh[d][0] > _stop_discharge) {
                                 _entladung_zeitfenster = false;
                                 _SpntCom = _InitCom_An;
                                 
-                              //  if (_debug) {
-                              //      console.warn('Entladezeiten: ' + poihigh[d][1] + '-' + poihigh[d][2] + ' Preis ' + poihigh[d][0] + ' Fahrzeug zieht ' + vehicleConsum + ' W');
-                              //  }
+                                if (_debug) {
+                                    console.warn('Entladezeiten: ' + poihigh[d][1] + '-' + poihigh[d][2] + ' Preis ' + poihigh[d][0] + ' Fahrzeug zieht ' + vehicleConsum + ' W');
+                                }
 
                                 entladeZeitenArray.push(poihigh[d]);
 
@@ -532,7 +536,7 @@ async function processing() {
                                 }
                             }
                         }
-                    }
+                   // }
                 }
             }
 
@@ -938,6 +942,22 @@ function sortiereNachUhrzeit(arr) {
             return minutenA - minutenB;
         }
     });
+}
+
+function datumTimestamp(uhrzeit, val) {
+    // Aktuelles Datum erstellen
+    let currentDate = new Date();
+
+    // Uhrzeit extrahieren und in Stunden und Minuten aufteilen
+    let [stunden, minuten] = uhrzeit.split(':').map(Number);
+
+    // Einen Tag hinzufügen
+    currentDate.setDate(currentDate.getDate() + val);
+
+    // Datum auf morgen setzen
+    currentDate.setHours(stunden, minuten, 0, 0);
+ 
+    return currentDate.getTime();
 }
 
 on({
