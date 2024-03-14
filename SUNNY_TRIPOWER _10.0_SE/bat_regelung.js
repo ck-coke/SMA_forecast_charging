@@ -360,14 +360,15 @@ async function processing() {
         }
         
         if (_debug) {
-            console.warn('Batterielaufzeit pricehrs: ' + pricehrs );
+            console.warn('Batterielaufzeit nach 14 uhr : ' + pricehrs.toFixed(2) + ' h');
         }
 
         let tti = 0;        
+        let nachtIdx = hhJetzt;
 
-        for (let t = hhJetzt; t < 24; t++) {     // nimm alle stunden ab laufender stunde 
-            let hrparse  = getState(tibberDP + t + '.startTime').val.split(':')[0];
-            let prcparse = getState(tibberDP + t + '.price').val;
+        for (let t = 0; t < pricehrs; t++) {     // nimm alle stunden ab laufender stunde 
+            let hrparse  = getState(tibberDP + nachtIdx + '.startTime').val.split(':')[0];
+            let prcparse = getState(tibberDP + nachtIdx + '.price').val;
 
             poihigh[tti] = [prcparse, hrparse + ':00', hrparse + ':30'];
 
@@ -375,8 +376,13 @@ async function processing() {
             if (t == 0 && nowhalfhr == (hrparse + ':30')) {
                 tti--;
             }
-            poihigh[tti] = [prcparse, hrparse + ':30', getState(tibberDP + t + '.endTime').val];
+            poihigh[tti] = [prcparse, hrparse + ':30', getState(tibberDP + nachtIdx + '.endTime').val];
             tti++;
+
+            nachtIdx++;
+            if (nachtIdx > 23) {
+                nachtIdx = 0;
+            }
         }
 
 
@@ -446,7 +452,7 @@ async function processing() {
                     }
                     if (poitmp.length > 0) {   /*&& prclow.length > 1 && poihigh[0][1] != prclow[0][1]*/
                         if (poihigh[l][2] == prclow[0][1]) {
-                            l = poihigh.length;
+                            break;
                         }
                     }
                 }
@@ -485,7 +491,7 @@ async function processing() {
         }
 
         if (_debug) {
-            console.warn('_macheNix: ' + _macheNix + ' max_pwr ' + _max_pwr);
+            console.warn('in Nachladen _macheNix: ' + _macheNix + ' max_pwr ' + _max_pwr);
         }
 
         if (!_macheNix) {
@@ -509,9 +515,13 @@ async function processing() {
 
             let entladeZeitenArray = [];
 
+  //          wenn die pricehrs + jetzige zeit dann schaue in die pronose rein und wenn diese > 750 dann entlade alles
+
+
+
             if (_batsoc > 0) {
                 if (lefthrs > 0 && lefthrs < hrstorun * 2 && pvwh < _baseLoad * 24 * _wr_efficiency) {
-                   // if (batlefthrs * 2 <= lefthrs) {
+                   // if (batlefthrs * 2 <= lefthrs) {                                               // muss das hier sein 
                         for (let d = 0; d < lefthrs; d++) {
                             if (poihigh[d][0] > _stop_discharge) {
                                 _entladung_zeitfenster = false;
@@ -528,8 +538,9 @@ async function processing() {
                                         break;                                            
                                     } else {
                                         _SpntCom = _InitCom_Aus;
+                                        _max_pwr = 0;
                                         _macheNix = true;
-                                        isTibber_active = 2;
+                                        isTibber_active = 2;                                        
                                         _entladung_zeitfenster = true;
                                         break;
                                     }
@@ -786,7 +797,7 @@ async function processing() {
                 for (let h = 0; h < (restladezeit * 2); h++) {
                     if ((compareTime(pvfc[h][3], pvfc[h][4], 'between')) || (einspeisung + powerAC) >= (pvlimit - 100)) {
                         if (_debug) {
-                            console.warn('-->> Bingo ladezeit mit überschuss ' + pvfc[h][0]);
+                            console.warn('-->> Bingo ladezeit mit überschuss ' + pvfc[h][0] + ' ' + pvfc[h][1]);
                         }     
                         _SpntCom = _InitCom_An;                       
                         _max_pwr = _max_pwr * -1;      
