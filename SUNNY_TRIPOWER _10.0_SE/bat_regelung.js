@@ -181,17 +181,17 @@ async function processing() {
     let dateNow = new Date();
 
     let pvlimit       = (_pvPeak / 100 * _surplusLimit);                       //pvlimit = 12000/100*0 = 0
-    let einspeisung = Math.round(getState(inputRegisters.powerOut).val);       // Einspeisung  in W
+    let einspeisung   = Math.round(getState(inputRegisters.powerOut).val);     // Einspeisung  in W
     _batsoc           = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR         
 
     _dc_now           = getState(inputRegisters.dc1).val + getState(inputRegisters.dc2).val;  // pv vom Dach zusammen in W
 
-    if (_dc_now < 10) {
+    if (_dc_now < 10) {              // alles was unter 10 KW kann weg
         _dc_now = 0;
     }
 
     let dc_now_DP     = _dc_now; 
-    if (dc_now_DP < 0) {
+    if (dc_now_DP <= 0) {
         dc_now_DP = 0;
     } else {
         dc_now_DP = Math.round((dc_now_DP /1000)*100)/100;
@@ -308,7 +308,7 @@ async function processing() {
             let sundown  = getAstroDate('sunsetStart', tomorrow).getHours() + ':' + getAstroDate('sunsetStart', tomorrow).getMinutes();
             
             if (_debug) {
-                console.warn('Nachtfenster 1 : ' + sundown + '-' + sunup);
+                console.warn('Nachtfenster nach Astro : ' + sundown + ' - ' + sunup);
             }
 
             for (let sd = 47; sd >= 0; sd--) {
@@ -327,8 +327,8 @@ async function processing() {
                 }
             }
 
-            let sundownTime         = datumTimestamp(sundown, 0);     // untergang
-            let sunriseTimeNextDay  = datumTimestamp(sunup, 1);       // aufgang am nächsten tag  
+            let sundownTime  = datumTimestamp(sundown, 0);     // untergang
+            let sunriseTime  = datumTimestamp(sunup, 1);       // aufgang am nächsten tag  
 
             let sundownhr = sundown;
 
@@ -337,11 +337,11 @@ async function processing() {
                 sundownhr = nowhalfhr;  
                 
                 if (compareTime('00:00', sunup, 'between')) {
-                    sunriseTimeNextDay = datumTimestamp(sunup, 0);         
+                    sunriseTime = datumTimestamp(sunup, 0);         
                 }
             }
 
-            hrstorun = Math.min((sunriseTimeNextDay  - sundownTime) / (1000 * 60 * 60), 24);
+            hrstorun = Math.min((sunriseTime  - sundownTime) / (1000 * 60 * 60), 24);
             hrstorun = Number(hrstorun.toFixed(2));
 
             if (_debug) {
@@ -407,6 +407,10 @@ async function processing() {
         let prclow = [];
         let prchigh = [];
         let ladeZeitenArray = [];
+
+        if (_debug) {
+            console.warn('batlefthrs ' + batlefthrs + ' hrstorun ' + hrstorun);
+        }
 
         if (batlefthrs < hrstorun) {          
             let pricelimit = 0;
@@ -512,25 +516,31 @@ async function processing() {
                 return b[0] - a[0];
             });
             
-         //   if (_debug) {
-         //       console.warn('poihigh.length '+ poihigh.length + ' poihigh sortiert ' + JSON.stringify(poihigh));
-         //   }
+            if (_debug) {
+                console.warn('poihigh.length '+ poihigh.length + ' poihigh sortiert ' + JSON.stringify(poihigh));
+            }
 
             let lefthrs = batlefthrs * 2;             // batlefthrs Bat h verbleibend
 
             if (lefthrs > 0 && lefthrs > poihigh.length) {
-                lefthrs = poihigh.length;            // ist da was 
+                lefthrs = poihigh.length;            
             }      
 
             let entladeZeitenArray = [];
 
-  //          wenn die pricehrs + jetzige zeit dann schaue in die pronose rein und wenn diese > 750 dann entlade alles
-
-
-
-            if (_batsoc > 0) {
+            if (_batsoc > 0) {             // doppelt hält besser
                 if (lefthrs > 0 && lefthrs < hrstorun * 2 && pvwh < _baseLoad * 24 * _wr_efficiency) {
-                   // if (batlefthrs * 2 <= lefthrs) {             // ist das kunst oder kann das weg 
+                    if (batlefthrs >= hrstorun) {             // die laufzeit reicht bis zum sonnenaufgang entlade alles
+                        if (_debug) {
+                            console.warn('Entladezeit reicht aus bis zum Sonnaufgang ' + lefthrs + ' - ' + batlefthrs);
+                        }
+                        _SpntCom = _InitCom_Aus;
+                        _max_pwr = 0;
+                        _macheNix = true;
+                        isTibber_active = 2;                                        
+                        _entladung_zeitfenster = true;
+                        entladeZeitenArray.push(0.00,'--:--','--:--');  //  [0.2856,"19:30","20:00"]
+                    } else {                        
                         for (let d = 0; d < lefthrs; d++) {
                             if (poihigh[d] != null) {
                                 if (poihigh[d][0] > _stop_discharge) {
@@ -541,7 +551,7 @@ async function processing() {
                                         console.warn('Entladezeiten: ' + poihigh[d][1] + '-' + poihigh[d][2] + ' Preis ' + poihigh[d][0] + ' Fahrzeug zieht ' + vehicleConsum + ' W');
                                     }
 
-                                    entladeZeitenArray.push(poihigh[d]);
+                                    entladeZeitenArray.push(poihigh[d]);                                        
 
                                     if (compareTime(poihigh[d][1], poihigh[d][2], "between")) {
                                         if (vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
@@ -555,12 +565,10 @@ async function processing() {
                                             break;
                                         }
                                     }
-                                } else {
-                                    break;
-                                }
+                                } 
                             }
                         }
-                   // }
+                    }
                 }
             }
 
