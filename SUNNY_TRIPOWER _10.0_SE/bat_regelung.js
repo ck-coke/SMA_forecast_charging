@@ -549,12 +549,14 @@ async function processing() {
                                         if (vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
                                             break;                                            
                                         } else {
-                                            _SpntCom = _InitCom_Aus;
-                                            _max_pwr = 0;
-                                            _macheNix = true;
-                                            isTibber_active = 2;                                        
-                                            _entladung_zeitfenster = true;
-                                            break;
+                                            if (_dc_now <= _baseLoad) { // entlade nur wenn sich das lohnt
+                                                _SpntCom = _InitCom_Aus;
+                                                _max_pwr = 0;
+                                                _macheNix = true;
+                                                isTibber_active = 2;                                        
+                                                _entladung_zeitfenster = true;
+                                                break;
+                                            }
                                         }
                                     }
                                 } 
@@ -623,9 +625,6 @@ async function processing() {
         setState(tibberDP + 'extra.ladeZeitenArray', ladeZeitenArray, true);
     }
 
-    if (_dc_now > _verbrauchJetzt) {     // tibber nicht beachten wenn pv > jetziger verbrauch
-       
-    }
 
     // ----------------------------------------------------  Start der PV Prognose Sektion
 
@@ -652,14 +651,8 @@ async function processing() {
     if (_batsoc > 99 && _dc_now > 0) {
         _prognoseNutzenSteuerung = false;   
     }
-
-    if (_dc_now > _verbrauchJetzt) {                                      // macht nur sinn wenn gunug PV
-        if (_debug) {
-            console.error('Tibber nicht beachten da genug PV ');
-        }
-        
-        isTibber_active = 0;
-        
+   
+    if (_dc_now > _verbrauchJetzt) {                                      // macht nur sinn wenn gunug PV      
         if (_prognoseNutzenSteuerung) {
         
             let latesttime;
@@ -799,8 +792,6 @@ async function processing() {
 
                 _max_pwr = Math.round(Math.min(Math.max(_max_pwr, min_pwr), _batteryLadePower)); //abfangen negativer werte, limitiere auf min_pwr orginal
 
-                    
-
                 if (_debug) {               
                     console.warn('Ausgabe B  :_max_pwr ' + _max_pwr);
                 }
@@ -810,7 +801,7 @@ async function processing() {
                 for (let h = 0; h < (restladezeit * 2); h++) {
                     if ((compareTime(pvfc[h][3], pvfc[h][4], 'between')) || (einspeisung + powerAC) >= (pvlimit - 100)) {
                         if (_debug) {
-                            console.error('-->> Bingo ladezeit mit überschuss ' + pvfc[h][0] + ' ' + pvfc[h][1]);
+                            console.error('-->> Bingo ladezeit mit überschuss _max_pwr ' +_max_pwr + '  ' + pvfc[h][0] + ' ' + pvfc[h][1]);
                         }     
                         _SpntCom = _InitCom_An;                       
                                
@@ -828,6 +819,7 @@ async function processing() {
                         break;
                     }
                 }
+
                 if (!ladezeit) {          // sicherstellen dass die batterie nicht entladen wird wenn falsche Werte
                     _max_pwr = 0;        
                 }
