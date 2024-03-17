@@ -10,6 +10,9 @@ const batterieLadenUhrzeitDP      = userDataDP + '.strom.batterieLadenUhrzeit';
 const batterieLadenUhrzeitStartDP = userDataDP + '.strom.batterieLadenUhrzeitStart';
 const batterieLadenManuellStartDP = userDataDP + '.strom.batterieLadenManuellStart';
 
+const momentan_VerbrauchDP = userDataDP + '.strom.Momentan_Verbrauch';
+const pV_Leistung_aktuellDP = userDataDP + '.strom.PV_Leistung_aktuell';
+
 const _options = { hour12: false, hour: '2-digit', minute: '2-digit' };
 
 // debug
@@ -145,9 +148,14 @@ createUserStates(userDataDP, false, ['strom.batterieLadenUhrzeitStart', { 'name'
 createUserStates(userDataDP, false, ['strom.batterieLadenUhrzeit', { 'name': 'Batterie Laden ab Uhr', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 15 }], function () {
     setState(batterieLadenUhrzeitDP, 15, true);
 });
+
 /*
-createUserStates(userDataDP, false, ['.strom.PV_Leistung_aktuell', { 'name': 'dc1 + dc2', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0, 'unit': 'kW', }], function () {
-    setState(userDataDP + '.strom.PV_Leistung_aktuell', _dc_now, true);
+createUserStates(userDataDP, false, [strom.Momentan_Verbrauch', { 'name': 'Momentan_Verbrauch', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0, 'unit': 'kW', }], function () {
+    setState(momentan_VerbrauchDP, 0, true);
+});
+
+createUserStates(userDataDP, false, ['strom.PV_Leistung_aktuell', { 'name': 'PV_Leistung_aktuell dc1 + dc2', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0, 'unit': 'kW', }], function () {
+    setState(pV_Leistung_aktuellDP, 0, true);
 });
 */
 
@@ -171,6 +179,8 @@ setState(communicationRegisters.maxdischrg, _maxdischrg_def);
 // ab hier Programmcode
 async function processing() {
 
+    let dateNow = new Date();
+
     _macheNix = false;
     _SpntCom = _InitCom_Aus;
 
@@ -178,13 +188,17 @@ async function processing() {
         inputRegisters.powerOut = _sma_em + ".psurplus" /*aktuelle Einspeiseleistung am Netzanschlußpunkt, SMA-EM Adapter*/
     }
 
-    let dateNow = new Date();
-
-    let pvlimit       = (_pvPeak / 100 * _surplusLimit);                       //pvlimit = 12000/100*0 = 0
-    let einspeisung   = Math.round(getState(inputRegisters.powerOut).val);     // Einspeisung  in W
     _batsoc           = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR         
 
+    let einspeisung   = Math.round(getState(inputRegisters.powerOut).val);     // Einspeisung  in W
+    let battOut       = getState(inputRegisters.battOut).val;
+    let battIn        = getState(inputRegisters.battIn).val;
+    let netzbezug     = getState(inputRegisters.netzbezug).val;
+
     _dc_now           = getState(inputRegisters.dc1).val + getState(inputRegisters.dc2).val;  // pv vom Dach zusammen in W
+
+    _verbrauchJetzt   = 100 + _dc_now + battOut + netzbezug - einspeisung - battIn;        // verbrauch in W , 100W reserve obendruaf
+    setState(momentan_VerbrauchDP, Math.round((_verbrauchJetzt /1000)*100)/100, true);
 
     if (_dc_now < 10) {              // alles was unter 10 KW kann weg
         _dc_now = 0;
@@ -197,13 +211,9 @@ async function processing() {
         dc_now_DP = Math.round((dc_now_DP /1000)*100)/100;
     }
 
-    setState(userDataDP + '.strom.PV_Leistung_aktuell', dc_now_DP, true);
+    setState(pV_Leistung_aktuellDP, dc_now_DP, true);
 
-    let battOut     = getState(inputRegisters.battOut).val;
-    let battIn      = getState(inputRegisters.battIn).val;
-    let netzbezug   = getState(inputRegisters.netzbezug).val;
-  //  let powerAC     = getState(inputRegisters.powerAC).val * -1;
-
+    let pvlimit                       = (_pvPeak / 100 * _surplusLimit);                       //pvlimit = 12000/100*0 = 0
     let batterieLadenUhrzeit          = getState(batterieLadenUhrzeitDP).val;
     let batterieLadenUhrzeitStart     = getState(batterieLadenUhrzeitStartDP).val;
 
@@ -219,8 +229,6 @@ async function processing() {
             }
         }
     }                                
-
-    _verbrauchJetzt = 100 + _dc_now + battOut + netzbezug - einspeisung - battIn;        // verbrauch in W , 100W reserve obendruaf
 
     /* Default Werte setzen*/
     let battStatus = getState(inputRegisters.betriebszustandBatterie).val;
@@ -239,12 +247,13 @@ async function processing() {
     // Lademenge
     let lademenge_full = Math.ceil((_batteryCapacity * (100 - _batsoc) / 100) * (1 / _wr_efficiency));                       //Energiemenge bis vollständige Ladung
     let lademenge = Math.max(Math.ceil((_batteryCapacity * (_batteryTarget - _batsoc) / 100) * (1 / _wr_efficiency)), 0);    //lademenge = Energiemenge bis vollständige Ladung
-    let restladezeit = lademenge / _batteryLadePower;                                                                               //Ladezeit = Energiemenge bis vollständige Ladung / Ladeleistung WR
+    let restladezeit = lademenge / _batteryLadePower;                                                                        //Ladezeit = Energiemenge bis vollständige Ladung / Ladeleistung WR
 
     if (restladezeit <= 0) {
         restladezeit = 0;
         lademenge = lademenge_full;
     }
+
     if (_debug) {
         console.warn('pvlimit        _________________ ' + pvlimit + ' W');
         console.warn('Verbrauch jetzt_________________ ' + _verbrauchJetzt + ' W');
@@ -903,7 +912,7 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
 
     setTimeout(function () {
         processing();             /*start processing in interval*/
-    }, 500);                        // verzögerung zwecks Datenabholung
+    }, 600);                        // verzögerung zwecks Datenabholung
 
 });
 
