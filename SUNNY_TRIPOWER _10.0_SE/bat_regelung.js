@@ -59,7 +59,7 @@ const inputRegisters = {
     battIn: 'modbus.0.inputRegisters.3.31393_Momentane_Batterieladung',
     dc1: 'modbus.0.inputRegisters.3.30773_DC-Leistung_1',
     dc2: 'modbus.0.inputRegisters.3.30961_DC-Leistung_2',
-    powerAC: 'modbus.0.inputRegisters.3.30775_AC-Leistung',
+  //  powerAC: 'modbus.0.inputRegisters.3.30775_AC-Leistung',
 }
 
 const bydDirectSOCDP  = 'bydhvs.0.State.SOC';                            // battSOC netto direkt von der Batterie
@@ -202,7 +202,7 @@ async function processing() {
     let battOut     = getState(inputRegisters.battOut).val;
     let battIn      = getState(inputRegisters.battIn).val;
     let netzbezug   = getState(inputRegisters.netzbezug).val;
-    let powerAC     = getState(inputRegisters.powerAC).val * -1;
+  //  let powerAC     = getState(inputRegisters.powerAC).val * -1;
 
     let batterieLadenUhrzeit          = getState(batterieLadenUhrzeitDP).val;
     let batterieLadenUhrzeitStart     = getState(batterieLadenUhrzeitStartDP).val;
@@ -246,6 +246,7 @@ async function processing() {
         lademenge = lademenge_full;
     }
     if (_debug) {
+        console.warn('pvlimit        _________________ ' + pvlimit + ' W');
         console.warn('Verbrauch jetzt_________________ ' + _verbrauchJetzt + ' W');
         console.warn('PV Produktion___________________ ' + _dc_now + ' W');
         console.warn('Ladeleistung Batterie___________ ' + _batteryLadePower + ' W');
@@ -376,7 +377,7 @@ async function processing() {
         let tti = 0;        
         let nachtIdx = Number(hhJetzt);
 
-        for (let t = 0; t < pricehrs; t++) {     // nimm alle stunden ab laufender stunde 
+        for (let t = 0; t < pricehrs; t++) {     // nimm alle tibber stunden  
             let hrparse  = getState(tibberDP + nachtIdx + '.startTime').val.split(':')[0];
             let prcparse = getState(tibberDP + nachtIdx + '.price').val;
 
@@ -396,7 +397,8 @@ async function processing() {
         }
 
         if (_debug) {
-            console.warn('poihigh.length ' + poihigh.length + ' poihigh vor nachladen: ' + JSON.stringify(poihigh) );
+            console.warn('poihigh.length ' + poihigh.length);
+        //    console.warn('poihigh vor nachladen: ' + JSON.stringify(poihigh));
         }
 
         // ggf nachladen?
@@ -511,7 +513,8 @@ async function processing() {
             poihigh = filterTimes(poihigh); // übernehmen nur laufende und zukünftige werte
 
             if (_debug) {
-                console.warn('poihigh.length '+ poihigh.length + ' poihigh sortiert ' + JSON.stringify(poihigh));
+                console.warn('poihigh.length '+ poihigh.length);
+            //    console.warn('poihigh sortiert ' + JSON.stringify(poihigh));
             }
 
             let lefthrs = batlefthrs * 2;             // batlefthrs Bat h verbleibend
@@ -746,7 +749,7 @@ async function processing() {
 
                 let pvlimit_calc = pvlimit;
                 let min_pwr = 0;
-
+ 
                 if (restladezeit > 0 && lademenge > 0 && lademenge > get_wh) {
                     if ((restladezeit * 2) <= pvfc.length) {
                         restladezeit = pvfc.length / 2;                          //entzerren des Ladevorganges
@@ -760,32 +763,24 @@ async function processing() {
                 }
 
                 if (_debug) {
-                    console.warn('-->   Verschiebe Einspeiselimit auf pvlimit_calc ' + pvlimit_calc + ' W' + ' mit mindestens ' + min_pwr + ' W  get_wh ' + get_wh);
+                    console.warn('-->   Verschiebe Einspeiselimit auf pvlimit_calc ' + pvlimit_calc + ' W' + ' mit mindestens ' + min_pwr + ' W  get_wh ' + get_wh + ' restladezeit ' + restladezeit);
                 }
 
-                let current_pwr_diff = 0;
+                let current_pwr_diff = _dc_now - _verbrauchJetzt;
 
                 if (lademenge > 0 && get_wh >= lademenge) {
                     restladezeit = pvfc.length / 2;
-                    current_pwr_diff =_dc_now - _verbrauchJetzt;
-                    _max_pwr = Math.round(current_pwr_diff);
-          
-                    if (_debug) {
-                        console.warn('-->> Einspeisung ' + einspeisung + ' _verbrauchJetzt ' + _verbrauchJetzt + ' current_pwr_diff ' + current_pwr_diff + ' restladezeit ' + restladezeit);
-                        console.warn('-->> aus der Begrenzung holen... ' + _max_pwr + ' _SpntCom ' + _SpntCom + ' isTibber_active ' + isTibber_active);
+
+                    _max_pwr = Math.round(pvfc[0][1] - pvlimit_calc);
+
+                    if (_max_pwr > current_pwr_diff) {
+                        _max_pwr = Math.round(current_pwr_diff);                       
                     }
                     
-                    //aus der begrenzung holen.. her evtl. 
-                    if (powerAC <= 10 && current_pwr_diff > 0) {
-                        _max_pwr = Math.round(pvfc[0][1] - pvlimit_calc);
-
-                        if (current_pwr_diff > _max_pwr) {
-                            _max_pwr = Math.round(current_pwr_diff);                       
-                        }
-                        if (_debug) { 
-                            console.warn('nach der Begrenzung  :_max_pwr ' + _max_pwr + ' pvfc[0][1] ' + pvfc[0][1] + ' startzeit ' + pvfc[0][3] + ' pvlimit_calc ' + pvlimit_calc);
-                        }
+                    if (_debug) { 
+                        console.warn('nach der Begrenzung  :_max_pwr ' + _max_pwr + ' pvfc[0][1] ' + pvfc[0][1] + ' startzeit ' + pvfc[0][3] + ' pvlimit_calc ' + pvlimit_calc);
                     }
+
                 }
 
                 if (_debug) {               
@@ -801,9 +796,9 @@ async function processing() {
                 let ladezeit = false;
 
                 for (let h = 0; h < (restladezeit * 2); h++) {
-                    if ((compareTime(pvfc[h][3], pvfc[h][4], 'between')) || (einspeisung + powerAC) >= (pvlimit - 100)) {
+                    if (compareTime(pvfc[h][3], pvfc[h][4], 'between')) {
                         if (_debug) {
-                            console.error('-->> Bingo ladezeit mit überschuss _max_pwr ' +_max_pwr + '  ' + pvfc[h][0] + ' ' + pvfc[h][1]);
+                            console.error('-->> Bingo ladezeit mit überschuss _max_pwr ' + _max_pwr + '  ' + pvfc[h][0] + ' ' + pvfc[h][1]);
                         }     
                         _SpntCom = _InitCom_An;                       
                                
