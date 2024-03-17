@@ -20,10 +20,10 @@ const _pvPeak = 13100;                                  // PV-Anlagenleistung in
 const _batteryCapacity = 12800;                         // Netto Batterie Kapazität in Wh
 const _surplusLimit = 0;                                // PV-Einspeise-Limit in % 0 keine Einspeisung
 const _batteryTarget = 100;                             // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
-const _lastPercentageLoadWith = -500;                   // letzten 5 % laden mit xxx Watt
+const _lastPercentageLoadWith = 500;                   // letzten 5 % laden mit xxx Watt
 const _baseLoad = 750;                                  // Grundverbrauch in Watt
 const _wr_efficiency = 0.9;                             // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
-const _batteryLadePower = 5000;                         // Ladeleistung der Batterie in W, BYD mehr geht nicht
+const   _batteryLadePower = 5000;                         // Ladeleistung der Batterie in W, BYD mehr geht nicht
 const _batteryPowerEmergency = -5000;                   // Ladeleistung der Batterie in W notladung
 const _mindischrg = 1;                                  // 0 geht nicht da sonst max entladung .. also die kleinste mögliche Einheit 1
 const _pwrAtCom_def = _batteryLadePower * (253 / 230);  // max power bei 253V = 5500 W 
@@ -373,10 +373,6 @@ async function processing() {
             }
         }
         
-        if (_debug) {
-            console.warn('Batterielaufzeit nach 14 uhr : ' + pricehrs + ' h');
-        }
-
         let tti = 0;        
         let nachtIdx = Number(hhJetzt);
 
@@ -467,7 +463,7 @@ async function processing() {
                             m--;
                         }
                     }
-                    if (poitmp.length > 0) {   /*&& prclow.length > 1 && poihigh[0][1] != prclow[0][1]*/
+                    if (poitmp.length > 0) {   // && prclow.length > 1 && poihigh[0][1] != prclow[0][1]
                         if (poihigh[l][2] == prclow[0][1]) {
                             break;
                         }
@@ -507,10 +503,6 @@ async function processing() {
             }
         }
 
-        if (_debug) {
-            console.warn('in Nachladen _macheNix: ' + _macheNix + ' max_pwr ' + _max_pwr);
-        }
-
         if (!_macheNix) {
             poihigh.sort(function (a, b) {      // sortiert höchster preis zuerst            
                 return b[0] - a[0];
@@ -532,14 +524,14 @@ async function processing() {
                 if (lefthrs > 0 && lefthrs < hrstorun * 2 && pvwh < _baseLoad * 24 * _wr_efficiency) {
                     if (batlefthrs >= hrstorun) {             // die laufzeit reicht bis zum sonnenaufgang entlade alles
                         if (_debug) {
-                            console.warn('Entladezeit reicht aus bis zum Sonnaufgang ' + lefthrs + ' - ' + batlefthrs);
+                            console.warn('Entladezeit reicht aus bis zum Sonnaufgang ' + hrstorun + ' - ' + batlefthrs);
                         }
                         _SpntCom = _InitCom_Aus;
                         _max_pwr = 0;
                         _macheNix = true;
                         isTibber_active = 2;                                        
                         _entladung_zeitfenster = true;
-                        entladeZeitenArray.push(0.00,'--:--','--:--');  //  [0.2856,"19:30","20:00"]
+                        entladeZeitenArray.push(0.00, lefthrs, batlefthrs);  //  [0.2856,"19:30","20:00"]
                     } else {                        
                         for (let d = 0; d < lefthrs; d++) {
                             if (poihigh[d] != null) {
@@ -766,7 +758,7 @@ async function processing() {
                     }
                     
                     pvlimit_calc = Math.max((Math.round(pvlimit - ((lademenge - get_wh) / restladezeit))), 0); //virtuelles reduzieren des pvlimits
-                    min_pwr = Math.max(Math.round((lademenge - get_wh) / restladezeit), 0);
+                    min_pwr = Math.max(Math.round((lademenge - get_wh) / restladezeit), 0);                   
 
                     get_wh = lademenge;       //daran liegts damit der unten immer rein geht ????                    
 
@@ -806,31 +798,40 @@ async function processing() {
                 }
 
                 _max_pwr = Math.round(Math.min(Math.max(_max_pwr, min_pwr), _batteryLadePower)); //abfangen negativer werte, limitiere auf min_pwr orginal
-                
+
+                    
+
                 if (_debug) {               
                     console.warn('Ausgabe B  :_max_pwr ' + _max_pwr);
                 }
                 
+                let ladezeit = false;
+
                 for (let h = 0; h < (restladezeit * 2); h++) {
                     if ((compareTime(pvfc[h][3], pvfc[h][4], 'between')) || (einspeisung + powerAC) >= (pvlimit - 100)) {
                         if (_debug) {
-                            console.warn('-->> Bingo ladezeit mit überschuss ' + pvfc[h][0] + ' ' + pvfc[h][1]);
+                            console.error('-->> Bingo ladezeit mit überschuss ' + pvfc[h][0] + ' ' + pvfc[h][1]);
                         }     
                         _SpntCom = _InitCom_An;                       
                                
-                        if (_max_pwr > _dc_now - _verbrauchJetzt) {  // wenn das ermittelte grösser ist als die realität dann limmitiere
+                        if (_max_pwr > _dc_now - _verbrauchJetzt) {  // wenn das ermittelte wert grösser ist als die realität dann limmitiere
                             _max_pwr = _dc_now - _verbrauchJetzt;   
                         }
-
-                        _max_pwr = _max_pwr * -1;
 
                         if (_batsoc > 95) {     // letzten 5 % langsam laden
                             _max_pwr = _lastPercentageLoadWith;    
                         }
 
+                        _max_pwr = _max_pwr * -1;
+
+                        ladezeit = true;
                         break;
                     }
                 }
+                if (!ladezeit) {          // sicherstellen dass die batterie nicht entladen wird wenn falsche Werte
+                    _max_pwr = 0;        
+                }
+
             } 
         }
     }
