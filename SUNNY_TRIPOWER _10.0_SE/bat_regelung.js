@@ -507,7 +507,9 @@ async function processing() {
             poihigh.sort(function (a, b) {      // sortiert höchster preis zuerst            
                 return b[0] - a[0];
             });
-            
+             
+            poihigh = filterTimes(poihigh); // übernehmen nur laufende und zukünftige werte
+
             if (_debug) {
                 console.warn('poihigh.length '+ poihigh.length + ' poihigh sortiert ' + JSON.stringify(poihigh));
             }
@@ -984,6 +986,19 @@ function datumTimestamp(uhrzeit, val) {
     currentDate.setHours(stunden, minuten, 0, 0);
  
     return currentDate.getTime();
+}
+
+function filterTimes(array) {
+    const now = new Date();
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+
+    const filteredArray = array.filter(item => {
+        const startTime = parseInt(item[1].split(':')[0]) * 60 + parseInt(item[1].split(':')[1]);
+        const endTime = parseInt(item[2].split(':')[0]) * 60 + parseInt(item[2].split(':')[1]);
+        return currentTime <= startTime || currentTime >= startTime && currentTime <= endTime;
+    });
+
+    return filteredArray;
 }
 
 on({
