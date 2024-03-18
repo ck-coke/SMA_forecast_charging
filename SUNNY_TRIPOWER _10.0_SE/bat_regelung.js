@@ -23,10 +23,10 @@ const _pvPeak = 13100;                                  // PV-Anlagenleistung in
 const _batteryCapacity = 12800;                         // Netto Batterie Kapazität in Wh
 const _surplusLimit = 0;                                // PV-Einspeise-Limit in % 0 keine Einspeisung
 const _batteryTarget = 100;                             // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
-const _lastPercentageLoadWith = 500;                   // letzten 5 % laden mit xxx Watt
-const _baseLoad = 750;                                  // Grundverbrauch in Watt
+const _lastPercentageLoadWith = 500;                    // letzten 5 % laden mit xxx Watt
+const _baseLoad = 850;                                  // Grundverbrauch in Watt
 const _wr_efficiency = 0.9;                             // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
-const   _batteryLadePower = 5000;                         // Ladeleistung der Batterie in W, BYD mehr geht nicht
+const   _batteryLadePower = 5000;                       // Ladeleistung der Batterie in W, BYD mehr geht nicht
 const _batteryPowerEmergency = -5000;                   // Ladeleistung der Batterie in W notladung
 const _mindischrg = 1;                                  // 0 geht nicht da sonst max entladung .. also die kleinste mögliche Einheit 1
 const _pwrAtCom_def = _batteryLadePower * (253 / 230);  // max power bei 253V = 5500 W 
@@ -457,6 +457,7 @@ async function processing() {
             if (hrstorun < 24 && !_snowmode) {
                 chargewh = chargewh - (pvwh * _wr_efficiency);
             }
+
             let curbatwh = ((_batteryCapacity / 100) * _batsoc);
             let chrglength = Math.max((chargewh - curbatwh) / (_batteryLadePower * _wr_efficiency), 0) * 2;
 
@@ -523,7 +524,7 @@ async function processing() {
 
             if (_debug) {
                 console.warn('poihigh.length '+ poihigh.length);
-            //    console.warn('poihigh sortiert ' + JSON.stringify(poihigh));
+                console.warn('poihigh sortiert ' + JSON.stringify(poihigh));
             }
 
             let lefthrs = batlefthrs * 2;             // batlefthrs Bat h verbleibend
@@ -568,8 +569,7 @@ async function processing() {
                                                 _max_pwr = 0;
                                                 _macheNix = true;
                                                 isTibber_active = 2;                                        
-                                                _entladung_zeitfenster = true;
-                                                break;
+                                                _entladung_zeitfenster = true;                                                
                                             }
                                         }
                                     }
@@ -662,10 +662,14 @@ async function processing() {
         _prognoseNutzenSteuerung = false;
     }
 
-    if (_batsoc > 99 && _dc_now > 0) {
+    if (_batsoc > 99 && _dc_now > 0) {        // Batterie voll 
         _prognoseNutzenSteuerung = false;   
     }
-   
+    
+    if (isTibber_active == 2) {     // nutze rest Sonne wenn schon Zeit zum entladen
+        _SpntCom = _InitCom_Aus;    
+    }
+
     if (_dc_now > _verbrauchJetzt) {                                      // macht nur sinn wenn gunug PV      
         if (_prognoseNutzenSteuerung) {
         
