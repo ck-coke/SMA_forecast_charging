@@ -564,9 +564,9 @@ async function processing() {
                                     _entladung_zeitfenster = false;
                                     _SpntCom = _InitCom_An;
                                     
-                                //    if (_debug) {
-                                //        console.warn('Entladezeiten: ' + poihigh[d][1] + '-' + poihigh[d][2] + ' Preis ' + poihigh[d][0] + ' Fahrzeug zieht ' + vehicleConsum + ' W');
-                                //    }
+                                    if (_debug) {
+                                        console.warn('Entladezeiten: ' + poihigh[d][1] + '-' + poihigh[d][2] + ' Preis ' + poihigh[d][0] + ' Fahrzeug zieht ' + vehicleConsum + ' W');
+                                    }
 
                                     entladeZeitenArray.push(poihigh[d]);   
 
@@ -574,7 +574,7 @@ async function processing() {
                                         if (vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
                                             break;                                            
                                         } else {
-                                            if (_dc_now <= _baseLoad) { // entlade nur wenn sich das lohnt
+                                            if (_dc_now <= _verbrauchJetzt) {           // entlade nur wenn sich das lohnt
                                                 _SpntCom = _InitCom_Aus;
                                                 _max_pwr = 0;
                                                 _macheNix = true;
@@ -856,7 +856,7 @@ async function processing() {
 
 // ----------------------------------------------------           write data
 
-    if (_SpntCom == _InitCom_An || _SpntCom != _lastSpntCom) {
+    if (_SpntCom == _InitCom_An || _SpntCom != _lastSpntCom && !_batterieLadenUebersteuernManuell && !_notLadung) {
         if (_debug) {
             console.warn('Daten gesendet an WR kommunikation Wirkleistungvorgabe : ' + PwrAtCom + ' comm ' + _SpntCom);
         }
@@ -872,19 +872,6 @@ async function processing() {
 
     _lastSpntCom = _SpntCom;
     
-    if (!_notLadung) {
-        if (_SpntCom != _lastSpntCom) {
-            if (_debug) {
-                console.error('Tibber und Prognose sind aus batterieLadenUebersteuernManuell ' + _batterieLadenUebersteuernManuell);
-            }
-            if (!_batterieLadenUebersteuernManuell) {
-                _SpntCom = _InitCom_Aus;
-                setState(communicationRegisters.fedInSpntCom, _SpntCom);        // 40151_Kommunikation
-                setState(spntComCheckDP, _SpntCom, true);                               // check DP für vis
-                _lastSpntCom = _SpntCom;
-            }
-        }
-    }
 }
 
 
@@ -904,7 +891,7 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
     _batterieLadenUebersteuernManuell   = getState(batterieLadenManuellStartDP).val;
 
     if (_batterieLadenUebersteuernManuell || _tibberNutzenManuell) {
-        _lastSpntCom = 0;
+        _lastSpntCom = 98;
         _tibberNutzenSteuerung = false;     // der steuert intern ob lauf gültig  für tibber laden/entladen
         _prognoseNutzenSteuerung = false;   // der steuert intern ob lauf gültig  für pv laden                                     
     }
@@ -917,6 +904,7 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
     _notLadung = notLadungCheck();
 
     if (_notLadung) {
+        _lastSpntCom = 99;
         _tibberNutzenSteuerung = false;
         _prognoseNutzenSteuerung = false;
     }
@@ -934,21 +922,19 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
 function notLadungCheck() {
     _bydDirectSOC = getState(bydDirectSOCDP).val;   
 
-    if (!_batterieLadenUebersteuernManuell) {       
-        if (_bydDirectSOC < 6 && _dc_now < _baseLoad) {
-            if (_bydDirectSOC != _bydDirectSOCMrk) {
-                console.warn(' -----------------    Batterie NOTLADEN ' + _bydDirectSOC + ' %');
-                _bydDirectSOCMrk = _bydDirectSOC;
-            }
-            
-            setState(communicationRegisters.fedInPwrAtCom, _batteryPowerEmergency);
-            _SpntCom = _InitCom_An;
-            setState(communicationRegisters.fedInSpntCom, _SpntCom);
-            setState(spntComCheckDP, _SpntCom, true);
-            _lastSpntCom = 0;
-            return true;            
+    if (_bydDirectSOC < 6 && _dc_now < _baseLoad) {
+        if (_bydDirectSOC != _bydDirectSOCMrk) {
+            console.warn(' -----------------    Batterie NOTLADEN ' + _bydDirectSOC + ' %');
+            _bydDirectSOCMrk = _bydDirectSOC;
         }
+        
+        setState(communicationRegisters.fedInPwrAtCom, _batteryPowerEmergency);
+        _SpntCom = _InitCom_An;
+        setState(communicationRegisters.fedInSpntCom, _SpntCom);
+        setState(spntComCheckDP, _SpntCom, true);
+        return true;            
     }
+    
     return false;
 }
 
