@@ -23,7 +23,7 @@ const _pvPeak = 13100;                                  // PV-Anlagenleistung in
 const _batteryCapacity = 12800;                         // Netto Batterie Kapazität in Wh
 const _surplusLimit = 0;                                // PV-Einspeise-Limit in % 0 keine Einspeisung
 const _batteryTarget = 100;                             // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
-const _lastPercentageLoadWith = 500;                    // letzten 5 % laden mit xxx Watt
+const _lastPercentageLoadWith = -500;                    // letzten 5 % laden mit xxx Watt
 const _baseLoad = 750;                                  // Grundverbrauch in Watt
 const _wr_efficiency = 0.9;                             // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
 const   _batteryLadePower = 5000;                       // Ladeleistung der Batterie in W, BYD mehr geht nicht
@@ -183,6 +183,7 @@ setState(communicationRegisters.maxdischrg, _maxdischrg_def);
 async function processing() {
 
     let dateNow = new Date();
+    const hhJetzt = getHH(); 
 
     _macheNix = false;
     _SpntCom = _InitCom_Aus;
@@ -197,13 +198,12 @@ async function processing() {
     let battOut       = getState(inputRegisters.battOut).val;
     let battIn        = getState(inputRegisters.battIn).val;
     let netzbezug     = getState(inputRegisters.netzbezug).val;
+    let wirdGeladen = false;
 
     _dc_now           = getState(inputRegisters.dc1).val + getState(inputRegisters.dc2).val;  // pv vom Dach zusammen in W
 
     _verbrauchJetzt   = 100 + (_dc_now + battOut + netzbezug) - (einspeisung + battIn);        // verbrauch in W , 100W reserve obendruaf
     setState(momentan_VerbrauchDP, Math.round(((_verbrauchJetzt-100) /1000)*100)/100, true); // für die darstellung können die 100 W wieder raus
-
-    setState(tibberDP + 'extra.PV_Abschluss', '--:--', true);
     
     if (_dc_now < 10) {              // alles was unter 10 KW kann weg
         _dc_now = 0;
@@ -294,7 +294,6 @@ async function processing() {
             }
         }
         
-        const hhJetzt = getHH(); 
         let nowhalfhr = hhJetzt + ':00';
         
         let batlefthrs = ((_batteryCapacity / 100) * _batsoc) / (_baseLoad / Math.sqrt(_lossfactor));    /// 12800 / 100 * 30
@@ -557,7 +556,7 @@ async function processing() {
                         _macheNix = true;
                         isTibber_active = 2;                                        
                         _entladung_zeitfenster = true;
-                        entladeZeitenArray.push(0.00, lefthrs, batlefthrs);  //  [0.2856,"19:30","20:00"]
+                        entladeZeitenArray.push('--:--');  //  [0.2856,"19:30","20:00"] 0.2756,21:30,22:00
                     } else {                        
                         for (let d = 0; d < lefthrs; d++) {
                             if (poihigh[d] != null) {
@@ -569,7 +568,7 @@ async function processing() {
                                 //        console.warn('Entladezeiten: ' + poihigh[d][1] + '-' + poihigh[d][2] + ' Preis ' + poihigh[d][0] + ' Fahrzeug zieht ' + vehicleConsum + ' W');
                                 //    }
 
-                                    entladeZeitenArray.push(poihigh[d]);                                        
+                                    entladeZeitenArray.push(poihigh[d]);   
 
                                     if (compareTime(poihigh[d][1], poihigh[d][2], "between")) {
                                         if (vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
@@ -665,20 +664,12 @@ async function processing() {
         console.error('-->> PV jetzt ' + _dc_now + ' Verbrauch jetzt ' + _verbrauchJetzt);
     }
 
-    if (batterieLadenUhrzeitStart && getHH() >= batterieLadenUhrzeit && _dc_now > _verbrauchJetzt) {    // laden übersteuern ab bestimmter uhrzeit
+    if ((batterieLadenUhrzeitStart && hhJetzt >= batterieLadenUhrzeit) || isTibber_active == 2) {    // laden übersteuern ab bestimmter uhrzeit
         if (_debug) {
-            console.error('-->> übersteuert mit nach Uhrzeit laden und genug PV');
+            console.error('-->> übersteuert mit nach Uhrzeit laden und genug PV oder tibber ' + isTibber_active);
         }
         _SpntCom = _InitCom_Aus;
         _prognoseNutzenSteuerung = false;
-    }
-
-    if (_batsoc > 99 && _dc_now > 0) {        // Batterie voll 
-        _prognoseNutzenSteuerung = false;   
-    }
-    
-    if (isTibber_active == 2) {     // nutze rest Sonne wenn schon Zeit zum entladen
-        _SpntCom = _InitCom_Aus;    
     }
 
     if (_dc_now > _verbrauchJetzt) {                                      // macht nur sinn wenn gunug PV      
@@ -705,6 +696,8 @@ async function processing() {
                     }
                 }
             }
+
+            setState(tibberDP + 'extra.PV_Abschluss', '--:--', true); 
 
             if (pvfc.length > 0) {
                 latesttime = pvfc[(pvfc.length - 1)][4];
@@ -817,8 +810,6 @@ async function processing() {
                 if (_debug) {               
                     console.warn('Ausgabe B  :_max_pwr ' + _max_pwr);
                 }
-                
-                let ladezeit = false;
 
                 setState(tibberDP + 'extra.ladeZeitenArray', pvfc, true);
                 
@@ -836,18 +827,14 @@ async function processing() {
                             }     
                         }
 
-                        if (_batsoc > 95) {     // letzten 5 % langsam laden
-                            _max_pwr = _lastPercentageLoadWith;    
-                        }
-
                         _max_pwr = _max_pwr * -1;
 
-                        ladezeit = true;
+                        wirdGeladen = true;
                         break;
                     }
                 }
 
-                if (!ladezeit) {          // sicherstellen dass die batterie nicht entladen wird wenn falsche Werte
+                if (!wirdGeladen) {          // sicherstellen dass die batterie nicht entladen wird wenn falsche Werte
                     _max_pwr = 0;        
                 }
 
@@ -856,35 +843,41 @@ async function processing() {
     }
 
 // ---------------------------------------------------- Ende der PV Prognose Sektion
+
+    if (_batsoc > 95 && wirdGeladen) {     // letzten 5 % langsam laden
+        _max_pwr = _lastPercentageLoadWith;    
+    }
+
     if (_max_pwr == _mindischrg || _max_pwr == 0) {
         _max_pwr = _mindischrg * -1;  // negiere das ganze 
     }
 
     PwrAtCom = _max_pwr;
 
-    if (_tibberNutzenSteuerung || _prognoseNutzenSteuerung) {               // doppelt hält besser
 // ----------------------------------------------------           write data
 
-        if (_SpntCom == _InitCom_An || _SpntCom != _lastSpntCom) {
-            if (_debug) {
-                console.warn('Daten gesendet an WR kommunikation Wirkleistungvorgabe : ' + PwrAtCom + ' comm ' + _SpntCom);
-            }
-            setState(communicationRegisters.fedInPwrAtCom, PwrAtCom);       // 40149_Wirkleistungvorgabe
-            setState(communicationRegisters.fedInSpntCom, _SpntCom);        // 40151_Kommunikation
-            setState(spntComCheckDP, _SpntCom, true);                               // check DP für vis
-        }
-
+    if (_SpntCom == _InitCom_An || _SpntCom != _lastSpntCom) {
         if (_debug) {
-            console.warn('SpntCom jetzt ' + _SpntCom + ' davor war ' + _lastSpntCom + ' Wirkleistungvorgabe ' + PwrAtCom + ' _verbrauchJetzt ' + _verbrauchJetzt + ' pv_jetzt ' + _dc_now);
-            console.warn('----------------------------------------------------------------------------------');
+            console.warn('Daten gesendet an WR kommunikation Wirkleistungvorgabe : ' + PwrAtCom + ' comm ' + _SpntCom);
         }
+        setState(communicationRegisters.fedInPwrAtCom, PwrAtCom);       // 40149_Wirkleistungvorgabe
+        setState(communicationRegisters.fedInSpntCom, _SpntCom);        // 40151_Kommunikation
+        setState(spntComCheckDP, _SpntCom, true);                       // check DP für vis
+    }
 
-        _lastSpntCom = _SpntCom;
-        
-    }  else {
-        if (!_notLadung) {
-            if (_SpntCom != _lastSpntCom) {
-                console.warn('Tibber und Prognose sind aus');
+    if (_debug) {
+        console.warn('SpntCom jetzt --> ' + _SpntCom + ' <-- davor war ' + _lastSpntCom + ' Wirkleistungvorgabe ' + PwrAtCom + ' _verbrauchJetzt ' + _verbrauchJetzt + ' pv_jetzt ' + _dc_now);
+        console.warn('----------------------------------------------------------------------------------');
+    }
+
+    _lastSpntCom = _SpntCom;
+    
+    if (!_notLadung) {
+        if (_SpntCom != _lastSpntCom) {
+            if (_debug) {
+                console.error('Tibber und Prognose sind aus batterieLadenUebersteuernManuell ' + _batterieLadenUebersteuernManuell);
+            }
+            if (!_batterieLadenUebersteuernManuell) {
                 _SpntCom = _InitCom_Aus;
                 setState(communicationRegisters.fedInSpntCom, _SpntCom);        // 40151_Kommunikation
                 setState(spntComCheckDP, _SpntCom, true);                               // check DP für vis
@@ -898,25 +891,26 @@ async function processing() {
 /* ***************************************************************************************************************************************** */
 
 on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisiere laut adapter abfrageintervall
-    _debug = getState(tibberDP + 'debug').val;
-    _snowmode = getState(userDataDP + '.strom.tibber.extra.PV_Schneebedeckt').val;
-    _tibberNutzenAutomatisch = getState(tibberDP + 'extra.tibberNutzenAutomatisch').val;           // aus dem DP kommend sollte true sein für vis
-    _prognoseNutzenAutomatisch = getState(tibberDP + 'extra.prognoseNutzenAutomatisch').val;       // aus dem DP kommend sollte true sein für vis
+    _debug                      = getState(tibberDP + 'debug').val;
+    _snowmode                   = getState(userDataDP + '.strom.tibber.extra.PV_Schneebedeckt').val;
+    _tibberNutzenAutomatisch    = getState(tibberDP + 'extra.tibberNutzenAutomatisch').val;           // aus dem DP kommend sollte true sein für vis
+    _prognoseNutzenAutomatisch  = getState(tibberDP + 'extra.prognoseNutzenAutomatisch').val;       // aus dem DP kommend sollte true sein für vis
 
-    _tibberNutzenSteuerung = _tibberNutzenAutomatisch;       // init
-    _prognoseNutzenSteuerung = _prognoseNutzenAutomatisch;      // init
+    _tibberNutzenSteuerung      = _tibberNutzenAutomatisch;       // init
+    _prognoseNutzenSteuerung    = _prognoseNutzenAutomatisch;      // init
 
     // übersteuern nach prio manuell zuerst dann autoamtisch oder battsoc unter 5 %
-    const _tibberNutzenManuell = getState(tibberDP + 'extra.tibberNutzenManuell').val;
-    _batterieLadenUebersteuernManuell = getState(batterieLadenManuellStartDP).val;
+    const _tibberNutzenManuell          = getState(tibberDP + 'extra.tibberNutzenManuell').val;
+    _batterieLadenUebersteuernManuell   = getState(batterieLadenManuellStartDP).val;
 
     if (_batterieLadenUebersteuernManuell || _tibberNutzenManuell) {
+        _lastSpntCom = 0;
         _tibberNutzenSteuerung = false;     // der steuert intern ob lauf gültig  für tibber laden/entladen
         _prognoseNutzenSteuerung = false;   // der steuert intern ob lauf gültig  für pv laden                                     
     }
 
     if (_debug) {
-        console.error(' _tibberNutzenAutomatisch ' + _tibberNutzenAutomatisch + ' _prognoseNutzenAutomatisch ' + _prognoseNutzenAutomatisch);
+        console.warn('tibberNutzenAutomatisch ' + _tibberNutzenAutomatisch + ' prognoseNutzenAutomatisch ' + _prognoseNutzenAutomatisch);
     }
 
     // ---     check ob notladung nötig
@@ -928,7 +922,7 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
     }
 
     if (_debug) {
-        console.warn(' _tibberNutzenSteuerung ' + _tibberNutzenSteuerung + ' _prognoseNutzenSteuerung ' + _prognoseNutzenSteuerung);
+        console.warn('tibberNutzenSteuerung ' + _tibberNutzenSteuerung + ' prognoseNutzenSteuerung ' + _prognoseNutzenSteuerung);
     }
 
     setTimeout(function () {
@@ -946,7 +940,7 @@ function notLadungCheck() {
                 console.warn(' -----------------    Batterie NOTLADEN ' + _bydDirectSOC + ' %');
                 _bydDirectSOCMrk = _bydDirectSOC;
             }
-           
+            
             setState(communicationRegisters.fedInPwrAtCom, _batteryPowerEmergency);
             _SpntCom = _InitCom_An;
             setState(communicationRegisters.fedInSpntCom, _SpntCom);
@@ -1032,8 +1026,5 @@ on({
         tibberDP + 'extra.prognoseNutzenAutomatisch',
     ], change: 'any', val: false
 }, function () {
-    const SpntCom = _InitCom_Aus;
-    setState(communicationRegisters.fedInSpntCom, SpntCom);
-    setState(spntComCheckDP, SpntCom, true);
-    _lastSpntCom = 0;
+    _lastSpntCom = 99;
 });
