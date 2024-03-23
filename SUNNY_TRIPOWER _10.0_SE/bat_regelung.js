@@ -252,9 +252,9 @@ async function processing() {
     }
     
     // Lademenge
-    let lademenge_full = Math.ceil((_batteryCapacity * (100 - _batsoc) / 100) * (1 / _wr_efficiency));                       //Energiemenge bis vollständige Ladung
-    let lademenge = Math.max(Math.ceil((_batteryCapacity * (_batteryTarget - _batsoc) / 100) * (1 / _wr_efficiency)), 0);    //lademenge = Energiemenge bis vollständige Ladung
-    let restladezeit = lademenge / _batteryLadePower;                                                                        //Ladezeit = Energiemenge bis vollständige Ladung / Ladeleistung WR
+    let lademenge_full =          Math.ceil((_batteryCapacity * (100 - _batsoc) / 100) * (1 / _wr_efficiency));                   //Energiemenge bis vollständige Ladung
+    let lademenge      = Math.max(Math.ceil((_batteryCapacity * (_batteryTarget - _batsoc) / 100) * (1 / _wr_efficiency)), 0);    //lademenge = Energiemenge bis vollständige Ladung
+    let restladezeit = lademenge / _batteryLadePower;                                                                             //Ladezeit = Energiemenge bis vollständige Ladung / Ladeleistung WR
 
     if (restladezeit <= 0) {
         restladezeit = 0;
@@ -530,14 +530,18 @@ async function processing() {
 
             if (_debug) {
                 console.warn('poihigh.length '+ poihigh.length);
-            //    console.warn('poihigh sortiert ' + JSON.stringify(poihigh));
+             
             }
 
             let lefthrs = batlefthrs * 2;             // batlefthrs Bat h verbleibend
 
             if (lefthrs > 0 && lefthrs > poihigh.length) {
-                lefthrs = poihigh.length;            
+                lefthrs = poihigh.length;   
             }      
+
+            if (poihigh.length > 0) {
+                _SpntCom = _InitCom_An;   
+            }   
 
             if (_debug) {
                 console.warn('Entladezeit lefthrs ' + lefthrs);
@@ -562,7 +566,7 @@ async function processing() {
                             if (poihigh[d] != null) {
                                 if (poihigh[d][0] > _stop_discharge) {
                                     _entladung_zeitfenster = false;
-                                    _SpntCom = _InitCom_An;
+                 //                   _SpntCom = _InitCom_An;
                                     
                                     if (_debug) {
                                         console.warn('Entladezeiten: ' + poihigh[d][1] + '-' + poihigh[d][2] + ' Preis ' + poihigh[d][0] + ' Fahrzeug zieht ' + vehicleConsum + ' W');
@@ -774,10 +778,9 @@ async function processing() {
                     }
                     
                     pvlimit_calc = Math.max((Math.round(pvlimit - ((lademenge - get_wh) / restladezeit))), 0); //virtuelles reduzieren des pvlimits
-                    min_pwr = Math.max(Math.round((lademenge - get_wh) / restladezeit), 0);                   
+                    min_pwr      = Math.max(Math.round((lademenge - get_wh) / restladezeit), 0);                   
 
                     get_wh = lademenge;       //daran liegts damit der unten immer rein geht ????                    
-
                 }
 
                 if (_debug) {
@@ -798,11 +801,10 @@ async function processing() {
                     if (_debug) { 
                         console.warn('nach der Begrenzung  :_max_pwr ' + _max_pwr + ' pvfc[0][1] ' + pvfc[0][1] + ' startzeit ' + pvfc[0][3] + ' pvlimit_calc ' + pvlimit_calc);
                     }
-
                 }
 
                 if (_debug) {               
-                    console.warn('Ausgabe A  :_max_pwr ' + _max_pwr + ' min_pwr ' + min_pwr + ' _batteryLadePower ' + _batteryLadePower);
+                    console.warn('Ausgabe A  :_max_pwr ' + _max_pwr + ' min_pwr ' + min_pwr + ' current_pwr_diff ' + current_pwr_diff);
                 }
 
                 _max_pwr = Math.round(Math.min(Math.max(_max_pwr, min_pwr), _batteryLadePower)); //abfangen negativer werte, limitiere auf min_pwr orginal
@@ -837,7 +839,6 @@ async function processing() {
                 if (!wirdGeladen) {          // sicherstellen dass die batterie nicht entladen wird wenn falsche Werte
                     _max_pwr = 0;        
                 }
-
             } 
         }
     }
