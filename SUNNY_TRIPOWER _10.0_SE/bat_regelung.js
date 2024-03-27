@@ -20,7 +20,8 @@ let _debug = getState(tibberDP + 'debug').val == null ? false : getState(tibberD
 
 //-------------------------------------------------------------------------------------
 const _pvPeak = 13100;                                  // PV-Anlagenleistung in Wp
-const _batteryCapacity = 12800;                         // Netto Batterie Kapazität in Wh
+//const _batteryCapacity = 12800;                         // Netto Batterie Kapazität in Wh 2.56 pro Modul
+const _batteryCapacity = 10240;                         // Netto Batterie Kapazität in Wh
 const _surplusLimit = 0;                                // PV-Einspeise-Limit in % 0 keine Einspeisung
 const _batteryTarget = 100;                             // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
 const _lastPercentageLoadWith = -500;                    // letzten 5 % laden mit xxx Watt
@@ -294,20 +295,20 @@ async function processing() {
             }
         }
         
-        let nowhalfhr = hhJetzt + ':00';
+        let nowhalfhr = hhJetzt + ':00'; // stunde jetzt zur laufzeit
         
         let batlefthrs = ((_batteryCapacity / 100) * _batsoc) / (_baseLoad / Math.sqrt(_lossfactor));    /// 12800 / 100 * 30
         batlefthrs = Number(batlefthrs.toFixed(2));
-        
-        let hrstorun = 24;     
 
         if (_debug) {
             console.warn('Bat h verbleibend ' + batlefthrs);
         }
 
         //wieviel wh kommen in etwa von PV in den nächsten 24h
+        let hrstorun = 24;   
         let pvwh = 0;
-        for (let p = 0; p < hrstorun * 2; p++) {
+
+        for (let p = 0; p < hrstorun * 2; p++) {   // *2 weil 48 Datenpunkte
             pvwh = pvwh + (getState(pvforecastDP + p + '.power').val / 2);
         }
 
@@ -551,7 +552,8 @@ async function processing() {
 
             if (_batsoc > 0) {             // doppelt hält besser
                 if (lefthrs > 0 && lefthrs < hrstorun * 2 && pvwh < _baseLoad * 24 * _wr_efficiency) {
-                    if (batlefthrs >= hrstorun) {             // die laufzeit reicht bis zum sonnenaufgang entlade alles
+                    if (batlefthrs >= hrstorun && _tibberPreisJetzt >= _stop_discharge) {     // die laufzeit reicht ab 18 Uhr bis zum sonnenaufgang entlade alles und der preis st hoch genug
+            //         if (batlefthrs >= hrstorun && hhJetzt >= 18) {     // oder so nach zeit
                         if (_debug) {
                             console.warn('Entladezeit reicht aus bis zum Sonnaufgang laufzeit ' + hrstorun + ' verbleibend ' + batlefthrs);
                         }
@@ -675,8 +677,7 @@ async function processing() {
         _SpntCom = _InitCom_Aus;
         _prognoseNutzenSteuerung = false;
     }
-
-    if (_dc_now > _verbrauchJetzt) {                                      // macht nur sinn wenn gunug PV      
+                                       
         if (_prognoseNutzenSteuerung) {
         
             let latesttime;
@@ -841,7 +842,7 @@ async function processing() {
                 }
             } 
         }
-    }
+    
 
 // ---------------------------------------------------- Ende der PV Prognose Sektion
 
