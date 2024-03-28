@@ -43,7 +43,7 @@ const vehicleConsumDP = 'evcc.0.loadpoint.1.status.chargePower'; // angaben in W
 let isVehicleConn = false;  
 let vehicleConsum = 0;               
 
-
+let _hhJetzt = getHH(); 
 
 const communicationRegisters = {
     fedInSpntCom: 'modbus.0.holdingRegisters.3.40151_Kommunikation', // (802 active, 803 inactive)
@@ -122,9 +122,12 @@ createUserStates(userDataDP, false, [tibberStromDP + 'extra.PV_Ueberschuss', { '
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenAutomatisch', { 'name': 'mit tibber laden erlauben', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': true }], function () {
     setState(tibberDP + 'extra.tibberNutzenAutomatisch', _tibberNutzenAutomatisch, true);
 });
-createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuell', { 'name': 'manuelles laden automatisch wird übersteuert', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
+createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuell', { 'name': 'nutze Tibber Preise manuell', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
     setState(tibberDP + 'extra.tibberNutzenManuell', false, true);
 });
+//createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuellHH', { 'name': 'nutze Tibber Preise manuell ab Stunde ', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0 }], function () {
+//    setState(tibberDP + 'extra.tibberNutzenManuellHH', 0, true);
+//});
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.entladeZeitenArray', { 'name': 'entladezeiten als array', 'type': 'array', 'read': true, 'write': false, 'role': 'object' }], function () {
     setState(tibberDP + 'extra.entladeZeitenArray', [], true);
 });
@@ -184,7 +187,6 @@ setState(communicationRegisters.maxdischrg, _maxdischrg_def);
 async function processing() {
 
     let dateNow = new Date();
-    const hhJetzt = getHH(); 
 
     _macheNix = false;
     _SpntCom = _InitCom_Aus;
@@ -295,7 +297,7 @@ async function processing() {
             }
         }
         
-        let nowhalfhr = hhJetzt + ':00'; // stunde jetzt zur laufzeit
+        let nowhalfhr = _hhJetzt + ':00'; // stunde jetzt zur laufzeit
         
         let batlefthrs = ((_batteryCapacity / 100) * _batsoc) / (_baseLoad / Math.sqrt(_lossfactor));    /// 12800 / 100 * 30
         batlefthrs = Number(batlefthrs.toFixed(2));
@@ -391,7 +393,7 @@ async function processing() {
         }
         
         let tti = 0;        
-        let nachtIdx = Number(hhJetzt);
+        let nachtIdx = Number(_hhJetzt);
 
         for (let t = 0; t < pricehrs; t++) {     // nimm alle tibber stunden  
             let hrparse  = getState(tibberDP + nachtIdx + '.startTime').val.split(':')[0];
@@ -553,7 +555,7 @@ async function processing() {
             if (_batsoc > 0) {             // doppelt hält besser
                 if (lefthrs > 0 && lefthrs < hrstorun * 2 && pvwh < _baseLoad * 24 * _wr_efficiency) {
                     if (batlefthrs >= hrstorun && _tibberPreisJetzt >= _stop_discharge) {     // die laufzeit reicht ab 18 Uhr bis zum sonnenaufgang entlade alles und der preis st hoch genug
-            //         if (batlefthrs >= hrstorun && hhJetzt >= 18) {     // oder so nach zeit
+            //         if (batlefthrs >= hrstorun && _hhJetzt >= 18) {     // oder so nach zeit
                         if (_debug) {
                             console.warn('Entladezeit reicht aus bis zum Sonnaufgang laufzeit ' + hrstorun + ' verbleibend ' + batlefthrs);
                         }
@@ -670,7 +672,7 @@ async function processing() {
         console.error('-->> PV jetzt ' + _dc_now + ' Verbrauch jetzt ' + _verbrauchJetzt);
     }
 
-    if ((batterieLadenUhrzeitStart && hhJetzt >= batterieLadenUhrzeit) || isTibber_active == 2) {    // laden übersteuern ab bestimmter uhrzeit oder es wird entladen und PV reicht nicht uas
+    if ((batterieLadenUhrzeitStart && _hhJetzt >= batterieLadenUhrzeit) || isTibber_active == 2) {    // laden übersteuern ab bestimmter uhrzeit oder es wird entladen und PV reicht nicht uas
         if (_debug) {
             console.error('-->> übersteuert mit nach Uhrzeit laden und genug PV oder TIBBER Entladen = 2 ist ' + isTibber_active + ' und nicht genug PV');
         }
@@ -882,6 +884,7 @@ async function processing() {
 /* ***************************************************************************************************************************************** */
 
 on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisiere laut adapter abfrageintervall
+    _hhJetzt                    = getHH(); 
     _debug                      = getState(tibberDP + 'debug').val;
     _snowmode                   = getState(userDataDP + '.strom.tibber.extra.PV_Schneebedeckt').val;
     _tibberNutzenAutomatisch    = getState(tibberDP + 'extra.tibberNutzenAutomatisch').val;           // aus dem DP kommend sollte true sein für vis
@@ -892,9 +895,11 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
 
     // übersteuern nach prio manuell zuerst dann autoamtisch oder battsoc unter 5 %
     const _tibberNutzenManuell          = getState(tibberDP + 'extra.tibberNutzenManuell').val;
+    const _tibberNutzenManuellHH        = getState(tibberDP + 'extra.tibberNutzenManuellHH').val;
+
     _batterieLadenUebersteuernManuell   = getState(batterieLadenManuellStartDP).val;
 
-    if (_batterieLadenUebersteuernManuell || _tibberNutzenManuell) {
+    if (_batterieLadenUebersteuernManuell || (_tibberNutzenManuell && _hhJetzt == _tibberNutzenManuellHH)) {       
         _lastSpntCom = 98;
         _tibberNutzenSteuerung = false;     // der steuert intern ob lauf gültig  für tibber laden/entladen
         _prognoseNutzenSteuerung = false;   // der steuert intern ob lauf gültig  für pv laden                                     
