@@ -637,7 +637,7 @@ async function processing() {
                     }
                 } 
 
-                     //ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
+                //ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
                 if (lowprice.length > 0 && restladezeit <= lowprice.length && isTibber_active == 5) {
                     if (_debug) {
                         console.warn('Stoppe Ladung, lowprice.length ' + lowprice.length);
@@ -670,159 +670,160 @@ async function processing() {
         console.error('-->> PV jetzt ' + _dc_now + ' Verbrauch jetzt ' + _verbrauchJetzt);
     }
 
-    if ((batterieLadenUhrzeitStart && hhJetzt >= batterieLadenUhrzeit) || isTibber_active == 2) {    // laden übersteuern ab bestimmter uhrzeit
+    if ((batterieLadenUhrzeitStart && hhJetzt >= batterieLadenUhrzeit) || isTibber_active == 2) {    // laden übersteuern ab bestimmter uhrzeit oder es wird entladen und PV reicht nicht uas
         if (_debug) {
-            console.error('-->> übersteuert mit nach Uhrzeit laden und genug PV oder tibber ' + isTibber_active);
+            console.error('-->> übersteuert mit nach Uhrzeit laden und genug PV oder TIBBER Entladen = 2 ist ' + isTibber_active + ' und nicht genug PV');
         }
         _SpntCom = _InitCom_Aus;
         _prognoseNutzenSteuerung = false;
     }
                                        
-        if (_prognoseNutzenSteuerung) {
+    if (_prognoseNutzenSteuerung) {
+    
+        let latesttime;
+        let pvfc = [];
+        let f = 0;
         
-            let latesttime;
-            let pvfc = [];
-            let f = 0;
-            
-            for (let p = 0; p < 48; p++) { /* 48 = 24h a 30min Fenster*/
-                let pvpower50 = getState(pvforecastDP + p + '.power').val;
-                let pvpower90 = getState(pvforecastDP + p + '.power90').val;
-                let pvendtime = getState(pvforecastDP + p + '.endTime').val;
-                let pvstarttime = getState(pvforecastDP + p + '.startTime').val;
+        for (let p = 0; p < 48; p++) { /* 48 = 24h a 30min Fenster*/
+            let pvpower50 = getState(pvforecastDP + p + '.power').val;
+            let pvpower90 = getState(pvforecastDP + p + '.power90').val;
+            let pvendtime = getState(pvforecastDP + p + '.endTime').val;
+            let pvstarttime = getState(pvforecastDP + p + '.startTime').val;
 
-                if (pvpower90 > (pvlimit + _baseLoad)) {
-                    if (compareTime(pvendtime, null, '<=', null)) {
-                        let minutes = 30;
-                        if (pvpower50 < pvlimit) {
-                            minutes = Math.round((100 - (((pvlimit - pvpower50) / ((pvpower90 - pvpower50) / 40)) + 50)) * 18 / 60);
-                        }
-                        pvfc[f] = [pvpower50, pvpower90, minutes, pvstarttime, pvendtime];
-                        f++;
-                    }
-                }
-            }
-
-            setState(tibberDP + 'extra.PV_Abschluss', '--:--', true); 
-
-            if (pvfc.length > 0) {
-                latesttime = pvfc[(pvfc.length - 1)][4];
-                setState(tibberDP + 'extra.PV_Abschluss', latesttime, true);
-            }
-
-            pvfc.sort(function (b, a) {
-                return a[1] - b[1];
-            });
-
-            if (_debug && latesttime) {
-                console.warn('Abschluss PV bis ' + latesttime);
-            }
-
-            // verschieben des Ladevorgangs in den Bereich der PV Limitierung. batterie ist nicht in notladebetrieb
-            if (_debug) {
-                console.warn('pvfc.length ' + pvfc.length + ' Restladezeit ' + restladezeit);
-            }
-
-            if (restladezeit > 0 && (restladezeit * 2) <= pvfc.length) {  // wenn die ladedauer kleiner ist als die vorhersage 
-                // Bugfix zur behebung der array interval von 30min und update interval 1h
-                if (compareTime(latesttime, null, '<=', null)) {
-                    _max_pwr = _mindischrg;
-                }
-                //berechnung zur entzerrung entlang der pv kurve, oberhalb des einspeiselimits
-                let get_wh = 0;
-                let get_wh_einzeln = 0;
-                
-                for (let k = 0; k < pvfc.length; k++) {
-                    let pvpower = pvfc[k][0];
+            if (pvpower90 > (pvlimit + _baseLoad)) {
+                if (compareTime(pvendtime, null, '<=', null)) {
                     let minutes = 30;
-
-                    if (pvpower < (pvlimit + _baseLoad)) {
-                        pvpower = pvfc[k][1];
+                    if (pvpower50 < pvlimit) {
+                        minutes = Math.round((100 - (((pvlimit - pvpower50) / ((pvpower90 - pvpower50) / 40)) + 50)) * 18 / 60);
                     }
+                    pvfc[f] = [pvpower50, pvpower90, minutes, pvstarttime, pvendtime];
+                    f++;
+                }
+            }
+        }
 
-                    minutes = pvfc[k][2];
+        setState(tibberDP + 'extra.PV_Abschluss', '--:--', true); 
 
-                    if (compareTime(pvfc[k][3], pvfc[k][4], 'between')) {
-                        //rechne restzeit aus
-                        const now = new Date();
-                        const nowTime = now.toLocaleTimeString('de-DE', _options);
-                        const startsplit = nowTime.split(':');
-                        const endsplit = pvfc[k][4].split(':');
-                        const minutescalc = (Number(endsplit[0]) * 60 + Number(endsplit[1])) - (Number(startsplit[0]) * 60 + Number(startsplit[1]));
-                        if (minutescalc < minutes) {
-                            minutes = minutescalc;
-                        }
-                    }
-                    get_wh_einzeln = (((pvpower / 2) - ((pvlimit + _baseLoad) / 2)) * (minutes / 30)); // wieviele Wh Überschuss???   
+        if (pvfc.length > 0) {
+            latesttime = pvfc[(pvfc.length - 1)][4];
+            setState(tibberDP + 'extra.PV_Abschluss', latesttime, true);
+        }
 
-                //    if (_debug) {
-                //        console.warn('Überschuß ' + Math.round(get_wh_einzeln) + ' Wh für Minuten ' + minutes + ' mit PV ' + pvfc[k][0] + ' und startzeit ' + pvfc[k][3]);
-                //    }
+        pvfc.sort(function (b, a) {
+            return a[1] - b[1];
+        });
 
-                    get_wh = get_wh + Number(get_wh_einzeln.toFixed(2));
+        if (_debug && latesttime) {
+            console.warn('Abschluss PV bis ' + latesttime);
+        }
+
+        // verschieben des Ladevorgangs in den Bereich der PV Limitierung. batterie ist nicht in notladebetrieb
+        if (_debug) {
+            console.warn('pvfc.length ' + pvfc.length + ' Restladezeit ' + restladezeit);
+        }
+
+        if (restladezeit > 0 && (restladezeit * 2) <= pvfc.length) {  // wenn die ladedauer kleiner ist als die vorhersage 
+            // Bugfix zur behebung der array interval von 30min und update interval 1h
+            if (compareTime(latesttime, null, '<=', null)) {
+                _max_pwr = _mindischrg;
+            }
+            //berechnung zur entzerrung entlang der pv kurve, oberhalb des einspeiselimits
+            let get_wh = 0;
+            let get_wh_einzeln = 0;
+            
+            for (let k = 0; k < pvfc.length; k++) {
+                let pvpower = pvfc[k][0];
+                let minutes = 30;
+
+                if (pvpower < (pvlimit + _baseLoad)) {
+                    pvpower = pvfc[k][1];
                 }
 
-                setState(tibberDP + 'extra.PV_Ueberschuss', get_wh, true);
+                minutes = pvfc[k][2];
 
-                pvfc = sortiereNachUhrzeit(pvfc);
-
-                if (_debug) {
-            //        console.warn('pvfc ' + JSON.stringify(pvfc));
-                    console.warn('get_wh vor entzerren ' + get_wh);
-                }
-
-                let pvlimit_calc = pvlimit;
-                let min_pwr = 0;
- 
-                if (restladezeit > 0 && lademenge > 0 && lademenge > get_wh) {
-                    if ((restladezeit * 2) <= pvfc.length) {
-                        restladezeit = pvfc.length / 2;                          //entzerren des Ladevorganges
-                    }
-                    
-                    pvlimit_calc = Math.max((Math.round(pvlimit - ((lademenge - get_wh) / restladezeit))), 0); //virtuelles reduzieren des pvlimits
-                    min_pwr      = Math.max(Math.round((lademenge - get_wh) / restladezeit), 0);                   
-
-                    get_wh = lademenge;       //daran liegts damit der unten immer rein geht ????                    
-                }
-
-                if (_debug) {
-                    console.warn('-->   Verschiebe Einspeiselimit auf pvlimit_calc ' + pvlimit_calc + ' W' + ' mit mindestens ' + min_pwr + ' W  get_wh ' + get_wh + ' restladezeit ' + restladezeit);
-                }
-
-                let current_pwr_diff = _dc_now - _verbrauchJetzt;
-
-                if (lademenge > 0 && get_wh >= lademenge) {
-                    restladezeit = pvfc.length / 2;
-
-                    _max_pwr = Math.round(pvfc[0][1] - pvlimit_calc);
-
-                    if (_max_pwr > current_pwr_diff) {
-                        _max_pwr = Math.round(current_pwr_diff);                       
-                    }
-                    
-                    if (_debug) { 
-                        console.warn('nach der Begrenzung  :_max_pwr ' + _max_pwr + ' pvfc[0][1] ' + pvfc[0][1] + ' startzeit ' + pvfc[0][3] + ' pvlimit_calc ' + pvlimit_calc);
+                if (compareTime(pvfc[k][3], pvfc[k][4], 'between')) {
+                    //rechne restzeit aus
+                    const now = new Date();
+                    const nowTime = now.toLocaleTimeString('de-DE', _options);
+                    const startsplit = nowTime.split(':');
+                    const endsplit = pvfc[k][4].split(':');
+                    const minutescalc = (Number(endsplit[0]) * 60 + Number(endsplit[1])) - (Number(startsplit[0]) * 60 + Number(startsplit[1]));
+                    if (minutescalc < minutes) {
+                        minutes = minutescalc;
                     }
                 }
+                get_wh_einzeln = (((pvpower / 2) - ((pvlimit + _baseLoad) / 2)) * (minutes / 30)); // wieviele Wh Überschuss???   
 
-                if (_debug) {               
-                    console.warn('Ausgabe A  :_max_pwr ' + _max_pwr + ' min_pwr ' + min_pwr + ' current_pwr_diff ' + current_pwr_diff);
+            //    if (_debug) {
+            //        console.warn('Überschuß ' + Math.round(get_wh_einzeln) + ' Wh für Minuten ' + minutes + ' mit PV ' + pvfc[k][0] + ' und startzeit ' + pvfc[k][3]);
+            //    }
+
+                get_wh = get_wh + Number(get_wh_einzeln.toFixed(2));
+            }
+
+            setState(tibberDP + 'extra.PV_Ueberschuss', get_wh, true);
+
+            pvfc = sortiereNachUhrzeit(pvfc);
+
+            if (_debug) {
+        //        console.warn('pvfc ' + JSON.stringify(pvfc));
+                console.warn('get_wh vor entzerren ' + get_wh);
+            }
+
+            let pvlimit_calc = pvlimit;
+            let min_pwr = 0;
+
+            if (restladezeit > 0 && lademenge > 0 && lademenge > get_wh) {
+                if ((restladezeit * 2) <= pvfc.length) {
+                    restladezeit = pvfc.length / 2;                          //entzerren des Ladevorganges
                 }
-
-                _max_pwr = Math.round(Math.min(Math.max(_max_pwr, min_pwr), _batteryLadePower)); //abfangen negativer werte, limitiere auf min_pwr orginal
-
-                if (_debug) {               
-                    console.warn('Ausgabe B  :_max_pwr ' + _max_pwr);
-                }
-
-                setState(tibberDP + 'extra.ladeZeitenArray', pvfc, true);
                 
+                pvlimit_calc = Math.max((Math.round(pvlimit - ((lademenge - get_wh) / restladezeit))), 0); //virtuelles reduzieren des pvlimits
+                min_pwr      = Math.max(Math.round((lademenge - get_wh) / restladezeit), 0);                   
+
+                get_wh = lademenge;       //daran liegts damit der unten immer rein geht ????                    
+            }
+
+            if (_debug) {
+                console.warn('-->   Verschiebe Einspeiselimit auf pvlimit_calc ' + pvlimit_calc + ' W' + ' mit mindestens ' + min_pwr + ' W  get_wh ' + get_wh + ' restladezeit ' + restladezeit);
+            }
+
+            let current_pwr_diff = _dc_now - _verbrauchJetzt;
+
+            if (lademenge > 0 && get_wh >= lademenge) {
+                restladezeit = pvfc.length / 2;
+
+                _max_pwr = Math.round(pvfc[0][1] - pvlimit_calc);
+
+                if (_max_pwr > current_pwr_diff) {
+                    _max_pwr = Math.round(current_pwr_diff);                       
+                }
+                
+                if (_debug) { 
+                    console.warn('nach der Begrenzung  :_max_pwr ' + _max_pwr + ' pvfc[0][1] ' + pvfc[0][1] + ' startzeit ' + pvfc[0][3] + ' pvlimit_calc ' + pvlimit_calc);
+                }
+            }
+
+            if (_debug) {               
+                console.warn('Ausgabe A  :_max_pwr ' + _max_pwr + ' min_pwr ' + min_pwr + ' current_pwr_diff ' + current_pwr_diff);
+            }
+
+            _max_pwr = Math.round(Math.min(Math.max(_max_pwr, min_pwr), _batteryLadePower)); //abfangen negativer werte, limitiere auf min_pwr orginal
+
+            if (_debug) {               
+                console.warn('Ausgabe B  :_max_pwr ' + _max_pwr);
+            }
+
+            setState(tibberDP + 'extra.ladeZeitenArray', pvfc, true);
+            
+            if (_dc_now >= _verbrauchJetzt) {                                // nur wenn überschuss wirklich da ist
                 for (let h = 0; h < (restladezeit * 2); h++) {
                     if (compareTime(pvfc[h][3], pvfc[h][4], 'between')) {
                         if (_debug) {
                             console.error('-->> Bingo ladezeit mit überschuss _max_pwr ' + _max_pwr + '  ' + pvfc[h][0] + ' ' + pvfc[h][1]);
                         }     
                         _SpntCom = _InitCom_An;                       
-                               
+                                
                         if (_max_pwr > _dc_now - _verbrauchJetzt) {  // wenn das ermittelte wert grösser ist als die realität dann limmitiere
                             _max_pwr = _dc_now - _verbrauchJetzt;   
                             if (_debug) {
@@ -836,12 +837,13 @@ async function processing() {
                         break;
                     }
                 }
+            }
 
-                if (!wirdGeladen) {          // sicherstellen dass die batterie nicht entladen wird wenn falsche Werte
-                    _max_pwr = 0;        
-                }
-            } 
-        }
+            if (!wirdGeladen) {          // sicherstellen dass die batterie nicht entladen wird wenn falsche Werte
+                _max_pwr = 0;        
+            }
+        } 
+    }
     
 
 // ---------------------------------------------------- Ende der PV Prognose Sektion
