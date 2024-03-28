@@ -7,6 +7,9 @@ const heute  = 'PricesToday.';
 const morgen = 'PricesTomorrow.';
 
 
+//createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuellHH', { 'name': 'nutze Tibber Preise manuell ab Stunde ', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0 }], function () {
+//    setState(tibberDP + 'extra.tibberNutzenManuellHH', 0, true);
+//});
 
 createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberBestPreisArray', { 'name': 'tibber bester preis als array', 'type':'array', 'read': true, 'write': false, 'role': 'object'}], function () {  });       
 createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberBestPreisArrayLang', { 'name': 'tibber bester preis als array', 'type':'array', 'read': true, 'write': false, 'role': 'object'}], function () {  }); 
