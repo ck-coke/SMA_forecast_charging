@@ -6,7 +6,7 @@ const _tibberDP = _tibberDP1 + '.' + _tibberDP2;
 const heute  = 'PricesToday.';
 const morgen = 'PricesTomorrow.';
 
-
+const _options = { hour12: false, hour: '2-digit', minute: '2-digit' };
 //createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuellHH', { 'name': 'nutze Tibber Preise manuell ab Stunde ', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0 }], function () {
 //    setState(tibberDP + 'extra.tibberNutzenManuellHH', 0, true);
 //});
