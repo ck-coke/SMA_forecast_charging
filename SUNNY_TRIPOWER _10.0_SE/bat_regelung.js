@@ -323,19 +323,19 @@ async function processing() {
         setState(tibberDP + 'extra.PV_Prognose', Math.round(pvwh), true);
 
         if (pvwh > (_baseLoad * hrstorun / 2) && !_snowmode) {   
-            _sunup    = getAstroDate('sunriseEnd').getHours() + ':' + getAstroDate('sunriseEnd').getMinutes();
+            _sunup         = getAstroDate('sunriseEnd').getHours() + ':' + getAstroDate('sunriseEnd').getMinutes().toString().padStart(2, '0');                               // aufgang
             const today    = new Date();
             const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-            _sundown  = getAstroDate('sunsetStart', tomorrow).getHours() + ':' + getAstroDate('sunsetStart', tomorrow).getMinutes();
+            _sundown       = getAstroDate('sunsetStart', tomorrow).getHours() + ':' + getAstroDate('sunsetStart', tomorrow).getMinutes().toString().padStart(2, '0');         // untergang
             
             if (_debug) {
-                console.warn('Nachtfenster nach Astro : ' + _sundown + ' - ' + _sunup);
+                console.warn('Nachtfenster nach Astro Untergang ' + _sundown + ' Aufgang nächster Tag ' + _sunup);
             }
 
             for (let sd = 47; sd >= 0; sd--) {
                 const pow = getState(pvforecastDP + sd + '.power').val;
 
-                if (pow <= 750 && pow != 0) {
+                if (pow <= _baseLoad && pow != 0) {
                     _sundown = getState(pvforecastDP + sd + '.startTime').val;
 
                     for (let su = 0; su < 48; su++) {
@@ -549,7 +549,7 @@ async function processing() {
             }   
 
             if (_debug) {
-                console.warn('Entladezeit lefthrs ' + lefthrs + ' pvwh ' + pvwh + ' berchenung ' + (_baseLoad * 24 * _wr_efficiency));
+                console.warn('Entladezeit lefthrs ' + lefthrs + ' pvwh ' + pvwh + ' Berechnung ' + (_baseLoad * 24 * _wr_efficiency));
             }    
 
             let entladeZeitenArray = [];
