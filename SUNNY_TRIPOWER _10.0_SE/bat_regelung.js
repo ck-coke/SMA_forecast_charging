@@ -20,16 +20,16 @@ let _debug = getState(tibberDP + 'debug').val == null ? false : getState(tibberD
 
 //-------------------------------------------------------------------------------------
 const _pvPeak = 13100;                                  // PV-Anlagenleistung in Wp
-//const _batteryCapacity = 12800;                         // Netto Batterie Kapazität in Wh 2.56 pro Modul
+//const _batteryCapacity = 12800;                        // Netto Batterie Kapazität in Wh 2.56 pro Modul
 const _batteryCapacity = 10240;                         // Netto Batterie Kapazität in Wh
 const _surplusLimit = 0;                                // PV-Einspeise-Limit in % 0 keine Einspeisung
 const _batteryTarget = 100;                             // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
-const _lastPercentageLoadWith = -500;                    // letzten 5 % laden mit xxx Watt
+const _lastPercentageLoadWith = -500;                   // letzten 5 % laden mit xxx Watt
 const _baseLoad = 750;                                  // Grundverbrauch in Watt
 const _wr_efficiency = 0.9;                             // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
-const   _batteryLadePower = 5000;                       // Ladeleistung der Batterie in W, BYD mehr geht nicht
+const _batteryLadePower = 5000;                         // Ladeleistung der Batterie in W, BYD mehr geht nicht
 const _batteryPowerEmergency = -5000;                   // Ladeleistung der Batterie in W notladung
-const _mindischrg = 1;                                  // 0 geht nicht da sonst max entladung .. also die kleinste mögliche Einheit 1
+const _mindischrg = 0;                                  // 0 geht nicht da sonst max entladung .. also die kleinste mögliche Einheit 1
 const _pwrAtCom_def = _batteryLadePower * (253 / 230);  // max power bei 253V = 5500 W 
 const _sma_em = 'sma-em.0.3015242334';                  // Name der SMA EnergyMeter/HM2 Instanz bei installierten SAM-EM Adapter, leer lassen wenn nicht vorhanden
 
@@ -657,9 +657,21 @@ async function processing() {
         setState(tibberDP + 'extra.ladeZeitenArray', ladeZeitenArray, true);
     }
 
+    // wenn tibber  = 3 und PV deckt Verbrauch zu 30 % dann nimm aus der batterie ist vielleicht ne Wolke unterwegs
+
+    if (isTibber_active == 3 && _dc_now >= (_verbrauchJetzt * 0.30)) {
+        if (_debug) {
+            console.warn('Stoppe Zukauf da Verbrauch zu 30% gedeckt');
+        }
+        _SpntCom = _InitCom_Aus;
+        _max_pwr = _mindischrg;
+        isTibber_active = 0;
+    }
+
 
     // ----------------------------------------------------  Start der PV Prognose Sektion
 
+//    isTibber_active = 0;    initial
 //    isTibber_active = 1;    Nachladezeit
 //    isTibber_active = 2;    Entladezeiten
 //    isTibber_active = 3;    entladung stoppen wenn preisschwelle erreicht
@@ -786,6 +798,8 @@ async function processing() {
                 get_wh = lademenge;       //daran liegts damit der unten immer rein geht ????                    
             }
 
+            get_wh = Math.round(get_wh * 100) / 100;     // aufrunden 2 stellen reichen
+
             if (_debug) {
                 console.warn('-->   Verschiebe Einspeiselimit auf pvlimit_calc ' + pvlimit_calc + ' W' + ' mit mindestens ' + min_pwr + ' W  get_wh ' + get_wh + ' restladezeit ' + restladezeit);
             }
@@ -842,7 +856,7 @@ async function processing() {
             }
 
             if (!wirdGeladen) {          // sicherstellen dass die batterie nicht entladen wird wenn falsche Werte
-                _max_pwr = 0;        
+                _max_pwr = _mindischrg;        
             }
         } 
     }
@@ -854,9 +868,9 @@ async function processing() {
         _max_pwr = _lastPercentageLoadWith;    
     }
 
-    if (_max_pwr == _mindischrg || _max_pwr == 0) {
-        _max_pwr = _mindischrg * -1;  // negiere das ganze 
-    }
+ //   if (_max_pwr == _mindischrg || _max_pwr == 0) {
+ //       _max_pwr = _mindischrg * -1;  // negiere das ganze 
+ //   }
 
     PwrAtCom = _max_pwr;
 
@@ -872,7 +886,7 @@ async function processing() {
     }
 
     if (_debug) {
-        console.warn('SpntCom jetzt --> ' + _SpntCom + ' <-- davor war ' + _lastSpntCom + ' Wirkleistungvorgabe ' + PwrAtCom + ' _verbrauchJetzt ' + _verbrauchJetzt + ' pv_jetzt ' + _dc_now);
+        console.warn('SpntCom jetzt --> ' + _SpntCom + ' <-- davor war ' + _lastSpntCom + ' Wirkleistungvorgabe ' + PwrAtCom);
         console.warn('----------------------------------------------------------------------------------');
     }
 
