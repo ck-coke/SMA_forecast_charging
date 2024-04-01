@@ -135,40 +135,20 @@ function errechneBesteUhrzeit(allePreise) {
 }
 
 function findeBenachbarteNiedrigstePreise(preisArray) {     
-     const jetzt = new Date();
-    const aktuelleStunde = jetzt.getHours();
-    const morgen13Uhr = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() + 1, 13, 0, 0);
-    
     let niedrigsterPreis = Number.POSITIVE_INFINITY;
     let zweitNiedrigsterPreis = Number.POSITIVE_INFINITY;
     let niedrigsterPreisIndex = -1;
     let zweitNiedrigsterPreisIndex = -1;
 
     for (let i = 0; i < preisArray.length; i++) {
-        const preisObj = preisArray[i];
-        const preis = preisObj.preis;
-        const startStunde = preisObj.start;
-
-        if (startStunde >= aktuelleStunde && startStunde < 24) {
-            if (preis < niedrigsterPreis) {
-                zweitNiedrigsterPreis = niedrigsterPreis;
-                zweitNiedrigsterPreisIndex = niedrigsterPreisIndex;
-                niedrigsterPreis = preis;
-                niedrigsterPreisIndex = i;
-            } else if (preis < zweitNiedrigsterPreis) {
-                zweitNiedrigsterPreis = preis;
-                zweitNiedrigsterPreisIndex = i;
-            }
-        } else if (startStunde < aktuelleStunde && morgen13Uhr <= jetzt && startStunde < 24) {
-            if (preis < niedrigsterPreis) {
-                zweitNiedrigsterPreis = niedrigsterPreis;
-                zweitNiedrigsterPreisIndex = niedrigsterPreisIndex;
-                niedrigsterPreis = preis;
-                niedrigsterPreisIndex = i;
-            } else if (preis < zweitNiedrigsterPreis) {
-                zweitNiedrigsterPreis = preis;
-                zweitNiedrigsterPreisIndex = i;
-            }
+        if (preisArray[i].preis < niedrigsterPreis) {
+            zweitNiedrigsterPreis = niedrigsterPreis;
+            zweitNiedrigsterPreisIndex = niedrigsterPreisIndex;
+            niedrigsterPreis = preisArray[i].preis;
+            niedrigsterPreisIndex = i;
+        } else if (preisArray[i].preis < zweitNiedrigsterPreis) {
+            zweitNiedrigsterPreis = preisArray[i].preis;
+            zweitNiedrigsterPreisIndex = i;
         }
     }
 
