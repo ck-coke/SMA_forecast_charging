@@ -129,8 +129,8 @@ createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenAutomati
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuell', { 'name': 'nutze Tibber Preise manuell', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
     setState(tibberDP + 'extra.tibberNutzenManuell', false, true);
 });
-createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberPotokoll', { 'name': 'Tibberprotokoll', 'type': 'number', 'read': true, 'write': true, 'role': 'value', 'def': 0 }], function () {
-    setState(tibberDP + 'extra.tibberPotokoll', 0, true);
+createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberProtokoll', { 'name': 'Tibberprotokoll', 'type': 'number', 'read': true, 'write': true, 'role': 'value', 'def': 0 }], function () {
+    setState(tibberDP + 'extra.tibberProtokoll', 0, true);
 });
 //createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuellHH', { 'name': 'nutze Tibber Preise manuell ab Stunde ', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0 }], function () {
 //    setState(tibberDP + 'extra.tibberNutzenManuellHH', 0, true);
@@ -667,7 +667,7 @@ async function processing() {
         setState(tibberDP + 'extra.ladeZeitenArray', ladeZeitenArray, true);
     }
 
-    setState(tibberDP + 'extra.tibberPotokoll', isTibber_active, true);
+    setState(tibberDP + 'extra.tibberProtokoll', isTibber_active, true);
 
     // wenn tibber  = 3 und PV deckt Verbrauch zu 30 % dann nimm aus der batterie ist vielleicht ne Wolke unterwegs
 
