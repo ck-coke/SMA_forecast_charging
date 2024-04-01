@@ -129,7 +129,7 @@ createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenAutomati
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuell', { 'name': 'nutze Tibber Preise manuell', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
     setState(tibberDP + 'extra.tibberNutzenManuell', false, true);
 });
-createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberPotokoll', { 'name': 'Tibberprotokoll', 'type': 'number', 'read': true, 'write': true, 'role': 'state', 'def': 0 }], function () {
+createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberPotokoll', { 'name': 'Tibberprotokoll', 'type': 'number', 'read': true, 'write': true, 'role': 'value', 'def': 0 }], function () {
     setState(tibberDP + 'extra.tibberPotokoll', 0, true);
 });
 //createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuellHH', { 'name': 'nutze Tibber Preise manuell ab Stunde ', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0 }], function () {
