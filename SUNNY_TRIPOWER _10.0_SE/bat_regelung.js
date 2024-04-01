@@ -79,7 +79,7 @@ let _SpntCom = _InitCom_Aus;           //   802: aktiv (Act)    803: inaktiv (In
 let _lastSpntCom = 0;
 let _bydDirectSOC = 5;
 let _bydDirectSOCMrk = 0;
-let _batsoc = 0;
+let _batsoc = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR      
 let _entladung_zeitfenster = false;
 let _max_pwr = 0;
 let _notLadung = false;
@@ -173,6 +173,9 @@ createUserStates(userDataDP, false, ['strom.PV_Leistung_aktuell', { 'name': 'PV_
 });
 */
 
+setState(communicationRegisters.fedInSpntCom, _InitCom_Aus);
+setState(spntComCheckDP, _InitCom_Aus, true);
+
 console.warn('***************************************************');
 console.warn('starte ladenNachPrognose mit debug ' + _debug);
 
@@ -180,11 +183,7 @@ console.warn('starte ladenNachPrognose mit debug ' + _debug);
 if (_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) {
     console.warn('starte direkt mit Begrenzung da Preis unter schwelle');
     _entladung_zeitfenster = true;
-} else {
-    setState(communicationRegisters.fedInSpntCom, _InitCom_Aus);
-    setState(spntComCheckDP, _InitCom_Aus, true);
-}
-
+} 
 
 //setState(communicationRegisters.maxchrg, _maxdischrg_def);
 //setState(communicationRegisters.maxdischrg, _maxdischrg_def);
@@ -564,45 +563,43 @@ async function processing() {
 
             let entladeZeitenArray = [];
 
-            if (_batsoc > 0) {             // doppelt hält besser
-                if (lefthrs > 0 && lefthrs < hrstorun * 2 && pvwh < _baseLoad * 24 * _wr_efficiency) {
-                    if (batlefthrs >= hrstorun && compareTime(_sundown, _sunup, 'between')) {     // oder so nach zeit
-                        if (_debug) {
-                            console.warn('Entladezeit reicht aus bis zum Sonnaufgang laufzeit hrstorun ' + hrstorun + ' verbleibend Batterierestlaufzeit batlefthrs' + batlefthrs);
-                        }
-                        _SpntCom = _InitCom_Aus;
-                        _max_pwr = 0;
-                        macheNix = true;
-                        isTibber_active = 2;                                        
-                        _entladung_zeitfenster = true;
-                        entladeZeitenArray.push('--:--');  //  [0.2856,"19:30","20:00"] 0.2756,21:30,22:00
-                    } else {                        
-                        for (let d = 0; d < lefthrs; d++) {
-                            if (poihigh[d] != null) {
-                                if (poihigh[d][0] > _stop_discharge) {
-                                    _entladung_zeitfenster = false;
-                                    
-                                    if (_debug) {
-                                        console.warn('Entladezeiten: ' + poihigh[d][1] + '-' + poihigh[d][2] + ' Preis ' + poihigh[d][0] + ' Fahrzeug zieht ' + vehicleConsum + ' W');
-                                    }
+            if (lefthrs > 0 && lefthrs < hrstorun * 2 && pvwh < _baseLoad * 24 * _wr_efficiency) {
+                if (batlefthrs >= hrstorun && compareTime(_sundown, _sunup, 'between')) {     // oder so nach zeit
+                    if (_debug) {
+                        console.warn('Entladezeit reicht aus bis zum Sonnaufgang laufzeit hrstorun ' + hrstorun + ' verbleibend Batterierestlaufzeit batlefthrs ' + batlefthrs);
+                    }
+                    _SpntCom = _InitCom_Aus;
+                    _max_pwr = 0;
+                    macheNix = true;
+                    isTibber_active = 2;                                        
+                    _entladung_zeitfenster = true;
+                    entladeZeitenArray.push('--:--');  //  [0.2856,"19:30","20:00"] 0.2756,21:30,22:00
+                } else {                        
+                    for (let d = 0; d < lefthrs; d++) {
+                        if (poihigh[d] != null) {
+                            if (poihigh[d][0] > _stop_discharge) {
+                                _entladung_zeitfenster = false;
+                                
+                                if (_debug) {
+                                    console.warn('Entladezeiten: ' + poihigh[d][1] + '-' + poihigh[d][2] + ' Preis ' + poihigh[d][0] + ' Fahrzeug zieht ' + vehicleConsum + ' W');
+                                }
 
-                                    entladeZeitenArray.push(poihigh[d]);   
+                                entladeZeitenArray.push(poihigh[d]);   
 
-                                    if (compareTime(poihigh[d][1], poihigh[d][2], "between")) {
-                                        if (vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
-                                            break;                                            
-                                        } else {
-                                            if (_dc_now <= _verbrauchJetzt) {           // entlade nur wenn sich das lohnt
-                                                _SpntCom = _InitCom_Aus;
-                                                _max_pwr = 0;
-                                                macheNix = true;
-                                                isTibber_active = 2;                                        
-                                                _entladung_zeitfenster = true;                                                
-                                            }
+                                if (compareTime(poihigh[d][1], poihigh[d][2], "between")) {
+                                    if (vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
+                                        break;                                            
+                                    } else {
+                                        if (_dc_now <= _verbrauchJetzt) {           // entlade nur wenn sich das lohnt
+                                            _SpntCom = _InitCom_Aus;
+                                            _max_pwr = 0;
+                                            macheNix = true;
+                                            isTibber_active = 2;                                        
+                                            _entladung_zeitfenster = true;                                                
                                         }
                                     }
-                                } 
-                            }
+                                }
+                            } 
                         }
                     }
                 }
@@ -677,7 +674,6 @@ async function processing() {
         }
         _SpntCom = _InitCom_Aus;
         _max_pwr = _mindischrg;
-        isTibber_active = 0;
     }
 
 
@@ -701,7 +697,7 @@ async function processing() {
             console.error('-->> übersteuert mit nach Uhrzeit laden und genug PV oder TIBBER Entladen = 2 ist ' + isTibber_active + ' und nicht genug PV');
         }
         _SpntCom                    = _InitCom_Aus;
-        _prognoseNutzenSteuerung    = false;
+    //    _prognoseNutzenSteuerung    = false;
     }
                                        
     if (_prognoseNutzenSteuerung) {
