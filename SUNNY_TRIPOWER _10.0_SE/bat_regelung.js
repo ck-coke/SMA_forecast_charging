@@ -1,16 +1,17 @@
-const userDataDP = '0_userdata.0';
-const tibberStromDP = 'strom.tibber.';
-const tibberDP = userDataDP + '.' + tibberStromDP;
-const pvforecastDP = userDataDP + '.strom.pvforecast.today.gesamt.';
-const spntComCheckDP = userDataDP + '.strom.40151_Kommunikation_Check'; // nochmal ablegen zur kontrolle
-const tomorrow_kWDP = userDataDP + '.strom.pvforecast.tomorrow.gesamt.tomorrow_kW';
-const tibberPreisJetztDP = tibberDP + 'extra.tibberPreisJetzt';
+
+const userDataDP            = '0_userdata.0';
+const tibberStromDP         = 'strom.tibber.';
+const tibberDP              = userDataDP + '.' + tibberStromDP;
+const pvforecastDP          = userDataDP + '.strom.pvforecast.today.gesamt.';
+const spntComCheckDP        = userDataDP + '.strom.40151_Kommunikation_Check'; // nochmal ablegen zur kontrolle
+const tomorrow_kWDP         = userDataDP + '.strom.pvforecast.tomorrow.gesamt.tomorrow_kW';
+const tibberPreisJetztDP    = tibberDP + 'extra.tibberPreisJetzt';
 
 const batterieLadenUhrzeitDP      = userDataDP + '.strom.batterieLadenUhrzeit';
 const batterieLadenUhrzeitStartDP = userDataDP + '.strom.batterieLadenUhrzeitStart';
 const batterieLadenManuellStartDP = userDataDP + '.strom.batterieLadenManuellStart';
 
-const momentan_VerbrauchDP = userDataDP + '.strom.Momentan_Verbrauch';
+const momentan_VerbrauchDP  = userDataDP + '.strom.Momentan_Verbrauch';
 const pV_Leistung_aktuellDP = userDataDP + '.strom.PV_Leistung_aktuell';
 
 const _options = { hour12: false, hour: '2-digit', minute: '2-digit' };
@@ -79,11 +80,10 @@ let _lastSpntCom = 0;
 let _bydDirectSOC = 5;
 let _bydDirectSOCMrk = 0;
 let _batsoc = 0;
-let _macheNix = false;
 let _entladung_zeitfenster = false;
 let _max_pwr = 0;
 let _notLadung = false;
-
+let _tick = 0;
 
 // für tibber
 let _tibberNutzenSteuerung = true;    //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis) 
@@ -114,10 +114,10 @@ createUserStates(userDataDP, false, [tibberStromDP + 'debug', { 'name': 'debug',
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.PV_Abschluss', { 'name': 'PV Abschluss ermittelt bis Uhrzeit', 'type': 'string', 'read': true, 'write': false, 'role': 'value', 'def': '00:00' }], function () {
     setState(tibberDP + 'extra.PV_Abschluss', '--:--', true);
 });
-createUserStates(userDataDP, false, [tibberStromDP + 'extra.schwellenwert_Entladung', { 'name': 'stoppe Entladung bei Preis von', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0 }], function () {
+createUserStates(userDataDP, false, [tibberStromDP + 'extra.schwellenwert_Entladung', { 'name': 'stoppe Entladung bei Preis von', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'unit': 'ct', 'def': 0 }], function () {
     setState(tibberDP + 'extra.schwellenwert_Entladung', _stop_discharge, true);
 });
-createUserStates(userDataDP, false, [tibberStromDP + 'extra.schwellenwert_Ladung', { 'name': 'starte Ladung mit Strom bei Preis von', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0 }], function () {
+createUserStates(userDataDP, false, [tibberStromDP + 'extra.schwellenwert_Ladung', { 'name': 'starte Ladung mit Strom bei Preis von', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'unit': 'ct', 'def': 0 }], function () {
     setState(tibberDP + 'extra.schwellenwert_Ladung', _start_charge, true);
 });
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.PV_Ueberschuss', { 'name': 'wie viele Wh Überschuss', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'unit': 'Wh', 'def': 0 }], function () {
@@ -190,10 +190,17 @@ if (_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) {
 // ab hier Programmcode
 async function processing() {
 
-    let dateNow = new Date();
+    _tick ++;
 
-    _macheNix = false;
-    _SpntCom = _InitCom_Aus;
+    if (_tick > 999) {         // alle 1000 ticks sorge dafür dass der WR die Daten bekommt
+        _lastSpntCom = 90; 
+        _tick = 0;   
+    }
+
+    let dateNow = new Date();
+    let macheNix = false;
+
+    _SpntCom = _InitCom_Aus;     // initialisiere aus AUS
 
     if (_sma_em.length > 0){
         inputRegisters.powerOut = _sma_em + ".psurplus" /*aktuelle Einspeiseleistung am Netzanschlußpunkt, SMA-EM Adapter*/
@@ -205,7 +212,7 @@ async function processing() {
     let battOut       = getState(inputRegisters.battOut).val;
     let battIn        = getState(inputRegisters.battIn).val;
     let netzbezug     = getState(inputRegisters.netzbezug).val;
-    let wirdGeladen = false;
+    let wirdGeladen   = false;
 
     _dc_now           = getState(inputRegisters.dc1).val + getState(inputRegisters.dc2).val;  // pv vom Dach zusammen in W
 
@@ -517,7 +524,7 @@ async function processing() {
                         if (compareTime(prclow[n][1], prclow[n][2], 'between')) {
                             _SpntCom = _InitCom_An;
                             _max_pwr = _pwrAtCom_def * -1;
-                            _macheNix = true;
+                            macheNix = true;
                             isTibber_active = 1;
                             break;
                         }
@@ -526,7 +533,7 @@ async function processing() {
             }
         }
 
-        if (!_macheNix) {
+        if (!macheNix) {
             poihigh.sort(function (a, b) {      // sortiert höchster preis zuerst            
                 return b[0] - a[0];
             });
@@ -562,7 +569,7 @@ async function processing() {
                         }
                         _SpntCom = _InitCom_Aus;
                         _max_pwr = 0;
-                        _macheNix = true;
+                        macheNix = true;
                         isTibber_active = 2;                                        
                         _entladung_zeitfenster = true;
                         entladeZeitenArray.push('--:--');  //  [0.2856,"19:30","20:00"] 0.2756,21:30,22:00
@@ -585,7 +592,7 @@ async function processing() {
                                             if (_dc_now <= _verbrauchJetzt) {           // entlade nur wenn sich das lohnt
                                                 _SpntCom = _InitCom_Aus;
                                                 _max_pwr = 0;
-                                                _macheNix = true;
+                                                macheNix = true;
                                                 isTibber_active = 2;                                        
                                                 _entladung_zeitfenster = true;                                                
                                             }
@@ -604,7 +611,7 @@ async function processing() {
 
             setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArray, true);
 
-            if (!_macheNix) {
+            if (!macheNix) {
                 //entladung stoppen wenn preisschwelle erreicht
                 if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) && _entladung_zeitfenster) {
                     if (_debug) {
@@ -680,7 +687,7 @@ async function processing() {
 
 
     if (_debug) {
-        console.error('-->> Start der PV Prognose Sektion : _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' _macheNix ' + _macheNix + ' isTibber_active ' + isTibber_active);
+        console.error('-->> Start der PV Prognose Sektion : _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' macheNix ' + macheNix + ' isTibber_active ' + isTibber_active);
         console.error('-->> PV jetzt ' + _dc_now + ' Verbrauch jetzt ' + _verbrauchJetzt);
     }
 
@@ -688,8 +695,8 @@ async function processing() {
         if (_debug) {
             console.error('-->> übersteuert mit nach Uhrzeit laden und genug PV oder TIBBER Entladen = 2 ist ' + isTibber_active + ' und nicht genug PV');
         }
-        _SpntCom = _InitCom_Aus;
-        _prognoseNutzenSteuerung = false;
+        _SpntCom                    = _InitCom_Aus;
+        _prognoseNutzenSteuerung    = false;
     }
                                        
     if (_prognoseNutzenSteuerung) {
@@ -878,7 +885,7 @@ async function processing() {
 
     if (_SpntCom == _InitCom_An || _SpntCom != _lastSpntCom && !_batterieLadenUebersteuernManuell && !_notLadung) {
         if (_debug) {
-            console.warn('Daten gesendet an WR kommunikation Wirkleistungvorgabe : ' + PwrAtCom + ' comm ' + _SpntCom);
+            console.warn('------ > Daten gesendet an WR kommunikation Wirkleistungvorgabe : ' + PwrAtCom + ' Kommunikation ' + _SpntCom);
         }
         setState(communicationRegisters.fedInPwrAtCom, PwrAtCom);       // 40149_Wirkleistungvorgabe
         setState(communicationRegisters.fedInSpntCom, _SpntCom);        // 40151_Kommunikation
