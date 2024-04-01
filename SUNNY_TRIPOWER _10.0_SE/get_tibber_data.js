@@ -5,8 +5,8 @@ const _tibberDP2 = 'strom.tibber.';
 const _tibberDP = _tibberDP1 + '.' + _tibberDP2;
 const heute  = 'PricesToday.';
 const morgen = 'PricesTomorrow.';
-
 const _options = { hour12: false, hour: '2-digit', minute: '2-digit' };
+
 //createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuellHH', { 'name': 'nutze Tibber Preise manuell ab Stunde ', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0 }], function () {
 //    setState(tibberDP + 'extra.tibberNutzenManuellHH', 0, true);
 //});
@@ -113,33 +113,66 @@ function holePreis(preisHeute,preisMorgen) {
         });  
     }
 
-    errechneBesteUhrzeit(preise);
-
-    preise.sort(function(a, b) {
+    let preiseLang = preise;
+    preiseLang.sort(function(a, b) {
         return a.start - b.start;
     });
 
-    setState(_tibberDP + 'extra.tibberBestPreisArrayLang', preise, true);
+    setState(_tibberDP + 'extra.tibberBestPreisArrayLang', preiseLang, true);
+
+    errechneBesteUhrzeit(preise);
+    
 }
 
 
 function errechneBesteUhrzeit(allePreise) {
-    let preiseKurz = [];
-    const hhNow = getHH();
-    for (let i = 0; i < allePreise.length; i++) {
-        const obj = allePreise[i];
-        const start = obj.start * 1;
+    const [niedrigsterIndex, zweitNiedrigsterIndex] = findeBenachbarteNiedrigstePreise(allePreise);
+    const preiseKurzArr = [];
 
-        if (start >= hhNow) {
-            preiseKurz.push(obj);
-        }       
-    };
+    preiseKurzArr.push(allePreise[niedrigsterIndex]);
+    preiseKurzArr.push(allePreise[zweitNiedrigsterIndex]);
+    startZeit(preiseKurzArr);
+}
+
+function findeBenachbarteNiedrigstePreise(preisArray) {     
+     const jetzt = new Date();
+    const aktuelleStunde = jetzt.getHours();
+    const morgen13Uhr = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() + 1, 13, 0, 0);
     
-    preiseKurz.sort(function(a, b) {
-        return a.preis - b.preis;
-    });
-   
-    startZeit(preiseKurz);
+    let niedrigsterPreis = Number.POSITIVE_INFINITY;
+    let zweitNiedrigsterPreis = Number.POSITIVE_INFINITY;
+    let niedrigsterPreisIndex = -1;
+    let zweitNiedrigsterPreisIndex = -1;
+
+    for (let i = 0; i < preisArray.length; i++) {
+        const preisObj = preisArray[i];
+        const preis = preisObj.preis;
+        const startStunde = preisObj.start;
+
+        if (startStunde >= aktuelleStunde && startStunde < 24) {
+            if (preis < niedrigsterPreis) {
+                zweitNiedrigsterPreis = niedrigsterPreis;
+                zweitNiedrigsterPreisIndex = niedrigsterPreisIndex;
+                niedrigsterPreis = preis;
+                niedrigsterPreisIndex = i;
+            } else if (preis < zweitNiedrigsterPreis) {
+                zweitNiedrigsterPreis = preis;
+                zweitNiedrigsterPreisIndex = i;
+            }
+        } else if (startStunde < aktuelleStunde && morgen13Uhr <= jetzt && startStunde < 24) {
+            if (preis < niedrigsterPreis) {
+                zweitNiedrigsterPreis = niedrigsterPreis;
+                zweitNiedrigsterPreisIndex = niedrigsterPreisIndex;
+                niedrigsterPreis = preis;
+                niedrigsterPreisIndex = i;
+            } else if (preis < zweitNiedrigsterPreis) {
+                zweitNiedrigsterPreis = preis;
+                zweitNiedrigsterPreisIndex = i;
+            }
+        }
+    }
+
+    return [niedrigsterPreisIndex, zweitNiedrigsterPreisIndex];
 }
 
 function startZeit(preiseKurz) {    
@@ -182,5 +215,3 @@ schedule('1 * * * *', function() {
     aktualisiereStunde();
 });
  
-
-
