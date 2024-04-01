@@ -337,7 +337,7 @@ async function processing() {
         _sunup         = getAstroDate('sunriseEnd', tomorrow).getHours() + ':' + getAstroDate('sunriseEnd', tomorrow).getMinutes().toString().padStart(2, '0');         // untergang
         
         if (_debug) {
-            console.info('Nachtfenster nach Astro Untergang ' + _sundown + ' - ' + _sunup);
+            console.info('Nachtfenster nach Astro : ' + _sundown + ' - ' + _sunup);
         }
 
         if (pvwh > (_baseLoad * hrstorun / 2) && !_snowmode) {   
@@ -364,10 +364,10 @@ async function processing() {
         let sundownhr = _sundown;
 
         if (compareTime(_sundown, _sunup, 'between')) {
-            sundownTime = dateNow.getTime();
-            sundownhr   = nowhour;  
+            sundownTime = dateNow.getTime();        // ab Stunde jetzt
+            sundownhr = nowhour;  
             
-            if (compareTime('00:00', _sunup, 'between')) {
+            if (compareTime('00:00', _sunup, 'between')) {      // anhängig von Tageswechsel Nachts
                 sunriseTime = datumTimestamp(_sunup, 0);         
             }
         }
@@ -375,7 +375,7 @@ async function processing() {
         hrstorun = Math.min(Number((sunriseTime  - sundownTime) / (1000 * 60 * 60)).toFixed(2), 24);
 
         if (_debug) {
-            console.info('Nachtfenster nach PVForcast : ' + sundownhr + ' - ' + _sunup + ' hrstorun (' + hrstorun + ' h)');
+            console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + ' hrstorun (' + hrstorun + ' h)');
         }
 
         pvwh = 0;
