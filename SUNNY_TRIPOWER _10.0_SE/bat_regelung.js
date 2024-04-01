@@ -668,7 +668,7 @@ async function processing() {
 
     // wenn tibber  = 3 und PV deckt Verbrauch zu 30 % dann nimm aus der batterie ist vielleicht ne Wolke unterwegs
 
-    if (isTibber_active == 3 && _dc_now >= (_verbrauchJetzt * 0.30)) {
+    if (isTibber_active == 3 && _dc_now >= (_verbrauchJetzt - (_verbrauchJetzt * 0.30))) {
         if (_debug) {
             console.warn('Stoppe Zukauf da Verbrauch zu 30% gedeckt');
         }
