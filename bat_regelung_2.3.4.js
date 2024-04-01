@@ -311,7 +311,7 @@ async function processing() {
             }
         }
         
-        let nowhalfhr = _hhJetzt + ':00'; // stunde jetzt zur laufzeit
+        let nowhour = _hhJetzt + ':00'; // stunde jetzt zur laufzeit
         
         let batlefthrs = ((_batteryCapacity / 100) * _batsoc) / (_baseLoad / Math.sqrt(_lossfactor));    /// 12800 / 100 * 30
         batlefthrs = Number(batlefthrs.toFixed(2));
@@ -357,6 +357,7 @@ async function processing() {
                 }
             }
         }
+
         let sundownTime  = datumTimestamp(_sundown, 0);     // untergang
         let sunriseTime  = datumTimestamp(_sunup, 1);       // aufgang am nächsten tag  
 
@@ -364,7 +365,7 @@ async function processing() {
 
         if (compareTime(_sundown, _sunup, 'between')) {
             sundownTime = dateNow.getTime();
-            sundownhr = nowhalfhr;  
+            sundownhr   = nowhour;  
             
             if (compareTime('00:00', _sunup, 'between')) {
                 sunriseTime = datumTimestamp(_sunup, 0);         
@@ -374,7 +375,7 @@ async function processing() {
         hrstorun = Math.min(Number((sunriseTime  - sundownTime) / (1000 * 60 * 60)).toFixed(2), 24);
 
         if (_debug) {
-            console.info('Nachtfenster berechnet : ' + sundownhr + ' - ' + _sunup + ' hrstorun (' + hrstorun + ' h)');
+            console.info('Nachtfenster nach PVForcast : ' + sundownhr + ' - ' + _sunup + ' hrstorun (' + hrstorun + ' h)');
         }
 
         pvwh = 0;
@@ -412,7 +413,7 @@ async function processing() {
             poihigh[tti] = [prcparse, hrparse + ':00', hrparse + ':30'];
 
             tti++;
-            if (t == 0 && nowhalfhr == (hrparse + ':30')) {
+            if (t == 0 && nowhour == (hrparse + ':30')) {
                 tti--;
             }
             poihigh[tti] = [prcparse, hrparse + ':30', getState(tibberDP + nachtIdx + '.endTime').val];
@@ -549,7 +550,7 @@ async function processing() {
                     _SpntCom = _InitCom_Aus;
                     _max_pwr = 0;
                     macheNix = true;
-                    isTibber_active = 2;                                        
+                    isTibber_active = 22;                                        
                     _entladung_zeitfenster = true;
                     entladeZeitenArray.push('--:--');  //  [0.2856,"19:30","20:00"] 0.2756,21:30,22:00
                 } else {                        
@@ -590,8 +591,8 @@ async function processing() {
             setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArray, true);
 
             if (!macheNix) {
-                //entladung stoppen wenn preisschwelle erreicht
-                if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) && _entladung_zeitfenster) {
+                //entladung stoppen wenn preisschwelle erreicht aber nicht wenn ladung reicht bis zum nächsten sonnenaufgang
+                if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) && _entladung_zeitfenster && isTibber_active == 2) {
                     if (_debug) {
                         console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + _stop_discharge.toFixed(2) + ' ct/kWh');
                     }
@@ -997,7 +998,7 @@ function sortiereNachUhrzeit(arr) {
     });
 }
 
-function datumTimestamp(uhrzeit, val) {
+function datumTimestamp(uhrzeit, tag) {
     // Aktuelles Datum erstellen
     let currentDate = new Date();
 
@@ -1005,7 +1006,7 @@ function datumTimestamp(uhrzeit, val) {
     let [stunden, minuten] = uhrzeit.split(':').map(Number);
 
     // Einen Tag hinzufügen
-    currentDate.setDate(currentDate.getDate() + val);
+    currentDate.setDate(currentDate.getDate() + tag);
 
     // Datum auf morgen setzen
     currentDate.setHours(stunden, minuten, 0, 0);
