@@ -7,6 +7,7 @@ const heute  = 'PricesToday.';
 const morgen = 'PricesTomorrow.';
 const _options = { hour12: false, hour: '2-digit', minute: '2-digit' };
 
+
 //createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuellHH', { 'name': 'nutze Tibber Preise manuell ab Stunde ', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0 }], function () {
 //    setState(tibberDP + 'extra.tibberNutzenManuellHH', 0, true);
 //});
@@ -32,7 +33,14 @@ createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberLevelNächsteStun
   setState(_tibberDP + 'extra.tibberLevelNächsteStunde', 'NORMAL', true);
 }); 
 
-holePreis(heute,heute);
+
+if (getHH() > 13) {
+    holePreis(heute,morgen);
+} else {
+    holePreis(heute,heute);
+}
+
+
 aktualisiereStunde();
 
 function holePreis(preisHeute,preisMorgen) {
@@ -151,7 +159,6 @@ function findeBenachbarteNiedrigstePreise(preisArray) {
             zweitNiedrigsterPreisIndex = i;
         }
     }
-
     return [niedrigsterPreisIndex, zweitNiedrigsterPreisIndex];
 }
 
@@ -194,4 +201,4 @@ schedule('*/60 0-14 * * *', function() {
 schedule('1 * * * *', function() {
     aktualisiereStunde();
 });
- 
+  
