@@ -23,6 +23,7 @@ const mainObjectTomorrow = '0_userdata.0.strom.pvforecast.tomorrow';
 const abbrechenBei = '00:00';   // ab wieviel Uhr kommt nix mehr, kann so bleiben
 // bis hier
 
+
 const baseUrl = "https://api.solcast.com.au/rooftop_sites/";
 const hours = 24;
 // ------------------------------------------------------------------------------------------------------------------
@@ -121,7 +122,7 @@ async function requestData(seiteUrl, seite) {
                 const end = new Date(list[listenDP].time * 1000 + 1800000);
 
                 const startTime = start.toLocaleTimeString('de-DE', options);
-                const endTime = end.toLocaleTimeString('de-DE', options);
+                //const endTime = end.toLocaleTimeString('de-DE', options);
 
                 if (startTime == abbrechenBei) {   // wir brauchen nur bis nachts
                     if (schonGebucht) {
@@ -331,14 +332,14 @@ async function kWAnlegen(seite) {
 
 function genGraphAnlegen(today) {
     let mainObjectGraph = '';
-    let tagTag = '';
+    let dayTag = '';
 
     if (!today) {
         mainObjectGraph = mainObjectTomorrow;
-        tagTag = 'tomorrow_kW';
+        dayTag = 'tomorrow_kW';
     } else {
         mainObjectGraph = mainObjectToday;
-        tagTag = 'today_kW'
+        dayTag = 'today_kW'
     }
     const jsonGraphData = [];
     const jsonGraphLabels = [];
@@ -367,13 +368,15 @@ function genGraphAnlegen(today) {
         powerWGesName2 = powerWGesName2 + powerWName2;
         //power90WGes = power90WGes + power90W;
     
-        if (powerWGesamt > 0) {     
-            jsonGraphLabels.push(startTime);                           
-            powerWGesamt = Number(Math.round((powerWGesamt * 100)/100)/1000);      
-            jsonGraphData.push(powerWGesamt);
+        if (powerWGesamt > 0) {  
+            if (startTime.match(':00')) {   
+                jsonGraphLabels.push(startTime);                           
+                powerWGesamt = Number(Math.round((powerWGesamt * 100)/100)/1000);      
+                jsonGraphData.push(powerWGesamt);
 
-            if (influxDb) {
-                influxDdOutput(startTime, powerWGesamt);                
+                if (influxDb) {
+                    influxDdOutput(startTime, powerWGesamt);                
+                }
             }
         }       
     }
@@ -384,7 +387,6 @@ function genGraphAnlegen(today) {
 
     genGraph(jsonGraphLabels, jsonGraphData, mainObjectGraph);
 }
-
 
 function formatTime(hour, minute) {
     return (hour < 10 ? '0' + hour : hour) + ':' + (minute < 10 ? '0' + minute : minute);
