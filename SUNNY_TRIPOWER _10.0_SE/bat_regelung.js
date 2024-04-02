@@ -85,6 +85,7 @@ let _entladung_zeitfenster = false;
 let _max_pwr = _mindischrg;
 let _notLadung = false;
 let _tick = 0;
+let _isTibber_active = 0;
 
 // für tibber
 let _tibberNutzenSteuerung = true;    //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis) 
@@ -253,9 +254,7 @@ async function processing() {
     }                                
 
     /* Default Werte setzen*/
-    let battStatus = getState(inputRegisters.betriebszustandBatterie).val;
-    
-    let isTibber_active = 0;       // initialisiere
+    let battStatus = getState(inputRegisters.betriebszustandBatterie).val;   
 
     _tibberPreisJetzt = getState(tibberPreisJetztDP).val;
     _tomorrow_kW      = getState(tomorrow_kWDP).val;
@@ -292,6 +291,8 @@ async function processing() {
     }
 
     if (_tibberNutzenSteuerung) {
+        _isTibber_active = 0;       // initialisiere
+
         let poi = [];
         for (let t = 0; t < 24; t++) {  // nur bis 13 uhr da um 14 nächste Preise 
             if (t < 13) {
@@ -506,7 +507,7 @@ async function processing() {
                         //    _max_pwr = (_pwrAtCom_def - (_dc_now - _verbrauchJetzt)) * -1
                             _max_pwr = _pwrAtCom_def * -1;
                             macheNix = true;
-                            isTibber_active = 1;
+                            _isTibber_active = 1;
                             break;
                         }
                     }
@@ -545,7 +546,7 @@ async function processing() {
                     _SpntCom = _InitCom_Aus;
                     _max_pwr = _mindischrg;
                     macheNix = true;
-                    isTibber_active = 22;                                        
+                    _isTibber_active = 22;                                        
                     _entladung_zeitfenster = true;
                     entladeZeitenArray.push('--:--');  //  [0.2856,"19:30","20:00"] 0.2756,21:30,22:00
                 } else {                        
@@ -568,7 +569,7 @@ async function processing() {
                                             _SpntCom = _InitCom_Aus;
                                             _max_pwr = _mindischrg;
                                             macheNix = true;
-                                            isTibber_active = 2;                                        
+                                            _isTibber_active = 2;                                        
                                             _entladung_zeitfenster = true;                                                
                                         }
                                     }
@@ -587,13 +588,13 @@ async function processing() {
 
             if (!macheNix) {
                 //entladung stoppen wenn preisschwelle erreicht aber nicht wenn ladung reicht bis zum nächsten sonnenaufgang
-                if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) && _entladung_zeitfenster && isTibber_active == 2) {
+                if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) && _entladung_zeitfenster && _isTibber_active == 2) {
                     if (_debug) {
                         console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + _stop_discharge.toFixed(2) + ' ct/kWh');
                     }
                     _SpntCom = _InitCom_An;
                     _max_pwr = _mindischrg;                    
-                    isTibber_active = 3;
+                    _isTibber_active = 3;
                 }
      
                 // starte die ladung
@@ -614,20 +615,20 @@ async function processing() {
                             }
                             _SpntCom = _InitCom_An;
                             _max_pwr = _pwrAtCom_def * -1;
-                            isTibber_active = 5;
+                            _isTibber_active = 5;
                             break;
                         }
                     }
                 } 
 
                 //ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
-                if (lowprice.length > 0 && restladezeit <= lowprice.length && isTibber_active == 5) {
+                if (lowprice.length > 0 && restladezeit <= lowprice.length && _isTibber_active == 5) {
                     if (_debug) {
                         console.info('Stoppe Ladung, lowprice.length ' + lowprice.length);
                     }
                     _SpntCom = _InitCom_An;
                     _max_pwr = _mindischrg;
-                    isTibber_active = 4;
+                    _isTibber_active = 4;
                 }              
             }
         }
@@ -638,11 +639,11 @@ async function processing() {
         setState(tibberDP + 'extra.ladeZeitenArray', ladeZeitenArray, true);
     }
 
-    setState(tibberDP + 'extra.tibberProtokoll', isTibber_active, true);
+    setState(tibberDP + 'extra.tibberProtokoll', _isTibber_active, true);
 
     // wenn tibber  = 3 und PV deckt Verbrauch zu 30 % dann nimm aus der batterie ist vielleicht ne Wolke unterwegs
 
-    if (isTibber_active == 3 && _dc_now >= (_verbrauchJetzt - (_verbrauchJetzt * 0.30))) {
+    if (_isTibber_active == 3 && _dc_now >= (_verbrauchJetzt - (_verbrauchJetzt * 0.30))) {
         if (_debug) {
             console.error('Stoppe Zukauf da Verbrauch zu 30% gedeckt');
         }
@@ -653,23 +654,25 @@ async function processing() {
 
     // ----------------------------------------------------  Start der PV Prognose Sektion
 
-//      isTibber_active = 0;    initial
-//      isTibber_active = 1;    Nachladezeit
-//      isTibber_active = 2;    Entladezeiten
-//      isTibber_active = 22;   Entladezeit reicht aus bis zum Sonnaufgang
-//      isTibber_active = 3;    entladung stoppen wenn preisschwelle erreicht
-//      isTibber_active = 4;    ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
-//      isTibber_active = 5;    starte die ladung
+//      _isTibber_active = 0;    initial
+//      _isTibber_active = 1;    Nachladezeit
+//      _isTibber_active = 2;    Entladezeiten
+//      _isTibber_active = 22;   Entladezeit reicht aus bis zum Sonnaufgang
+//      _isTibber_active = 3;    entladung stoppen wenn preisschwelle erreicht
+//      _isTibber_active = 4;    ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
+//      _isTibber_active = 5;    starte die ladung
+//      _isTibber_active = 98;   manuelles laden
+//      _isTibber_active = 99;   notladung
 
 
     if (_debug) {
-        console.error('-->> Start der PV Prognose Sektion _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' macheNix ' + macheNix + ' isTibber_active ' + isTibber_active);
+        console.error('-->> Start der PV Prognose Sektion _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' macheNix ' + macheNix + ' _isTibber_active ' + _isTibber_active);
         console.error('-->  PV ' + _dc_now + ' Verbrauch ' + _verbrauchJetzt);
     }
 
-    if ((batterieLadenUhrzeitStart && _hhJetzt >= batterieLadenUhrzeit) || isTibber_active == 2) {    // laden übersteuern ab bestimmter uhrzeit oder es wird entladen und PV reicht nicht uas
+    if ((batterieLadenUhrzeitStart && _hhJetzt >= batterieLadenUhrzeit) || _isTibber_active == 2) {    // laden übersteuern ab bestimmter uhrzeit oder es wird entladen und PV reicht nicht uas
         if (_debug) {
-            console.warn('-->> übersteuert mit nach Uhrzeit laden und genug PV oder TIBBER Entladen (2) -->  ' + isTibber_active + ' und nicht genug PV');
+            console.warn('-->> übersteuert mit nach Uhrzeit laden und genug PV oder TIBBER Entladen (2) -->  ' + _isTibber_active + ' und nicht genug PV');
         }
         _SpntCom                 = _InitCom_Aus;
     }
@@ -729,13 +732,11 @@ async function processing() {
             
             for (let k = 0; k < pvfc.length; k++) {
                 let pvpower = pvfc[k][0];
-                let minutes = 30;
+                let minutes = pvfc[k][2];
 
                 if (pvpower < (pvlimit + _baseLoad)) {
                     pvpower = pvfc[k][1];
                 }
-
-                minutes = pvfc[k][2];
 
                 if (compareTime(pvfc[k][3], pvfc[k][4], 'between')) {
                     //rechne restzeit aus
@@ -769,7 +770,7 @@ async function processing() {
             let pvlimit_calc = pvlimit;
             let min_pwr = 0;
 
-            if (restladezeit > 0 && lademenge > 0 && lademenge > get_wh) {
+            if (lademenge > 0 && lademenge > get_wh) {
                 if ((restladezeit * 2) <= pvfc.length) {
                     restladezeit = pvfc.length / 2;                          //entzerren des Ladevorganges
                 }
@@ -836,9 +837,9 @@ async function processing() {
                     }
                 }
             } else {                                   // komme aus der nachladung
-                if (isTibber_active == 1) {
+                if (_isTibber_active == 1) {
                     if (_debug) {
-                        console.error('-->> Nachladung aktiv aus isTibber_active == ' + isTibber_active);
+                        console.error('-->> Nachladung aktiv aus _isTibber_active == ' + _isTibber_active);
                     }     
                     _SpntCom = _InitCom_An;  
                     _max_pwr = _pwrAtCom_def * -1;
@@ -905,6 +906,7 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
 
     if (_batterieLadenUebersteuernManuell || (_tibberNutzenManuell && _hhJetzt == _tibberNutzenManuellHH)) {       
         _lastSpntCom = 98;
+        _isTibber_active = 98;
         _tibberNutzenSteuerung = false;     // der steuert intern ob lauf gültig  für tibber laden/entladen
         _prognoseNutzenSteuerung = false;   // der steuert intern ob lauf gültig  für pv laden                                     
     }
@@ -918,6 +920,7 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
 
     if (_notLadung) {
         _lastSpntCom = 99;
+        _isTibber_active = 99;
         _tibberNutzenSteuerung = false;
         _prognoseNutzenSteuerung = false;
     }
