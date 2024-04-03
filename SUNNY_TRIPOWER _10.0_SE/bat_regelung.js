@@ -311,7 +311,8 @@ async function processing() {
             }
         }
         
-        let nowhour = _hhJetzt + ':00'; // stunde jetzt zur laufzeit
+        let nowhour     = _hhJetzt + ':00'; // stunde jetzt zur laufzeit
+        let hhJetztNum  = Number(_hhJetzt);
         
         let batlefthrs = ((_batteryCapacity / 100) * _batsoc) / (_baseLoad / Math.sqrt(_lossfactor));    /// 12800 / 100 * 30
         batlefthrs = Number(batlefthrs.toFixed(2));
@@ -387,7 +388,7 @@ async function processing() {
 
         pvwh = 0;
         //wieviel wh kommen in etwa von PV die verkürzt
-        for (let p = Number(_hhJetzt); p < hrstorun * 2; p++) {
+        for (let p = hhJetztNum; p < hrstorun * 2; p++) {
             pvwh = pvwh + (getState(pvforecastTodayDP + p + '.power').val / 2);
         }
 
@@ -404,18 +405,17 @@ async function processing() {
 
         //neue Preisdaten ab 14 Uhr
         if (compareTime('14:00', null, '<', null)) {
-            let remainhrs = 24 - dateNow.getHours();
+            let remainhrs = 24 - hhJetztNum;
             if (pricehrs > remainhrs) {
                 pricehrs = remainhrs;
             }
         }
         
-        let tti = 0;        
-        let nachtIdx = Number(_hhJetzt);
+        let tti = 0;                
 
-        for (let t = 0; t < pricehrs; t++) {     // nimm alle tibber stunden  
-            let hrparse  = getState(tibberDP + nachtIdx + '.startTime').val.split(':')[0];
-            let prcparse = getState(tibberDP + nachtIdx + '.price').val;
+        for (let t = 0; t < pricehrs; t++) {     // nimm alle tibber stunden bis zum sonnenaufgang oder ab 14 uhr alle
+            let hrparse  = getState(tibberDP + hhJetztNum + '.startTime').val.split(':')[0];
+            let prcparse = getState(tibberDP + hhJetztNum + '.price').val;
 
             poihigh[tti] = [prcparse, hrparse + ':00', hrparse + ':30'];
 
@@ -423,12 +423,12 @@ async function processing() {
             if (t == 0 && nowhour == (hrparse + ':30')) {
                 tti--;
             }
-            poihigh[tti] = [prcparse, hrparse + ':30', getState(tibberDP + nachtIdx + '.endTime').val];
+            poihigh[tti] = [prcparse, hrparse + ':30', getState(tibberDP + hhJetztNum + '.endTime').val];
             tti++;
 
-            nachtIdx++;
-            if (nachtIdx > 23) {
-                nachtIdx = 0;
+            hhJetztNum++;
+            if (hhJetztNum > 23) {
+                hhJetztNum = 0;
             }
         }
 
@@ -484,6 +484,11 @@ async function processing() {
             let chrglength = (Math.max((chargewh - curbatwh) / (_batteryLadePower * _wr_efficiency), 0) * 2).toFixed(2);       
 
             // neuaufbau poihigh ohne Nachladestunden
+            if (_debug) {
+                console.warn('prclow ohne Nachladestunden ' + JSON.stringify(prclow));
+                console.warn('poihigh ohne Nachladestunden ' + JSON.stringify(prchigh));
+            }
+            
             poihigh = getArrayDifference(prclow,poihigh);
                     
             if (chrglength > prclow.length) {
@@ -491,7 +496,7 @@ async function processing() {
             }
 
             if (_debug) {
-                console.warn('poihigh: ' + JSON.stringify(poihigh));
+                console.warn('poihigh ohne Nachladestunden ' + JSON.stringify(poihigh));
                 console.warn('chrglength ' + chrglength + ' curbatwh ' + curbatwh);
             }
 
@@ -561,7 +566,7 @@ async function processing() {
                     macheNix = true;
                     _isTibber_active = 22;                                        
                     _entladung_zeitfenster = true;
-                    entladeZeitenArray.push('--:--');  //  [0.2856,"19:30","20:00"] 0.2756,21:30,22:00
+                    entladeZeitenArray.push('--:--');  //  [0.2856,"19:30","20:00"]
                 } else {                        
                     for (let d = 0; d < lefthrs; d++) {
                         if (poihigh[d] != null) {
