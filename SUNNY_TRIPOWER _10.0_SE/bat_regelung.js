@@ -862,8 +862,7 @@ async function processing() {
                 }
             }
         } 
-    }
-    
+    }    
 
 // ---------------------------------------------------- Ende der PV Prognose Sektion
 
@@ -871,12 +870,10 @@ async function processing() {
         _max_pwr = _lastPercentageLoadWith;    
     }
  
-    const pwrAtCom = _max_pwr;
-    const commWR   = _SpntCom;
 
-// ----------------------------------------------------           write data
+// ----------------------------------------------------           write WR data 
 
-    sendToWR(commWR, pwrAtCom);
+    sendToWR(_SpntCom, _max_pwr);
 }
 
 
@@ -923,7 +920,6 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
 
     if (_batterieLadenUebersteuernManuell || (_tibberNutzenManuell && _hhJetzt == _tibberNutzenManuellHH)) {       // wird durch anderes script geregelt
         _lastSpntCom = 98;
-        _isTibber_active = 98;
         _tibberNutzenSteuerung = false;     // der steuert intern ob lauf gültig  für tibber laden/entladen
         _prognoseNutzenSteuerung = false;   // der steuert intern ob lauf gültig  für pv laden                                     
     }
@@ -937,9 +933,9 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
 
     if (_notLadung) {
         _lastSpntCom = 99;
-        _isTibber_active = 99;
         _tibberNutzenSteuerung = false;
         _prognoseNutzenSteuerung = false;
+        setState(spntComCheckDP, 998, true);       // erzwinge änderung
         sendToWR(_InitCom_An, _batteryPowerEmergency);
     } else {
         setTimeout(function () {
@@ -953,8 +949,17 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
 
 });
 
+
+on({id: [tibberDP + 'extra.tibberNutzenAutomatisch',
+         tibberDP + 'extra.prognoseNutzenAutomatisch',
+        ], change: 'any', val: false}, function () {
+        _lastSpntCom = 97;
+});
+
+
+
 function notLadungCheck() {
-    _bydDirectSOC = getState(bydDirectSOCDP).val;   
+    _bydDirectSOC = getState(bydDirectSOCDP).val;   // nimm den bydSoc da der WR nicht immer diesen übermittelt
 
     if (_bydDirectSOC < 6 && _dc_now < _baseLoad) {
         if (_bydDirectSOC != _bydDirectSOCMrk) {
@@ -1031,13 +1036,6 @@ function filterTimes(array) {
 
     return filteredArray;
 }
-
-on({
-    id: [tibberDP + 'extra.tibberNutzenAutomatisch',
-        tibberDP + 'extra.prognoseNutzenAutomatisch',
-        ], change: 'any', val: false}, function () {
-        _lastSpntCom = 99;
-});
 
 function getArrayDifference(array1, array2) {
     const map = new Map(array1.map(item => [item.toString(), item]));
