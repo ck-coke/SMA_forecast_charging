@@ -30,7 +30,7 @@ const _lastPercentageLoadWith = -500;                   // letzten 5 % laden mit
 const _baseLoad = 750;                                  // Grundverbrauch in Watt
 const _wr_efficiency = 0.9;                             // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
 const _batteryLadePower = 5000;                         // Ladeleistung der Batterie in W, BYD mehr geht nicht
-const _batteryPowerEmergency = -5000;                   // Ladeleistung der Batterie in W notladung
+const _batteryPowerEmergency = -4000;                   // Ladeleistung der Batterie in W notladung
 const _mindischrg = 0;                                  // 0 geht nicht da sonst max entladung .. also die kleinste mögliche Einheit 1
 const _pwrAtCom_def = _batteryLadePower * (253 / 230);  // max power bei 253V = 5500 W 
 const _sma_em = 'sma-em.0.3015242334';                  // Name der SMA EnergyMeter/HM2 Instanz bei installierten SAM-EM Adapter, leer lassen wenn nicht vorhanden
@@ -599,8 +599,7 @@ async function processing() {
             }
 
             // sortiere die zeiten für die Vis
-            entladeZeitenArray = filterPastTimes(entladeZeitenArray);
-            entladeZeitenArray = sortBySecondElement(entladeZeitenArray);           
+            entladeZeitenArray = sortBySecondElementAndFilterPastTimes(entladeZeitenArray);              
 
             setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArray, true);
 
@@ -873,27 +872,33 @@ async function processing() {
     }
  
     const pwrAtCom = _max_pwr;
+    const commWR   = _SpntCom;
 
 // ----------------------------------------------------           write data
 
+    sendToWR(commWR, pwrAtCom);
+}
+
+
+function sendToWR(commWR, pwrAtCom) {
  //   if (_SpntCom == _InitCom_An || _SpntCom != _lastSpntCom && !_batterieLadenUebersteuernManuell && !_notLadung) {
     const commNow = getState(spntComCheckDP).val;
 
-    if ((_SpntCom != commNow || _SpntCom != _lastSpntCom) && !_batterieLadenUebersteuernManuell) {
+    if ((commWR != commNow || commWR != _lastSpntCom) && !_batterieLadenUebersteuernManuell) {
         if (_debug) {
-            console.warn('------ > Daten gesendet an WR kommunikation : ' + _SpntCom  + ' Wirkleistungvorgabe ' + pwrAtCom);
+            console.warn('------ > Daten gesendet an WR kommunikation : ' + commWR  + ' Wirkleistungvorgabe ' + pwrAtCom);
         }
         setState(communicationRegisters.fedInPwrAtCom, pwrAtCom);       // 40149_Wirkleistungvorgabe
-        setState(communicationRegisters.fedInSpntCom, _SpntCom);        // 40151_Kommunikation
-        setState(spntComCheckDP, _SpntCom, true);                       // check DP für vis
+        setState(communicationRegisters.fedInSpntCom, commWR);        // 40151_Kommunikation
+        setState(spntComCheckDP, commWR, true);                       // check DP für vis
     }
 
     if (_debug && !_batterieLadenUebersteuernManuell) {
-        console.warn('SpntCom jetzt --> ' + _SpntCom + ' <-- davor war ' + _lastSpntCom + ' Wirkleistungvorgabe ' + pwrAtCom);
+        console.warn('SpntCom jetzt --> ' + commWR + ' <-- davor war ' + _lastSpntCom + ' Wirkleistungvorgabe ' + pwrAtCom);
         console.info('----------------------------------------------------------------------------------');
     }
 
-    _lastSpntCom = _SpntCom;
+    _lastSpntCom = commWR;
     
 }
 
@@ -916,7 +921,7 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
 
     _batterieLadenUebersteuernManuell   = getState(batterieLadenManuellStartDP).val;
 
-    if (_batterieLadenUebersteuernManuell || (_tibberNutzenManuell && _hhJetzt == _tibberNutzenManuellHH)) {       
+    if (_batterieLadenUebersteuernManuell || (_tibberNutzenManuell && _hhJetzt == _tibberNutzenManuellHH)) {       // wird durch anderes script geregelt
         _lastSpntCom = 98;
         _isTibber_active = 98;
         _tibberNutzenSteuerung = false;     // der steuert intern ob lauf gültig  für tibber laden/entladen
@@ -935,15 +940,16 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
         _isTibber_active = 99;
         _tibberNutzenSteuerung = false;
         _prognoseNutzenSteuerung = false;
+        sendToWR(_InitCom_An, _batteryPowerEmergency);
+    } else {
+        setTimeout(function () {
+            processing();             /*start processing in interval*/
+        }, 600);                     
     }
 
     if (_debug) {
         console.info('tibberNutzenSteuerung ' + _tibberNutzenSteuerung + ' prognoseNutzenSteuerung ' + _prognoseNutzenSteuerung);
     }
-
-    setTimeout(function () {
-        processing();             /*start processing in interval*/
-    }, 600);                        // verzögerung zwecks Datenabholung
 
 });
 
@@ -954,17 +960,18 @@ function notLadungCheck() {
         if (_bydDirectSOC != _bydDirectSOCMrk) {
             console.info(' -----------------    Batterie NOTLADEN ' + _bydDirectSOC + ' %');
             _bydDirectSOCMrk = _bydDirectSOC;
-        }
-        
-        _SpntCom = _InitCom_An;
-        _max_pwr = _batteryPowerEmergency
+        }        
         return true;            
-    }
-    
+    }    
     return false;
 }
 
-function sortBySecondElement(arr) {
+function sortBySecondElementAndFilterPastTimes(arr) {
+    const currentTime = new Date();         // Aktuelle Zeit
+    const currentHours = currentTime.getHours();
+    const currentMinutes = currentTime.getMinutes();
+    const currentTimeString = `${currentHours.toString().padStart(2, '0')}:${currentMinutes.toString().padStart(2, '0')}`;
+    
     arr.sort((a, b) => {
         const timeA = a[1];
         const timeB = b[1];
@@ -972,15 +979,7 @@ function sortBySecondElement(arr) {
         if (timeA > timeB) return 1;
         return 0;
     });
-    return arr;
-}
 
-function filterPastTimes(arr) {
-    const currentTime = new Date();         // Aktuelle Zeit
-    const currentHours = currentTime.getHours();
-    const currentMinutes = currentTime.getMinutes();
-    const currentTimeString = `${currentHours.toString().padStart(2, '0')}:${currentMinutes.toString().padStart(2, '0')}`;
-    
     return arr.filter(item => {
         const endTime = item[2];            // Das Endzeitfeld des Unterarrays
         return endTime > currentTimeString; // Rückgabe, ob die Endzeit nach der aktuellen Zeit liegt
