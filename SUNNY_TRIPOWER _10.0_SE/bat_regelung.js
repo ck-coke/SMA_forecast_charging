@@ -195,8 +195,8 @@ async function processing() {
 
     _tick ++;
 
-    if (_tick > 999) {         // alle 1000 ticks sorge dafür dass der WR die Daten bekommt
-        _lastSpntCom = 90; 
+    if (_tick > 10 *6 * 5) {         // alle 5 min rest damit der WR die Daten bekommt
+        setState(spntComCheckDP, 999, true);  
         _tick = 0;   
     }
 
@@ -876,7 +876,10 @@ async function processing() {
 
 // ----------------------------------------------------           write data
 
-    if (_SpntCom == _InitCom_An || _SpntCom != _lastSpntCom && !_batterieLadenUebersteuernManuell && !_notLadung) {
+ //   if (_SpntCom == _InitCom_An || _SpntCom != _lastSpntCom && !_batterieLadenUebersteuernManuell && !_notLadung) {
+    const commNow = getState(spntComCheckDP).val;
+
+    if ((_SpntCom != commNow || _SpntCom != _lastSpntCom) && !_batterieLadenUebersteuernManuell) {
         if (_debug) {
             console.warn('------ > Daten gesendet an WR kommunikation : ' + _SpntCom  + ' Wirkleistungvorgabe ' + pwrAtCom);
         }
@@ -953,10 +956,8 @@ function notLadungCheck() {
             _bydDirectSOCMrk = _bydDirectSOC;
         }
         
-        setState(communicationRegisters.fedInPwrAtCom, _batteryPowerEmergency);
         _SpntCom = _InitCom_An;
-        setState(communicationRegisters.fedInSpntCom, _SpntCom);
-        setState(spntComCheckDP, _SpntCom, true);
+        _max_pwr = _batteryPowerEmergency
         return true;            
     }
     
@@ -973,6 +974,7 @@ function sortBySecondElement(arr) {
     });
     return arr;
 }
+
 function filterPastTimes(arr) {
     const currentTime = new Date();         // Aktuelle Zeit
     const currentHours = currentTime.getHours();
