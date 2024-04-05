@@ -51,8 +51,6 @@ const communicationRegisters = {
     fedInSpntCom: 'modbus.0.holdingRegisters.3.40151_Kommunikation', // (802 active, 803 inactive)
     fedInPwrAtCom: 'modbus.0.holdingRegisters.3.40149_Wirkleistungvorgabe',
     wMaxCha: 'modbus.0.holdingRegisters.3.40189_max_Ladeleistung_BatWR',        // Max Ladeleistung BatWR
- //   maxchrg: 'modbus.0.holdingRegisters.3.40795_Maximale_Batterieladeleistung',
- //   maxdischrg: 'modbus.0.holdingRegisters.3.40799_Maximale_Batterieentladeleistung',
 }
 
 const inputRegisters = {
@@ -65,7 +63,6 @@ const inputRegisters = {
     battIn: 'modbus.0.inputRegisters.3.31393_Momentane_Batterieladung',
     dc1: 'modbus.0.inputRegisters.3.30773_DC-Leistung_1',
     dc2: 'modbus.0.inputRegisters.3.30961_DC-Leistung_2',
-  //  powerAC: 'modbus.0.inputRegisters.3.30775_AC-Leistung',
 }
 
 const bydDirectSOCDP  = 'bydhvs.0.State.SOC';                            // battSOC netto direkt von der Batterie
@@ -181,14 +178,10 @@ console.info('***************************************************');
 console.info('starte ladenNachPrognose mit debug ' + _debug);
 
 // bei start immer initialisieren
-if (_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) {
+if (_tibberPreisJetzt <= _stop_discharge || _batsoc <= 1) {
     console.warn('starte direkt mit Begrenzung da Preis unter schwelle');
     _entladung_zeitfenster = true;
 } 
-
-//setState(communicationRegisters.maxchrg, _maxdischrg_def);
-//setState(communicationRegisters.maxdischrg, _maxdischrg_def);
-
 
 // ab hier Programmcode
 async function processing() {
@@ -209,8 +202,6 @@ async function processing() {
     if (_sma_em.length > 0){
         inputRegisters.powerOut = _sma_em + ".psurplus" /*aktuelle Einspeiseleistung am Netzanschlußpunkt, SMA-EM Adapter*/
     }
-
-    _batsoc           = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR         
 
     let einspeisung   = Math.round(getState(inputRegisters.powerOut).val);     // Einspeisung  in W
     let battOut       = getState(inputRegisters.battOut).val;
@@ -267,9 +258,9 @@ async function processing() {
     }
    
     // Lademenge
-    let lademenge_full =          Math.ceil((_batteryCapacity * (100 - _batsoc) / 100) * (1 / _wr_efficiency));                   //Energiemenge bis vollständige Ladung
+    let lademenge_full = Math.ceil((_batteryCapacity * (100 - _batsoc) / 100) * (1 / _wr_efficiency));                   //Energiemenge bis vollständige Ladung
     let lademenge      = Math.max(Math.ceil((_batteryCapacity * (_batteryTarget - _batsoc) / 100) * (1 / _wr_efficiency)), 0);    //lademenge = Energiemenge bis vollständige Ladung
-    let restladezeit = lademenge / _batteryLadePower;                                                                             //Ladezeit = Energiemenge bis vollständige Ladung / Ladeleistung WR
+    let restladezeit   = lademenge / _batteryLadePower;                                                                             //Ladezeit = Energiemenge bis vollständige Ladung / Ladeleistung WR
 
     if (restladezeit <= 0) {
         restladezeit = 0;
@@ -905,7 +896,9 @@ function sendToWR(commWR, pwrAtCom) {
 
 on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisiere laut adapter abfrageintervall
     _hhJetzt                    = getHH(); 
+    _batsoc                     = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR         
     _debug                      = getState(tibberDP + 'debug').val;
+    
     _snowmode                   = getState(userDataDP + '.strom.tibber.extra.PV_Schneebedeckt').val;
     _tibberNutzenAutomatisch    = getState(tibberDP + 'extra.tibberNutzenAutomatisch').val;           // aus dem DP kommend sollte true sein für vis
     _prognoseNutzenAutomatisch  = getState(tibberDP + 'extra.prognoseNutzenAutomatisch').val;       // aus dem DP kommend sollte true sein für vis
@@ -960,12 +953,12 @@ on({id: [tibberDP + 'extra.tibberNutzenAutomatisch',
 
 
 function notLadungCheck() {
-    _bydDirectSOC = getState(bydDirectSOCDP).val;   // nimm den bydSoc da der WR nicht immer diesen übermittelt
+    _bydDirectSOC = getState(bydDirectSOCDP).val;   // nimm den bydSoc da der WR nicht immer diesen übermittelt    
 
-    if (_bydDirectSOC < 6 && _dc_now < _baseLoad) {
+    if ((_bydDirectSOC < 6 || _batsoc <= 1) && _dc_now < _baseLoad) {
         if (_bydDirectSOC != _bydDirectSOCMrk) {
             console.error(' -----------------    Batterie NOTLADEN ' + _bydDirectSOC + ' %' + ' um ' + _hhJetzt + ':00');
-       //     toLog(' -----------------    Batterie NOTLADEN ' + _bydDirectSOC + ' %', true);
+      //      toLog(' -----------------    Batterie NOTLADEN ' + _bydDirectSOC + ' %', true);
             _bydDirectSOCMrk = _bydDirectSOC;
         }        
         return true;            
