@@ -186,18 +186,18 @@ if (_tibberPreisJetzt <= _stop_discharge || _batsoc <= 1) {
 // ab hier Programmcode
 async function processing() {
 
-    _tick ++;
+    _tick ++;            
 
-    if (_tick > 10 *6 * 5) {         // alle 5 min rest damit der WR die Daten bekommt
+    if (_tick >= 30) {         // alle 5 min (30 ticks) reset damit der WR die Daten bekommt
         setState(spntComCheckDP, 998, true);  
         _tick = 0;   
     }
 
     let dateNow = new Date();
     let macheNix = false;
-    _bydDirectSOCMrk = 0;
 
-    _SpntCom = _InitCom_Aus;     // initialisiere aus AUS
+    _bydDirectSOCMrk = 0;
+    _SpntCom = _InitCom_Aus;     // initialisiere AUS
 
     if (_sma_em.length > 0){
         inputRegisters.powerOut = _sma_em + ".psurplus" /*aktuelle Einspeiseleistung am Netzanschlußpunkt, SMA-EM Adapter*/
@@ -283,6 +283,10 @@ async function processing() {
     }
 
     if (_tibberNutzenSteuerung) {
+        if (_isTibber_active == 88) { // komme aus notladung
+            setState(spntComCheckDP, 888, true);
+        }
+
         _isTibber_active = 0;       // initialisiere
 
         let poi = [];
@@ -425,7 +429,7 @@ async function processing() {
         }
 
         if (_debug) {
-            console.info('poihigh.length ' + poihigh.length);
+            console.info('poihigh.length ' + poihigh.length + ' pricehrs ' + pricehrs);
         //    console.info('poihigh vor nachladen: ' + JSON.stringify(poihigh));
         }
 
@@ -440,7 +444,7 @@ async function processing() {
 
         if (batlefthrs < hrstorun) {          
             for (let h = 0; h < poihigh.length; h++) {
-                let pricelimit = (poihigh[h][0] * _loadfact);                
+                let pricelimit = parseFloat((poihigh[h][0] * _loadfact).toFixed(4));            
                 
                 for (let l = h; l < poihigh.length; l++) {
                     if (poihigh[l][0] > pricelimit && poihigh[l][0] > _stop_discharge) {
@@ -449,7 +453,7 @@ async function processing() {
                     }
                 }
             }
-        
+
             let uniqueprclow = prclow.filter(function (value, index, self) {
                 return self.indexOf(value) === index;
             });
@@ -457,7 +461,6 @@ async function processing() {
             let uniqueprchigh = prchigh.filter(function (value, index, self) {
                 return self.indexOf(value) === index;
             });
-
 
             prclow  = uniqueprclow;
             prchigh = uniqueprchigh;
@@ -488,7 +491,7 @@ async function processing() {
             }
 
             if (_debug) {
-                console.warn('poihigh ohne Nachladestunden ' + JSON.stringify(poihigh));
+            //    console.warn('poihigh ohne Nachladestunden ' + JSON.stringify(poihigh));
                 console.warn('chrglength ' + chrglength + ' curbatwh ' + curbatwh);
             }
 
@@ -509,10 +512,10 @@ async function processing() {
                             }                                                         
                             _SpntCom = _InitCom_An;
                         //    _max_pwr = (_pwrAtCom_def - (_dc_now - _verbrauchJetzt)) * -1
-                            _max_pwr = _pwrAtCom_def * -1;
-                            macheNix = true;
+                            _max_pwr = _pwrAtCom_def * -1;                           
                             _isTibber_active = 1;
                             _prognoseNutzenSteuerung = false;
+                            macheNix = true;
                             break;
                         }
                     }
@@ -652,7 +655,6 @@ async function processing() {
     setState(tibberDP + 'extra.tibberProtokoll', _isTibber_active, true);
 
     // wenn tibber  = 3 und PV deckt Verbrauch zu 30 % dann nimm aus der batterie ist vielleicht ne Wolke unterwegs
-
     if (_isTibber_active == 3 && _dc_now >= (_verbrauchJetzt - (_verbrauchJetzt * 0.30))) {
         if (_debug) {
             console.error('Stoppe Zukauf da Verbrauch zu 30% gedeckt');
@@ -688,6 +690,9 @@ async function processing() {
     }
                                        
     if (_prognoseNutzenSteuerung) {
+        if (_isTibber_active == 88) { // komme aus notladung
+            setState(spntComCheckDP, 888, true);
+        }
     
         let latesttime;
         let pvfc = [];
@@ -840,7 +845,7 @@ async function processing() {
                     if (_batsoc < 100) {  // batterie ist nicht voll 
                         wirdGeladen = true;
                     }
-                    
+                  
                     break;
                 }
             }
@@ -870,10 +875,9 @@ async function processing() {
 
 
 function sendToWR(commWR, pwrAtCom) {
- //   if (_SpntCom == _InitCom_An || _SpntCom != _lastSpntCom && !_batterieLadenUebersteuernManuell && !_notLadung) {
     const commNow = getState(spntComCheckDP).val;
 
-    if ((commWR != commNow || commWR != _lastSpntCom) && !_batterieLadenUebersteuernManuell) {
+    if ((commWR == _InitCom_An || commWR != commNow || commWR != _lastSpntCom) && !_batterieLadenUebersteuernManuell) {
         if (_debug) {
             console.warn('------ > Daten gesendet an WR kommunikation : ' + commWR  + ' Wirkleistungvorgabe ' + pwrAtCom);
         }
@@ -913,9 +917,9 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
     _batterieLadenUebersteuernManuell   = getState(batterieLadenManuellStartDP).val;
 
     if (_batterieLadenUebersteuernManuell || (_tibberNutzenManuell && _hhJetzt == _tibberNutzenManuellHH)) {       // wird durch anderes script geregelt
-        _lastSpntCom = 98;
-        _tibberNutzenSteuerung = false;     // der steuert intern ob lauf gültig  für tibber laden/entladen
-        _prognoseNutzenSteuerung = false;   // der steuert intern ob lauf gültig  für pv laden                                     
+        _tibberNutzenSteuerung      = false;     // der steuert intern ob lauf gültig  für tibber laden/entladen
+        _prognoseNutzenSteuerung    = false;   // der steuert intern ob lauf gültig  für pv laden   
+        _lastSpntCom                = 98;                                  
     }
 
     if (_debug) {
@@ -925,11 +929,10 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
     // ---     check ob notladung nötig
     _notLadung = notLadungCheck();
 
-    if (_notLadung) {
-        _lastSpntCom = 99;
-        _tibberNutzenSteuerung = false;
-        _prognoseNutzenSteuerung = false;
-        setState(spntComCheckDP, 999, true);       // erzwinge änderung
+    if (_notLadung) {       
+        _tibberNutzenSteuerung      = false;
+        _prognoseNutzenSteuerung    = false;
+        _isTibber_active            = 88      // notladung mrk 
         sendToWR(_InitCom_An, _batteryPowerEmergency);
     } else {
         setTimeout(function () {
@@ -958,7 +961,7 @@ function notLadungCheck() {
     if ((_bydDirectSOC < 6 || _batsoc <= 1) && _dc_now < _baseLoad) {
         if (_bydDirectSOC != _bydDirectSOCMrk) {
             console.error(' -----------------    Batterie NOTLADEN ' + _bydDirectSOC + ' %' + ' um ' + _hhJetzt + ':00');
-      //      toLog(' -----------------    Batterie NOTLADEN ' + _bydDirectSOC + ' %', true);
+            toLog(' -----------------    Batterie NOTLADEN ' + _bydDirectSOC + ' %', true);
             _bydDirectSOCMrk = _bydDirectSOC;
         }        
         return true;            
