@@ -196,12 +196,13 @@ async function processing() {
     _tick ++;
 
     if (_tick > 10 *6 * 5) {         // alle 5 min rest damit der WR die Daten bekommt
-        setState(spntComCheckDP, 999, true);  
+        setState(spntComCheckDP, 998, true);  
         _tick = 0;   
     }
 
     let dateNow = new Date();
     let macheNix = false;
+    _bydDirectSOCMrk = 0;
 
     _SpntCom = _InitCom_Aus;     // initialisiere aus AUS
 
@@ -935,7 +936,7 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
         _lastSpntCom = 99;
         _tibberNutzenSteuerung = false;
         _prognoseNutzenSteuerung = false;
-        setState(spntComCheckDP, 998, true);       // erzwinge änderung
+        setState(spntComCheckDP, 999, true);       // erzwinge änderung
         sendToWR(_InitCom_An, _batteryPowerEmergency);
     } else {
         setTimeout(function () {
@@ -963,7 +964,8 @@ function notLadungCheck() {
 
     if (_bydDirectSOC < 6 && _dc_now < _baseLoad) {
         if (_bydDirectSOC != _bydDirectSOCMrk) {
-            console.info(' -----------------    Batterie NOTLADEN ' + _bydDirectSOC + ' %');
+            console.error(' -----------------    Batterie NOTLADEN ' + _bydDirectSOC + ' %' + ' um ' + _hhJetzt + ':00');
+       //     toLog(' -----------------    Batterie NOTLADEN ' + _bydDirectSOC + ' %', true);
             _bydDirectSOCMrk = _bydDirectSOC;
         }        
         return true;            
