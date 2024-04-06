@@ -75,6 +75,7 @@ const _InitCom_An = 802;
 
 let _SpntCom = _InitCom_Aus;           //   802: aktiv (Act)    803: inaktiv (Ina)
 let _lastSpntCom = 0;
+let _lastpwrAtCom = 0;
 let _bydDirectSOC = 5;
 let _bydDirectSOCMrk = 0;
 let _batsoc = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR      
@@ -337,7 +338,7 @@ async function processing() {
             console.info('Nachtfenster nach Astro : ' + _sundown + ' - ' + _sunup);
         }
 
-        if (!_snowmode) { // pvwh > (_baseLoad * hrstorun) &&  
+        if (pvwh > (_baseLoad * hrstorun) && !_snowmode) {    // ist genug PV da
             for (let sd = 47; sd >= 0; sd--) {
                 const pow = getState(pvforecastTodayDP + sd + '.power').val;
 
@@ -359,44 +360,45 @@ async function processing() {
                         break;
                     }
                 }
-            }     
-        }
+            }             
 
-        let sundownTime  = datumTimestamp(_sundown, 0);     // untergang
-        let sunriseTime  = datumTimestamp(_sunup, 1);       // aufgang am nächsten tag  
+            let sundownTime  = datumTimestamp(_sundown, 0);     // untergang
+            let sunriseTime  = datumTimestamp(_sunup, 1);       // aufgang am nächsten tag  
 
-        let sundownhr = _sundown;
+            let sundownhr = _sundown;
 
-        if (compareTime(_sundown, _sunup, 'between')) {
-            sundownTime = dateNow.getTime();        // ab Stunde jetzt
-            sundownhr = nowhour;  
-            
-            if (compareTime('00:00', _sunup, 'between')) {      // abhängig von Tageswechsel Nachts
-                sunriseTime = datumTimestamp(_sunup, 0);         
+            if (compareTime(_sundown, _sunup, 'between')) {
+                sundownTime = dateNow.getTime();        // ab Stunde jetzt
+                sundownhr = nowhour;  
+                
+                if (compareTime('00:00', _sunup, 'between')) {      // abhängig von Tageswechsel Nachts
+                    sunriseTime = datumTimestamp(_sunup, 0);         
+                }
+            }
+
+            hrstorun = Math.min(Number((sunriseTime  - sundownTime) / (1000 * 60 * 60)).toFixed(2), 24);
+
+            if (_debug) {
+                console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + ' hrstorun (' + hrstorun + ' h)');
+            }
+
+            pvwh = 0;         // initialisiere damit die entladung läuft
+
+            if (_dc_now > 0) {                
+                //wieviel wh kommen in etwa von PV die verkürzt
+                for (let p = hhJetztNum; p < hrstorun * 2; p++) {
+                    pvwh = pvwh + (getState(pvforecastTodayDP + p + '.power').val / 2);
+                }
+
+                setState(tibberDP + 'extra.PV_Prognose_kurz', Math.round(pvwh), true);
+
+                if (_debug) {
+                    console.info('Erwarte ca______________________ ' + (pvwh / 1000).toFixed(1) + ' kWh von PV verkürtzt');
+                }
             }
         }
 
-        hrstorun = Math.min(Number((sunriseTime  - sundownTime) / (1000 * 60 * 60)).toFixed(2), 24);
-
-        if (_debug) {
-            console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + ' hrstorun (' + hrstorun + ' h)');
-        }
-
-        pvwh = 0;
-        //wieviel wh kommen in etwa von PV die verkürzt
-        for (let p = hhJetztNum; p < hrstorun * 2; p++) {
-            pvwh = pvwh + (getState(pvforecastTodayDP + p + '.power').val / 2);
-        }
-
-        setState(tibberDP + 'extra.PV_Prognose_kurz', Math.round(pvwh), true);
-
-        if (_debug) {
-            console.info('Erwarte ca______________________ ' + (pvwh / 1000).toFixed(1) + ' kWh von PV verkürtzt');
-        }
-    
-
         let poihigh = [];
-
         let pricehrs = hrstorun;
 
         //neue Preisdaten ab 14 Uhr
@@ -547,12 +549,13 @@ async function processing() {
             let entladeZeitenArray = [];
 
             if (_debug) {
-                console.warn('lefthrs ' + lefthrs + ' batlefthrs ' + batlefthrs + ' hrstorun ' + hrstorun );
+                console.warn('lefthrs ' + lefthrs + ' batlefthrs ' + batlefthrs + ' hrstorun ' + hrstorun + ' pvwh ' + pvwh);
+            
             }
+// entladung         
 
-            if (lefthrs > 0 && lefthrs < hrstorun * 2 && pvwh < _baseLoad * 24 * _wr_efficiency) {
-        //    if (lefthrs > 0 && batlefthrs >= hrstorun && pvwh < _baseLoad * 24 * _wr_efficiency) {
-                if (batlefthrs >= hrstorun && compareTime(_sundown, _sunup, 'between')) {     // wenn rest battlaufzeit > als bis zum sonnenaufgang
+            if (lefthrs > 0 && lefthrs < hrstorun * 2 && pvwh < _baseLoad * 24 * _wr_efficiency) {        //               16200 aus der berechung
+                if (batlefthrs >= hrstorun && compareTime(_sundown, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
                     if (_debug) {
                         console.warn('Entladezeit reicht aus bis zum Sonnaufgang');
                     }
@@ -687,6 +690,7 @@ async function processing() {
             console.warn('-->> übersteuert mit nach Uhrzeit laden');
         }
         _SpntCom  = _InitCom_Aus;
+        _prognoseNutzenSteuerung = false;
     }
                                        
     if (_prognoseNutzenSteuerung) {
@@ -852,12 +856,7 @@ async function processing() {
          
             if (_isTibber_active == 2 || _isTibber_active == 22) {
                 wirdGeladen = true;    
-            } else {
-                if (!wirdGeladen) {          // sicherstellen dass die batterie nicht entladen wird wenn falsche Werte und wenn voll dann auch nicht
-                    _SpntCom = _InitCom_An; 
-                    _max_pwr = _mindischrg; 
-                }
-            }
+            }            
         } 
     }    
 
@@ -877,7 +876,8 @@ async function processing() {
 function sendToWR(commWR, pwrAtCom) {
     const commNow = getState(spntComCheckDP).val;
 
-    if ((commWR == _InitCom_An || commWR != commNow || commWR != _lastSpntCom) && !_batterieLadenUebersteuernManuell) {
+   // if ((commWR == _InitCom_An || commWR != commNow || commWR != _lastSpntCom) && !_batterieLadenUebersteuernManuell) {
+    if ((_lastpwrAtCom != pwrAtCom || commWR != commNow || commWR != _lastSpntCom) && !_batterieLadenUebersteuernManuell) {
         if (_debug) {
             console.warn('------ > Daten gesendet an WR kommunikation : ' + commWR  + ' Wirkleistungvorgabe ' + pwrAtCom);
         }
@@ -887,12 +887,12 @@ function sendToWR(commWR, pwrAtCom) {
     }
 
     if (_debug && !_batterieLadenUebersteuernManuell) {
-        console.warn('SpntCom jetzt --> ' + commWR + ' <-- davor war ' + _lastSpntCom + ' Wirkleistungvorgabe ' + pwrAtCom);
+        console.warn('SpntCom jetzt --> ' + commWR + ' <-- davor war ' + _lastSpntCom + ' .. Wirkleistungvorgabe jetzt ' + pwrAtCom + ' davor war ' + _lastpwrAtCom);
         console.info('----------------------------------------------------------------------------------');
     }
 
-    _lastSpntCom = commWR;
-    
+    _lastSpntCom    = commWR;
+    _lastpwrAtCom   = pwrAtCom; 
 }
 
 
