@@ -338,7 +338,7 @@ async function processing() {
             console.info('Nachtfenster nach Astro : ' + _sundown + ' - ' + _sunup);
         }
 
-        if (pvwh > (_baseLoad * hrstorun) && !_snowmode) {    // ist genug PV da
+        if (pvwh > (_baseLoad * hrstorun) && !_snowmode) {    // ist genug PV da am tag
             for (let sd = 47; sd >= 0; sd--) {
                 const pow = getState(pvforecastTodayDP + sd + '.power').val;
 
@@ -384,7 +384,7 @@ async function processing() {
 
             pvwh = 0;         // initialisiere damit die entladung läuft
 
-            if (_dc_now > 0) {                
+            if (_dc_now > _verbrauchJetzt) {                
                 //wieviel wh kommen in etwa von PV die verkürzt
                 for (let p = hhJetztNum; p < hrstorun * 2; p++) {
                     pvwh = pvwh + (getState(pvforecastTodayDP + p + '.power').val / 2);
@@ -482,8 +482,9 @@ async function processing() {
 
             // neuaufbau poihigh ohne Nachladestunden
             if (_debug) {
-                console.warn('prclow ohne Nachladestunden ' + JSON.stringify(prclow));
-                console.warn('poihigh ohne Nachladestunden ' + JSON.stringify(prchigh));
+                console.info('vor  chrglength ' + chrglength + ' curbatwh ' + curbatwh + 'chargewh' + chargewh);
+                console.info('prclow ohne Nachladestunden ' + JSON.stringify(prclow));
+                console.info('poihigh ohne Nachladestunden ' + JSON.stringify(prchigh));
             }
             
             poihigh = getArrayDifference(prclow,poihigh);
@@ -494,7 +495,7 @@ async function processing() {
 
             if (_debug) {
             //    console.warn('poihigh ohne Nachladestunden ' + JSON.stringify(poihigh));
-                console.warn('chrglength ' + chrglength + ' curbatwh ' + curbatwh);
+                console.info('nach chrglength ' + chrglength + ' curbatwh ' + curbatwh);
             }
 
             if (chrglength > 0 && prclow.length > 0) {
@@ -540,6 +541,9 @@ async function processing() {
 
             if (lefthrs > 0 && lefthrs > poihigh.length) {        // limmitiere die Battlaufzeit wenn zu viel PV stunden
                 lefthrs = poihigh.length;   
+                if (_dc_now < _verbrauchJetzt) {
+                    lefthrs = 1;                                 // bin in den morgenstuden    
+                }
             }      
 
             if (lefthrs > 0) {
@@ -557,7 +561,7 @@ async function processing() {
             if (lefthrs > 0 && lefthrs < hrstorun * 2 && pvwh < _baseLoad * 24 * _wr_efficiency) {        //               16200 aus der berechung
                 if (batlefthrs >= hrstorun && compareTime(_sundown, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
                     if (_debug) {
-                        console.warn('Entladezeit reicht aus bis zum Sonnaufgang');
+                        console.warn('Entladezeit reicht aus bis zum Sonnaufgang und genug PV');
                     }
                     _SpntCom = _InitCom_Aus;
                     _max_pwr = _mindischrg;
