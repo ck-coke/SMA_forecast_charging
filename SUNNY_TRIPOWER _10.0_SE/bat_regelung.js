@@ -199,11 +199,7 @@ async function processing() {
     let wirdGeladen   = false;
 
     _bydDirectSOCMrk = 0;
-    _SpntCom = _InitCom_Aus;     // initialisiere AUS
-
-    if (_sma_em.length > 0){
-        inputRegisters.powerOut = _sma_em + ".psurplus" /*aktuelle Einspeiseleistung am Netzanschlußpunkt, SMA-EM Adapter*/
-    }
+    _SpntCom = _InitCom_Aus;     // initialisiere AUS    
     
     if (_dc_now < 10) {              // alles was unter 10 KW kann weg
         _dc_now = 0;
@@ -891,13 +887,13 @@ function sendToWR(commWR, pwrAtCom) {
 
 /* ***************************************************************************************************************************************** */
 
-on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisiere laut adapter abfrageintervall
+on({ id: inputRegisters.triggerDP, change: 'any' }, async function () {  // aktualisiere laut adapter abfrageintervall
     _hhJetzt                    = getHH(); 
     _batsoc                     = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR         
     _debug                      = getState(tibberDP + 'debug').val;
     _dc_now                     = getState(inputRegisters.dc1).val + getState(inputRegisters.dc2).val;  // pv vom Dach zusammen in W
 
-    _verbrauchJetzt = berechneVerbrauch(_dc_now);
+    _verbrauchJetzt = await berechneVerbrauch(_dc_now);
 
     _snowmode                   = getState(userDataDP + '.strom.tibber.extra.PV_Schneebedeckt').val;
     _tibberNutzenAutomatisch    = getState(tibberDP + 'extra.tibberNutzenAutomatisch').val;           // aus dem DP kommend sollte true sein für vis
@@ -933,7 +929,7 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
     } else {
         setTimeout(function () {
             processing();             /*start processing in interval*/
-        }, 600);                     
+        }, 300);                     
     }
 
     if (_debug) {
@@ -1036,13 +1032,17 @@ function getArrayDifference(array1, array2) {
     return array2.filter(item => !map.has(item.toString()));
 }
 
-function berechneVerbrauch(pvNow) {
-    let einspeisung   = Math.round(getState(inputRegisters.powerOut).val);     // Einspeisung  in W
-    let battOut       = getState(inputRegisters.battOut).val;
-    let battIn        = getState(inputRegisters.battIn).val;
-    let netzbezug     = getState(inputRegisters.netzbezug).val;
+async function berechneVerbrauch(pvNow) {
+    if (_sma_em.length > 0) {
+        inputRegisters.powerOut = _sma_em + ".psurplus" /*aktuelle Einspeiseleistung am Netzanschlußpunkt, SMA-EM Adapter*/
+    }
     
-    const verbrauchJetzt   = 100 + (pvNow + battOut + netzbezug) - (einspeisung + battIn);        // verbrauch in W , 100W reserve obendruaf
+    const einspeisung   = Math.round(getState(inputRegisters.powerOut).val);     // Einspeisung  in W
+    const battOut       = await getStateAsync(inputRegisters.battOut);
+    const battIn        = await getStateAsync(inputRegisters.battIn);
+    const netzbezug     = await getStateAsync(inputRegisters.netzbezug);
+    
+    const verbrauchJetzt   = 100 + (pvNow + battOut.val + netzbezug.val) - (einspeisung + battIn.val);        // verbrauch in W , 100W reserve obendruaf
     setState(momentan_VerbrauchDP, Math.round(((_verbrauchJetzt-100) /1000)*100)/100, true); // für die darstellung können die 100 W wieder raus
 
     return verbrauchJetzt;
