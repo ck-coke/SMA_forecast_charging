@@ -196,6 +196,7 @@ async function processing() {
 
     let dateNow = new Date();
     let macheNix = false;
+    let wirdGeladen   = false;
 
     _bydDirectSOCMrk = 0;
     _SpntCom = _InitCom_Aus;     // initialisiere AUS
@@ -204,16 +205,7 @@ async function processing() {
         inputRegisters.powerOut = _sma_em + ".psurplus" /*aktuelle Einspeiseleistung am Netzanschlußpunkt, SMA-EM Adapter*/
     }
 
-    let einspeisung   = Math.round(getState(inputRegisters.powerOut).val);     // Einspeisung  in W
-    let battOut       = getState(inputRegisters.battOut).val;
-    let battIn        = getState(inputRegisters.battIn).val;
-    let netzbezug     = getState(inputRegisters.netzbezug).val;
-    let wirdGeladen   = false;
-
-    _dc_now           = getState(inputRegisters.dc1).val + getState(inputRegisters.dc2).val;  // pv vom Dach zusammen in W
-
-    _verbrauchJetzt   = 100 + (_dc_now + battOut + netzbezug) - (einspeisung + battIn);        // verbrauch in W , 100W reserve obendruaf
-    setState(momentan_VerbrauchDP, Math.round(((_verbrauchJetzt-100) /1000)*100)/100, true); // für die darstellung können die 100 W wieder raus
+    _verbrauchJetzt = berechneVerbrauch(_dc_now);
     
     if (_dc_now < 10) {              // alles was unter 10 KW kann weg
         _dc_now = 0;
@@ -273,7 +265,6 @@ async function processing() {
         console.info('Verbrauch jetzt_________________ ' + _verbrauchJetzt + ' W');
         console.info('PV Produktion___________________ ' + _dc_now + ' W');
         console.info('Ladeleistung Batterie___________ ' + _batteryLadePower + ' W');
-        console.info('Einspeiseleistung_______________ ' + einspeisung + ' W');
         console.info('Batt_SOC________________________ ' + _batsoc + ' %');
         const battsts = battStatus == 2291 ? 'Batterie Standby' : battStatus == 3664 ? 'Notladebetrieb' : battStatus == 2292 ? 'Batterie laden' : battStatus == 2293 ? 'Batterie entladen' : 'Aus';
         console.info('Batt_Status_____________________ ' + battsts + ' = ' + battStatus);
@@ -906,7 +897,8 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
     _hhJetzt                    = getHH(); 
     _batsoc                     = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR         
     _debug                      = getState(tibberDP + 'debug').val;
-    
+    _dc_now                     = getState(inputRegisters.dc1).val + getState(inputRegisters.dc2).val;  // pv vom Dach zusammen in W
+
     _snowmode                   = getState(userDataDP + '.strom.tibber.extra.PV_Schneebedeckt').val;
     _tibberNutzenAutomatisch    = getState(tibberDP + 'extra.tibberNutzenAutomatisch').val;           // aus dem DP kommend sollte true sein für vis
     _prognoseNutzenAutomatisch  = getState(tibberDP + 'extra.prognoseNutzenAutomatisch').val;       // aus dem DP kommend sollte true sein für vis
@@ -937,7 +929,7 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
         _tibberNutzenSteuerung      = false;
         _prognoseNutzenSteuerung    = false;
         _isTibber_active            = 88      // notladung mrk 
-        sendToWR(_InitCom_An, _batteryPowerEmergency);
+        sendToWR(_InitCom_Aus, _batteryPowerEmergency);
     } else {
         setTimeout(function () {
             processing();             /*start processing in interval*/
@@ -962,7 +954,7 @@ on({id: [tibberDP + 'extra.tibberNutzenAutomatisch',
 function notLadungCheck() {
     _bydDirectSOC = getState(bydDirectSOCDP).val;   // nimm den bydSoc da der WR nicht immer diesen übermittelt    
 
-    if ((_bydDirectSOC < 6 || _batsoc <= 1) && _dc_now < _baseLoad) {
+    if (_bydDirectSOC < 5 && _dc_now < _baseLoad) {
         if (_bydDirectSOC != _bydDirectSOCMrk) {
             console.error(' -----------------    Batterie NOTLADEN ' + _bydDirectSOC + ' %' + ' um ' + _hhJetzt + ':00');
             toLog(' -----------------    Batterie NOTLADEN ' + _bydDirectSOC + ' %', true);
@@ -1042,4 +1034,16 @@ function filterTimes(array) {
 function getArrayDifference(array1, array2) {
     const map = new Map(array1.map(item => [item.toString(), item]));
     return array2.filter(item => !map.has(item.toString()));
+}
+
+function berechneVerbrauch(pvNow) {
+    let einspeisung   = Math.round(getState(inputRegisters.powerOut).val);     // Einspeisung  in W
+    let battOut       = getState(inputRegisters.battOut).val;
+    let battIn        = getState(inputRegisters.battIn).val;
+    let netzbezug     = getState(inputRegisters.netzbezug).val;
+    
+    const verbrauchJetzt   = 100 + (_dc_now + battOut + netzbezug) - (einspeisung + battIn);        // verbrauch in W , 100W reserve obendruaf
+    setState(momentan_VerbrauchDP, Math.round(((_verbrauchJetzt-100) /1000)*100)/100, true); // für die darstellung können die 100 W wieder raus
+
+    return verbrauchJetzt;
 }
