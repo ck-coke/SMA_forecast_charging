@@ -204,8 +204,6 @@ async function processing() {
     if (_sma_em.length > 0){
         inputRegisters.powerOut = _sma_em + ".psurplus" /*aktuelle Einspeiseleistung am Netzanschlußpunkt, SMA-EM Adapter*/
     }
-
-    _verbrauchJetzt = berechneVerbrauch(_dc_now);
     
     if (_dc_now < 10) {              // alles was unter 10 KW kann weg
         _dc_now = 0;
@@ -899,6 +897,8 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, function () {  // aktualisie
     _debug                      = getState(tibberDP + 'debug').val;
     _dc_now                     = getState(inputRegisters.dc1).val + getState(inputRegisters.dc2).val;  // pv vom Dach zusammen in W
 
+    _verbrauchJetzt = berechneVerbrauch(_dc_now);
+
     _snowmode                   = getState(userDataDP + '.strom.tibber.extra.PV_Schneebedeckt').val;
     _tibberNutzenAutomatisch    = getState(tibberDP + 'extra.tibberNutzenAutomatisch').val;           // aus dem DP kommend sollte true sein für vis
     _prognoseNutzenAutomatisch  = getState(tibberDP + 'extra.prognoseNutzenAutomatisch').val;       // aus dem DP kommend sollte true sein für vis
@@ -1042,7 +1042,7 @@ function berechneVerbrauch(pvNow) {
     let battIn        = getState(inputRegisters.battIn).val;
     let netzbezug     = getState(inputRegisters.netzbezug).val;
     
-    const verbrauchJetzt   = 100 + (_dc_now + battOut + netzbezug) - (einspeisung + battIn);        // verbrauch in W , 100W reserve obendruaf
+    const verbrauchJetzt   = 100 + (pvNow + battOut + netzbezug) - (einspeisung + battIn);        // verbrauch in W , 100W reserve obendruaf
     setState(momentan_VerbrauchDP, Math.round(((_verbrauchJetzt-100) /1000)*100)/100, true); // für die darstellung können die 100 W wieder raus
 
     return verbrauchJetzt;
