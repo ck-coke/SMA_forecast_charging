@@ -290,7 +290,7 @@ async function processing() {
         let hrstorun = 24;   
         let pvwh = 0;
 
-        for (let p = 0; p < hrstorun * 2; p++) {   // *2 weil 48 Datenpunkte
+        for (let p = 0; p < hrstorun * 2; p++) {   // *2 weil 48 PV Datenpunkte
             pvwh = pvwh + (getState(pvforecastTodayDP + p + '.power').val / 2);
         }
         
@@ -334,8 +334,9 @@ async function processing() {
             }             
         }
         
-        let sundownTime  = datumTimestamp(_sundown, 0);     // untergang
-        let sunriseTime  = datumTimestamp(_sunup, 1);       // aufgang am nächsten tag  
+        let sundownTime   = datumToTimestamp(_sundown, 0);     // untergang
+        let tosundownTime = datumToTimestamp(nowhour, 0);      // jetzt
+        let sunriseTime   = datumToTimestamp(_sunup, 1);       // aufgang am nächsten tag  
 
         let sundownhr = _sundown;
 
@@ -344,28 +345,31 @@ async function processing() {
             sundownhr = nowhour;  
             
             if (compareTime('00:00', _sunup, 'between')) {      // abhängig von Tageswechsel Nachts
-                sunriseTime = datumTimestamp(_sunup, 0);         
+                sunriseTime = datumToTimestamp(_sunup, 0);         
             }
         }
 
-        hrstorun = Math.min(Number((sunriseTime  - sundownTime) / (1000 * 60 * 60)).toFixed(2), 24);
+        hrstorun          = Math.min(Number((sunriseTime  - sundownTime) / (1000 * 60 * 60)).toFixed(2), 24);
+        const tosundownhr = Math.max(Number((sundownTime - tosundownTime) / (1000 * 60 * 60)).toFixed(2), 0);   // von jetzt bis zum sonnenuntergang
 
         if (_debug) {
-            console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + ' hrstorun (' + hrstorun + ' h)');
-        }
+            console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + ' bis zum Sonnenaufgang sind hrstorun ' + hrstorun + ' h und zum Untergang tosundownhr ' + tosundownhr);
+        }        
 
-        pvwh = 0;         // initialisiere damit die entladung läuft
-
-        if (_dc_now > _verbrauchJetzt) {                
+      //  if (_dc_now > _verbrauchJetzt) {                            
+          if (tosundownhr >= 0) {                            
+            pvwh = 0;         // initialisiere damit die entladung läuft
+            if (tosundownhr > 1) { 
             //wieviel wh kommen in etwa von PV die verkürzt
-            for (let p = hhJetztNum; p < hrstorun * 2; p++) {
-                pvwh = pvwh + (getState(pvforecastTodayDP + p + '.power').val / 2);
-            }
+                for (let p = hhJetztNum; p < hrstorun * 2; p++) {
+                    pvwh = pvwh + (getState(pvforecastTodayDP + p + '.power').val / 2);
+                }
 
-            setState(tibberDP + 'extra.PV_Prognose_kurz', Math.round(pvwh), true);
+                setState(tibberDP + 'extra.PV_Prognose_kurz', Math.round(pvwh), true);
 
-            if (_debug) {
-                console.info('Erwarte ca______________________ ' + (pvwh / 1000).toFixed(1) + ' kWh von PV verkürtzt');
+                if (_debug) {
+                    console.info('Erwarte ca______________________ ' + (pvwh / 1000).toFixed(1) + ' kWh von PV verkürtzt');
+                }
             }
         }
     
@@ -412,11 +416,21 @@ async function processing() {
         let ladeZeitenArray = [];
 
         if (_debug) {
-            console.info('Bat h verbleibend_____batlefthrs ' + batlefthrs + ' bis zum Sonnenaufgang sind hrstorun ' + hrstorun);
+            console.info('Bat h verbleibend_____batlefthrs ' + batlefthrs);
         }
 
-        if (batlefthrs < hrstorun) {          
+        if (batlefthrs < hrstorun) {
             for (let h = 0; h < poihigh.length; h++) {
+                if (poihigh[h][0] < _start_charge) {
+                    prclow.push(poihigh[h]);    
+                }
+                if (poihigh[h][0] > _stop_discharge) {
+                    prchigh.push(poihigh[h]);    
+                }
+            }
+
+/*
+           for (let h = 0; h < poihigh.length; h++) {
                 let pricelimit = parseFloat((poihigh[h][0] * _loadfact).toFixed(4));            
                 
                 for (let l = h; l < poihigh.length; l++) {
@@ -437,35 +451,36 @@ async function processing() {
 
             prclow  = uniqueprclow;
             prchigh = uniqueprchigh;
-
+*/
             prclow.sort(function (a, b) {
                 return a[0] - b[0];
             })
 
             //nachlademenge 
             let chargewh = ((prchigh.length) * (_baseLoad / 2) * 1 / _wr_efficiency);
+            
             if (hrstorun < 24 && !_snowmode) {
                 chargewh = (chargewh - (pvwh * _wr_efficiency)) * -1;
             }
 
-            let curbatwh = ((_batteryCapacity / 100) * _batsoc).toFixed(2);
+            let curbatwh   = Number(((_batteryCapacity / 100) * _batsoc).toFixed(2));
             let chrglength = Number((Math.max((chargewh - curbatwh) / (_batteryLadePower * _wr_efficiency), 0) * 2).toFixed(2));       
 
             // neuaufbau poihigh ohne Nachladestunden
             if (_debug) {
                 console.info('vor  chrglength ' + chrglength + ' curbatwh ' + curbatwh + ' chargewh ' + chargewh);
-                console.info('prclow vor Nachladestunden ' + JSON.stringify(prclow));
-                console.info('poihigh vor Nachladestunden ' + JSON.stringify(prchigh));
+            //    console.info('prclow  Nachladestunden ' + JSON.stringify(prclow));
+            //    console.info('poihigh Nachladestunden ' + JSON.stringify(prchigh));
             }
             
-            poihigh = getArrayDifference(prclow,poihigh);
+    //        poihigh = getArrayDifference(prclow,poihigh);
                     
             if (chrglength > prclow.length) {
                 chrglength = prclow.length;
             }
 
             if (_debug) {
-                console.warn('poihigh ohne Nachladestunden ' + JSON.stringify(poihigh));
+            //    console.info('poihigh ohne Nachladestunden ' + JSON.stringify(poihigh));
                 console.info('nach chrglength ' + chrglength + ' curbatwh ' + curbatwh);
             }
 
@@ -485,7 +500,6 @@ async function processing() {
                                 console.warn('-->> Bingo nachladezeit');
                             }                                                         
                             _SpntCom = _InitCom_An;
-                        //    _max_pwr = (_pwrAtCom_def - (_dc_now - _verbrauchJetzt)) * -1
                             _max_pwr = _pwrAtCom_def * -1;                           
                             _isTibber_active = 1;
                             _prognoseNutzenSteuerung = false;
@@ -498,7 +512,6 @@ async function processing() {
         }
 
         if (!macheNix) {
-           
             poihigh = filterTimes(poihigh); // übernehmen nur laufende und zukünftige werte
 
     //        poihigh.sort(function (a, b) {      // sortiert höchster preis zuerst            
@@ -508,7 +521,7 @@ async function processing() {
             let lefthrs = batlefthrs * 2;             // batlefthrs Bat h verbleibend
 
             if (_debug) {
-                console.info('lefthrs ' + lefthrs + ' poihigh.length '+ poihigh.length + ' poihigh nach filter ' + JSON.stringify(poihigh));
+                console.info(' poihigh.length '+ poihigh.length + ' poihigh nach filter ' + JSON.stringify(poihigh));
             }
 
 
@@ -531,7 +544,7 @@ async function processing() {
             }
 // entladung         
 
-            if (lefthrs > 0 && lefthrs < hrstorun * 2 && pvwh < _baseLoad * 24 * _wr_efficiency) {        //               16200 aus der berechung
+            if (lefthrs > 0 && lefthrs < hrstorun * 2) { // && pvwh < _baseLoad * 24 * _wr_efficiency) {        //               16200 aus der berechung
                 if (batlefthrs >= hrstorun && compareTime(nowhour, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
                     if (_debug) {
                         console.warn('Entladezeit reicht aus bis zum Sonnaufgang und genug PV');
@@ -573,8 +586,7 @@ async function processing() {
                 }
             }
 
-            // sortiere die zeiten für die Vis
-            entladeZeitenArray = sortBySecondElementAndFilterPastTimes(entladeZeitenArray);              
+            entladeZeitenArray = filterUniquePrices(entladeZeitenArray);
 
             setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArray, true);
 
@@ -956,26 +968,6 @@ function notLadungCheck() {
     return false;
 }
 
-function sortBySecondElementAndFilterPastTimes(arr) {
-    const currentTime = new Date();         // Aktuelle Zeit
-    const currentHours = currentTime.getHours();
-    const currentMinutes = currentTime.getMinutes();
-    const currentTimeString = `${currentHours.toString().padStart(2, '0')}:${currentMinutes.toString().padStart(2, '0')}`;
-    
-    arr.sort((a, b) => {
-        const timeA = a[1];
-        const timeB = b[1];
-        if (timeA < timeB) return -1;
-        if (timeA > timeB) return 1;
-        return 0;
-    });
-
-    return arr.filter(item => {
-        const endTime = item[2];            // Das Endzeitfeld des Unterarrays
-        return endTime > currentTimeString; // Rückgabe, ob die Endzeit nach der aktuellen Zeit liegt
-    });
-}
-
 function sortiereNachUhrzeit(arr) {
     return arr.sort((a, b) => {
         const zeitA = a[3];
@@ -993,20 +985,37 @@ function sortiereNachUhrzeit(arr) {
     });
 }
 
-function datumTimestamp(uhrzeit, tag) {
+function datumToTimestamp(uhrzeit, tag) {
     // Aktuelles Datum erstellen
     let currentDate = new Date();
 
     // Uhrzeit extrahieren und in Stunden und Minuten aufteilen
     let [stunden, minuten] = uhrzeit.split(':').map(Number);
 
-    // Einen Tag hinzufügen
+    // Tag hinzufügen
     currentDate.setDate(currentDate.getDate() + tag);
 
-    // Datum auf morgen setzen
+    // Datum setzen
     currentDate.setHours(stunden, minuten, 0, 0);
  
     return currentDate.getTime();
+}
+
+function filterUniquePrices(inputArray) {
+    const uniquePrices = {}; // Ein Objekt, um eindeutige Preise zu verfolgen
+    const outputArray = [];
+
+    inputArray.forEach(element => {
+        const price = element[0];
+
+        // Wenn der Preis noch nicht im eindeutigen Preisobjekt vorhanden ist
+        if (!uniquePrices[price]) {
+            uniquePrices[price] = true; // Markiere ihn als bereits gesehen
+            outputArray.push(element); // Füge das Element dem Ausgabearray hinzu
+        }
+    });
+
+    return outputArray;
 }
 
 function filterTimes(array) {
@@ -1016,7 +1025,8 @@ function filterTimes(array) {
     const filteredArray = array.filter(item => {
         const startTime = parseInt(item[1].split(':')[0]) * 60 + parseInt(item[1].split(':')[1]);
         const endTime = parseInt(item[2].split(':')[0]) * 60 + parseInt(item[2].split(':')[1]);
-        return currentTime <= startTime || currentTime >= startTime && currentTime <= endTime;
+        //return currentTime <= startTime || currentTime >= startTime && currentTime <= endTime;
+        return currentTime <= startTime || currentTime >= startTime;
     });
 
     return filteredArray;
