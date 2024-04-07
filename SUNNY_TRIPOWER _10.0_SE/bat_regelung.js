@@ -65,15 +65,16 @@ const inputRegisters = {
     dc2: 'modbus.0.inputRegisters.3.30961_DC-Leistung_2',
 }
 
+
 const bydDirectSOCDP  = 'bydhvs.0.State.SOC';                            // battSOC netto direkt von der Batterie
 const _maxdischrg_def = getState(communicationRegisters.wMaxCha).val;    // 10600
 let _dc_now           = getState(inputRegisters.dc1).val + getState(inputRegisters.dc2).val;  // pv vom Dach zusammen in W
-let _verbrauchJetzt   = 0;
 
 const _InitCom_Aus = 803;
 const _InitCom_An = 802;
 
 let _SpntCom = _InitCom_Aus;           //   802: aktiv (Act)    803: inaktiv (Ina)
+let _verbrauchJetzt   = 0;
 let _lastSpntCom = 0;
 let _lastpwrAtCom = 0;
 let _bydDirectSOC = 5;
@@ -544,7 +545,7 @@ async function processing() {
 // entladung         
 
             if (lefthrs > 0 && lefthrs < hrstorun * 2 && pvwh < _baseLoad * 24 * _wr_efficiency) {        //               16200 aus der berechung
-                if (batlefthrs >= hrstorun && compareTime(_sundown, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
+                if (batlefthrs >= hrstorun && compareTime(nowhour, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
                     if (_debug) {
                         console.warn('Entladezeit reicht aus bis zum Sonnaufgang und genug PV');
                     }
@@ -927,9 +928,7 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, async function () {  // aktu
         _isTibber_active            = 88      // notladung mrk 
         sendToWR(_InitCom_Aus, _batteryPowerEmergency);
     } else {
-        setTimeout(function () {
-            processing();             /*start processing in interval*/
-        }, 300);                     
+        processing();             /*start processing in interval*/
     }
 
     if (_debug) {
