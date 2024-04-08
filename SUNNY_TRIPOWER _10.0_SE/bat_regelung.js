@@ -105,7 +105,7 @@ let _snowmode = false;                  //manuelles setzen des Schneemodus, dadu
 const _start_charge = 0.19;             //Eigenverbrauchspreis
 const _lossfactor = 0.75;               //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
 const _loadfact = 1 / _lossfactor;      /// 1,33
-const _stop_discharge = parseFloat((_start_charge * _loadfact).toFixed(4));    /// 0.19 * 1.33 = 0.2533 € 
+const _stop_discharge = parseInt((_start_charge * _loadfact).toFixed(4));    /// 0.19 * 1.33 = 0.2533 € 
 
 createUserStates(userDataDP, false, [tibberStromDP + 'debug', { 'name': 'debug', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
     setState(tibberDP + 'debug', _debug, true);
@@ -284,7 +284,7 @@ async function processing() {
         let hhJetztNum  = Number(_hhJetzt);
         
         let batlefthrs = ((_batteryCapacity / 100) * _batsoc) / (_baseLoad / Math.sqrt(_lossfactor));    /// 12800 / 100 * 30
-        batlefthrs = Number(batlefthrs.toFixed(2));
+        batlefthrs = parseInt(batlefthrs.toFixed(2));
 
         //wieviel wh kommen in etwa von PV in den nächsten 24h
         let hrstorun = 24;   
@@ -350,8 +350,8 @@ async function processing() {
             }
         }
 
-        hrstorun          = Math.min(Number((sunriseTime  - sundownTime) / (1000 * 60 * 60)).toFixed(2), 24);
-        const tosundownhr = Math.max(Number((sundownTimeOrginal - tosundownTime) / (1000 * 60 * 60)).toFixed(2), 0);   // von jetzt bis zum sonnenuntergang
+        hrstorun          = Math.min(parseInt(((sunriseTime  - sundownTime) / (1000 * 60 * 60)).toFixed(2)) , 24);
+        const tosundownhr = Math.max(parseInt(((sundownTimeOrginal - tosundownTime) / (1000 * 60 * 60)).toFixed(2)), 0);   // von jetzt bis zum sonnenuntergang
 
         if (_debug) {
             console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + ' bis zum Sonnenaufgang sind hrstorun ' + hrstorun + ' h und zum Untergang tosundownhr ' + tosundownhr);
@@ -464,8 +464,8 @@ async function processing() {
                 chargewh = (chargewh - (pvwh * _wr_efficiency)) * -1;
             }
 
-            let curbatwh   = Number(((_batteryCapacity / 100) * _batsoc).toFixed(2));
-            let chrglength = Number((Math.max((chargewh - curbatwh) / (_batteryLadePower * _wr_efficiency), 0) * 2).toFixed(2));       
+            let curbatwh   = parseInt(((_batteryCapacity / 100) * _batsoc).toFixed(2));
+            let chrglength = parseInt((Math.max((chargewh - curbatwh) / (_batteryLadePower * _wr_efficiency), 0) * 2).toFixed(2));       
 
             // neuaufbau poihigh ohne Nachladestunden
             if (_debug) {
@@ -764,7 +764,7 @@ async function processing() {
                 }
                 get_wh_einzeln = (((pvpower / 2) - ((pvlimit + _baseLoad) / 2)) * (minutes / 30)); // wieviele Wh Überschuss???   
                 
-                get_wh = get_wh + Number(get_wh_einzeln.toFixed(2));
+                get_wh = get_wh + parseInt(get_wh_einzeln.toFixed(2));
             }
 
             setState(tibberDP + 'extra.PV_Ueberschuss', get_wh, true);
