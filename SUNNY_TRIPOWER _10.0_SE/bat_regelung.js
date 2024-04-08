@@ -334,9 +334,10 @@ async function processing() {
             }             
         }
         
-        let sundownTime   = datumToTimestamp(_sundown, 0);     // untergang
-        let tosundownTime = datumToTimestamp(nowhour, 0);      // jetzt
-        let sunriseTime   = datumToTimestamp(_sunup, 1);       // aufgang am nächsten tag  
+        let sundownTime             = datumToTimestamp(_sundown, 0);     // untergang
+        let sundownTimeOrginal      = datumToTimestamp(_sundown, 0);     // untergang
+        let tosundownTime           = datumToTimestamp(nowhour, 0);      // jetzt
+        let sunriseTime             = datumToTimestamp(_sunup, 1);       // aufgang am nächsten tag  
 
         let sundownhr = _sundown;
 
@@ -350,7 +351,7 @@ async function processing() {
         }
 
         hrstorun          = Math.min(Number((sunriseTime  - sundownTime) / (1000 * 60 * 60)).toFixed(2), 24);
-        const tosundownhr = Math.max(Number((sundownTime - tosundownTime) / (1000 * 60 * 60)).toFixed(2), 0);   // von jetzt bis zum sonnenuntergang
+        const tosundownhr = Math.max(Number((sundownTimeOrginal - tosundownTime) / (1000 * 60 * 60)).toFixed(2), 0);   // von jetzt bis zum sonnenuntergang
 
         if (_debug) {
             console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + ' bis zum Sonnenaufgang sind hrstorun ' + hrstorun + ' h und zum Untergang tosundownhr ' + tosundownhr);
