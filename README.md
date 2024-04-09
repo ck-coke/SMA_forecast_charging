@@ -1,6 +1,19 @@
-[![Paypal](https://raw.githubusercontent.com/Maverick78de/SMA_forecast_charging/master/img/donate-PayPal-green.svg)](https://www.paypal.me/Maverick78de)
-
 # SMA_forecast_charging
+
+Achtung NUR für den Wechselrichter SUNNY_TRIPOWER _10.0_SE von SMA. Es werden keine anderen unterstützt. 
+
+Das Script wurde im gänze verändert und dient dem Laden bei günstigen Preisen und entladen bei hohen.
+Es bedient sich dem Tibberlink adapter, dieser muss installiert und konfiguriert sein sowie einer PV Prognose von solcast.com
+ 
+
+
+
+
+
+
+
+
+# OLD Version 
 SMA prognosebasierte Ladung mit ioBroker 
 
 Mit diesen Scripten soll die prognosebasierte Ladung von SMA Batteriewechselrichtern mittels ioBroker verbessert werden. Grund sind die jahrelang ungelösten Probleme des SMA HomeManagers, vorallem im bereich der fehlerhaften bzw schlechten Prognose. Die Details können hier nachgelesen werden: https://www.photovoltaikforum.com/thread/119955-warum-wird-eingespeist-und-nicht-der-akku-geladen/
