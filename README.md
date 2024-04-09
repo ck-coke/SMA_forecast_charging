@@ -3,7 +3,7 @@
 Achtung NUR für den Wechselrichter SUNNY_TRIPOWER _10.0_SE von SMA. Es werden keine anderen unterstützt. 
 
 Das Script wurde im gänze verändert und dient dem Laden bei günstigen Preisen und entladen bei hohen.
-Es bedient sich dem Tibberlink adapter, dieser muss installiert und konfiguriert sein sowie einer PV Prognose von solcast.com
+Es nutzt den Tibberlink Adapter für die Preise, dieser muss installiert und konfiguriert sein, sowie einer PV Prognose von solcast.com, hier muss man sich registrieren und ein Token generieren.
  
 
 ![tree](https://github.com/arteck/SMA_forecast_charging/blob/master/SUNNY_TRIPOWER%20_10.0_SE/datenpunkte.PNG)
