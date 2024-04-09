@@ -6,7 +6,7 @@ Das Script wurde im gänze verändert und dient dem Laden bei günstigen Preisen
 Es bedient sich dem Tibberlink adapter, dieser muss installiert und konfiguriert sein sowie einer PV Prognose von solcast.com
  
 
-
+![tree](https://github.com/arteck/SMA_forecast_charging/blob/master/SUNNY_TRIPOWER%20_10.0_SE/datenpunkte.PNG)
 
 
 
