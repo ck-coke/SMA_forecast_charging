@@ -102,7 +102,7 @@ let _sundown  = '00:00';
 
 // tibber Preis Bereich
 let _snowmode = false;                  //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
-const _start_charge = 0.19;             //Eigenverbrauchspreis
+const _start_charge = 0.1805;             //Eigenverbrauchspreis
 const _lossfactor = 0.75;               //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
 const _loadfact = 1 / _lossfactor;      /// 1,33
 const _stop_discharge = parseInt((_start_charge * _loadfact).toFixed(4));    /// 0.19 * 1.33 = 0.2533 € 
@@ -189,7 +189,7 @@ async function processing() {
 
     _tick ++;            
 
-    if (_tick >= 30) {         // alle 5 min (30 ticks) reset damit der WR die Daten bekommt
+    if (_tick >= 30) {         // alle 5 min (30 ticks) reset damit der WR die Daten bekommt, WR ist auf 10 min reset Eingestellt
         setState(spntComCheckDP, 998, true);  
         _tick = 0;   
     }
@@ -275,7 +275,7 @@ async function processing() {
 
         let lowprice = []; //wieviele Ladestunden unter Startcharge Preis
         for (let x = 0; x < poi.length; x++) {
-            if (poi[x][0] < _start_charge) {
+            if (poi[x][0] <= _start_charge) {
                 lowprice.push(poi[x]);
             }
         }
@@ -419,7 +419,7 @@ async function processing() {
 
         if (batlefthrs < hrstorun) {
             for (let h = 0; h < poihigh.length; h++) {
-                if (poihigh[h][0] < _start_charge) {
+                if (poihigh[h][0] <= _start_charge) {
                     prclow.push(poihigh[h]);    
                 }
                 if (poihigh[h][0] > _stop_discharge) {
@@ -516,7 +516,7 @@ async function processing() {
             }
 
 // Entladezeit 
-            if (lefthrs > 0 && lefthrs < hrstorun * 2) { // && pvwh < _baseLoad * 24 * _wr_efficiency) {        //  16200 aus der berechung
+            if (lefthrs > 0 && lefthrs <= hrstorun * 2) { // && pvwh < _baseLoad * 24 * _wr_efficiency) {        //  16200 aus der berechung
                 macheNix = false;
                 if (batlefthrs >= hrstorun && compareTime(nowhour, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
                     if (_debug) {
@@ -578,7 +578,7 @@ async function processing() {
                 }
      
 // starte die ladung
-                if (_tibberPreisJetzt < _start_charge) {
+                if (_tibberPreisJetzt <= _start_charge) {
                     let length = Math.ceil(restladezeit);
 
                     if (length > lowprice.length) {
@@ -809,7 +809,7 @@ async function processing() {
                     }     
                     _SpntCom = _InitCom_An;                       
                             
-                    if (_max_pwr > _dc_now - _verbrauchJetzt) {  // wenn das ermittelte wert grösser ist als die realität dann limmitiere
+                    if (_max_pwr > _dc_now - _verbrauchJetzt) {  // wenn das ermittelte wert grösser ist als die realität dann limmitiere, check nochmal besser ist es
                         _max_pwr = _dc_now - _verbrauchJetzt;   
                         if (_debug) {
                             console.warn('-->> Bingo ladezeit limmitiere auf ' + _max_pwr);
