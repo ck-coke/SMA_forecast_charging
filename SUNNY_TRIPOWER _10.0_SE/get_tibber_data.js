@@ -135,7 +135,7 @@ function holePreis(preisHeute,preisMorgen) {
         return a.start - b.start;
     });
 
-    preisePV = sortArrayByStartTime(preisePV,9);
+    preisePV = sortArrayByStartTime(preisePV, getHH());
 
     setState(_tibberDP + 'extra.tibberBestPreisArrayLang', preiseSortLang, true);
     setState(_tibberDP + 'extra.tibberPvForcast', preisePV, true);
