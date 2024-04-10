@@ -14,6 +14,7 @@ const _options = { hour12: false, hour: '2-digit', minute: '2-digit' };
 
 createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberBestPreisArray', { 'name': 'tibber bester preis als array', 'type':'array', 'read': true, 'write': false, 'role': 'object'}], function () {  });       
 createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberBestPreisArrayLang', { 'name': 'tibber bester preis als array', 'type':'array', 'read': true, 'write': false, 'role': 'object'}], function () {  }); 
+createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberPvForcast', { 'name': 'tibber formattierung für pv prognose', 'type':'array', 'read': true, 'write': false, 'role': 'object'}], function () {  }); 
 
 createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberBestPreis', { 'name': 'tibber Best Preis', 'type':'number', 'read': true, 'write': false, 'role': 'state', 'def':0 , "unit": "ct" }], function () {      
   setState(_tibberDP + 'extra.tibberBestPreis', 0, true);
@@ -45,6 +46,7 @@ aktualisiereStunde();
 
 function holePreis(preisHeute,preisMorgen) {
     let preise = [];
+    let preisePV = [];
     
     for(let i = 14; i < 24; i++) {      
         let obj = {};
@@ -64,6 +66,10 @@ function holePreis(preisHeute,preisMorgen) {
 
         obj.preis = preis;
         preise.push(obj);
+
+        preisePV.push([preis, startTime , startTime.split(':')[0] + ':30']);
+        preisePV.push([preis, startTime.split(':')[0] + ':30', endTime]);
+
         const level = _tibber + preisHeute + i + '.level';
         const levelText  = getState(level).val;
 
@@ -101,6 +107,9 @@ function holePreis(preisHeute,preisMorgen) {
         obj.preis = preis;
         preise.push(obj);
     
+        preisePV.push([preis, startTime , startTime.split(':')[0] + ':30']);
+        preisePV.push([preis, startTime.split(':')[0] + ':30', endTime]);
+
         const level = _tibber + preisMorgen + i + '.level';
         const levelText  = getState(level).val;
 
@@ -121,16 +130,47 @@ function holePreis(preisHeute,preisMorgen) {
         });  
     }
 
-    let preiseLang = preise;
-    preiseLang.sort(function(a, b) {
+    let preiseSortLang = preise;
+    preiseSortLang.sort(function(a, b) {
         return a.start - b.start;
     });
 
-    setState(_tibberDP + 'extra.tibberBestPreisArrayLang', preiseLang, true);
+    preisePV = sortArrayByStartTime(preisePV,9);
+
+    setState(_tibberDP + 'extra.tibberBestPreisArrayLang', preiseSortLang, true);
+    setState(_tibberDP + 'extra.tibberPvForcast', preisePV, true);
 
     errechneBesteUhrzeit(preise);
     
 }
+
+function sortArrayByStartTime(array, currentHour) {
+    // Sortiere den Array nach der Startzeit
+    array.sort((a, b) => {
+        const timeA = a[1].split(":").map(Number);
+        const timeB = b[1].split(":").map(Number);
+        
+        // Vergleiche Stunden
+        if (timeA[0] !== timeB[0]) {
+            return timeA[0] - timeB[0];
+        }
+        
+        // Wenn Stunden gleich sind, vergleiche Minuten
+        return timeA[1] - timeB[1];
+    });
+
+    // Finde den Index des aktuellen Zeitpunkts
+    let startIndex = array.findIndex(item => {
+        const time = item[1].split(":").map(Number);
+        return time[0] >= currentHour || (time[0] === currentHour && time[1] >= 30);
+    });
+
+    // Schneide den Array ab startIndex und setze ihn an das Ende
+    const sortedArray = array.slice(startIndex).concat(array.slice(0, startIndex));
+
+    return sortedArray;
+}
+
 
 
 function errechneBesteUhrzeit(allePreise) {
@@ -201,4 +241,5 @@ schedule('*/60 0-14 * * *', function() {
 schedule('1 * * * *', function() {
     aktualisiereStunde();
 });
+ 
   
