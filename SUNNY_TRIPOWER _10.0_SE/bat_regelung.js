@@ -7,6 +7,7 @@ const pvforecastTomorrowDP  = userDataDP + '.strom.pvforecast.tomorrow.gesamt.';
 const spntComCheckDP        = userDataDP + '.strom.40151_Kommunikation_Check'; // nochmal ablegen zur kontrolle
 const tomorrow_kWDP         = userDataDP + '.strom.pvforecast.tomorrow.gesamt.tomorrow_kW';
 const tibberPreisJetztDP    = tibberDP + 'extra.tibberPreisJetzt';
+const tibberPvForcastDP     = tibberDP + 'extra.tibberPvForcast';
 
 const batterieLadenUhrzeitDP      = userDataDP + '.strom.batterieLadenUhrzeit';
 const batterieLadenUhrzeitStartDP = userDataDP + '.strom.batterieLadenUhrzeitStart';
@@ -375,7 +376,9 @@ async function processing() {
             }
         }
     
-        let poihigh = [];
+        let poihigh = getState(tibberPvForcastDP).val;
+
+/*
         let pricehrs = hrstorun;
 
         //neue Preisdaten ab 14 Uhr
@@ -398,6 +401,7 @@ async function processing() {
             if (t == 0 && nowhour == (hrparse + ':30')) {
                 tti--;
             }
+            
             poihigh[tti] = [prcparse, hrparse + ':30', getState(tibberDP + hhJetztNum + '.endTime').val];
             tti++;
 
@@ -406,9 +410,9 @@ async function processing() {
                 hhJetztNum = 0;
             }
         }
-
+*/
         if (_debug) {
-            console.info('Tibber poihigh.length ' + poihigh.length + ' pricehrs ' + pricehrs);
+            console.info('Tibber poihigh.length ' + poihigh.length);
         //    console.info('poihigh vor nachladen: ' + JSON.stringify(poihigh));
         }
 
@@ -506,13 +510,18 @@ async function processing() {
                 console.warn('-->>  lefthrs ' + lefthrs + ' batlefthrs ' + batlefthrs + ' hrstorun ' + hrstorun + ' pvwh ' + pvwh);          
             }
 
-// Entladezeit  wenn reste im akku 
+// Entladezeit  wenn reste im akku           
 
-            if (hrstorun > 0 && batlefthrs == 0 && _batsoc > 1 && _tibberPreisJetzt > _stop_discharge && _dc_now > 1) {      // wenn noch was im akku 
+            if (hrstorun == 0 && _tibberPreisJetzt > _stop_discharge) { // wenn jetzige stunde genau auf Teuerpreis trifft
+                hrstorun = 1;    
+            }
+
+            if (hrstorun > 0 && batlefthrs > 0 && _batsoc > 1 && _tibberPreisJetzt > _stop_discharge && _dc_now > 1) {      // wenn noch was im akku 
                 _SpntCom = _InitCom_Aus;    
                 macheNix = true;
                 _entladung_zeitfenster = true;
                 _isTibber_active = 21;  
+         //       entladeZeitenArray.push(poihigh[1]);
             }
 
 // Entladezeit 
