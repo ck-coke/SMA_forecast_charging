@@ -1,4 +1,3 @@
-
 const userDataDP            = '0_userdata.0';
 const tibberStromDP         = 'strom.tibber.';
 const tibberDP              = userDataDP + '.' + tibberStromDP;
@@ -106,7 +105,7 @@ let _snowmode = false;                  //manuelles setzen des Schneemodus, dadu
 const _start_charge = 0.1805;             //Eigenverbrauchspreis
 const _lossfactor = 0.75;               //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
 const _loadfact = 1 / _lossfactor;      /// 1,33
-const _stop_discharge = parseInt((_start_charge * _loadfact).toFixed(4));    /// 0.19 * 1.33 = 0.2533 € 
+const _stop_discharge = (_start_charge * _loadfact).toFixed(4);    /// 0.19 * 1.33 = 0.2533 € 
 
 createUserStates(userDataDP, false, [tibberStromDP + 'debug', { 'name': 'debug', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
     setState(tibberDP + 'debug', _debug, true);
@@ -489,6 +488,9 @@ async function processing() {
                 macheNix = true;
                 _entladung_zeitfenster = true;
                 _isTibber_active = 21;  
+
+                console.warn('-->>  _tibberPreisJetzt ' + _tibberPreisJetzt + ' _stop_discharge ' + _stop_discharge);       
+
          //       entladeZeitenArray.push(poihigh[1]);
             }
 
