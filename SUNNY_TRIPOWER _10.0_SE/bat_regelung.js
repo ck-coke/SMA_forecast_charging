@@ -105,7 +105,7 @@ let _snowmode = false;                  //manuelles setzen des Schneemodus, dadu
 const _start_charge = 0.1805;             //Eigenverbrauchspreis
 const _lossfactor = 0.75;               //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
 const _loadfact = 1 / _lossfactor;      /// 1,33
-const _stop_discharge = (_start_charge * _loadfact).toFixed(4);    /// 0.19 * 1.33 = 0.2533 € 
+const _stop_discharge =  Math.round((_start_charge * _loadfact) * 10000) / 10000;    /// 0.19 * 1.33 = 0.2533 € 
 
 createUserStates(userDataDP, false, [tibberStromDP + 'debug', { 'name': 'debug', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
     setState(tibberDP + 'debug', _debug, true);
@@ -488,9 +488,6 @@ async function processing() {
                 macheNix = true;
                 _entladung_zeitfenster = true;
                 _isTibber_active = 21;  
-
-                console.warn('-->>  _tibberPreisJetzt ' + _tibberPreisJetzt + ' _stop_discharge ' + _stop_discharge);       
-
          //       entladeZeitenArray.push(poihigh[1]);
             }
 
@@ -751,7 +748,7 @@ async function processing() {
 
             let current_pwr_diff = _dc_now - _verbrauchJetzt;
 
-            if (lademenge > 0 && get_wh >= lademenge) {
+            if (lademenge > 0 && get_wh >= lademenge && _isTibber_active == 0) {                   // vielleicht so bei tibber = 21
                 restladezeit = pvfc.length / 2;
 
                 _max_pwr = Math.round(pvfc[0][1] - pvlimit_calc);
