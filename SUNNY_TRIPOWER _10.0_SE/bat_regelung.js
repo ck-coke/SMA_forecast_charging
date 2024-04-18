@@ -22,7 +22,7 @@ let _debug = getState(tibberDP + 'debug').val == null ? false : getState(tibberD
 
 //-------------------------------------------------------------------------------------
 const _pvPeak = 13100;                                  // PV-Anlagenleistung in Wp
-//const _batteryCapacity = 12800;                        // Netto Batterie Kapazität in Wh 2.56 pro Modul
+//const _batteryCapacity = 12800;                       // Netto Batterie Kapazität in Wh 2.56 pro Modul
 const _batteryCapacity = 10240;                         // Netto Batterie Kapazität in Wh
 const _surplusLimit = 0;                                // PV-Einspeise-Limit in % 0 keine Einspeisung
 const _batteryTarget = 100;                             // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
@@ -65,40 +65,40 @@ const inputRegisters = {
     dc2: 'modbus.0.inputRegisters.3.30961_DC-Leistung_2',
 }
 
-const bydDirectSOCDP  = 'bydhvs.0.State.SOC';                            // battSOC netto direkt von der Batterie
+const bydDirectSOCDP    = 'bydhvs.0.State.SOC';                            // battSOC netto direkt von der Batterie
 
-let _dc_now           = getState(inputRegisters.dc1).val + getState(inputRegisters.dc2).val;  // pv vom Dach zusammen in W
+let _dc_now             = getState(inputRegisters.dc1).val + getState(inputRegisters.dc2).val;  // pv vom Dach zusammen in W
 
-const _InitCom_Aus = 803;
-const _InitCom_An = 802;
+const _InitCom_Aus      = 803;
+const _InitCom_An       = 802;
 
-let _SpntCom = _InitCom_Aus;           //   802: aktiv (Act)    803: inaktiv (Ina)
-let _verbrauchJetzt   = 0;
-let _lastSpntCom = 0;
-let _lastpwrAtCom = 0;
-let _bydDirectSOC = 5;
-let _bydDirectSOCMrk = 0;
-let _batsoc = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR      
-let _entladung_zeitfenster = false;
-let _max_pwr = _mindischrg;
+let _SpntCom            = _InitCom_Aus;           //   802: aktiv (Act)    803: inaktiv (Ina)
+let _verbrauchJetzt     = 0;
+let _lastSpntCom        = 0;
+let _lastpwrAtCom       = 0;
+let _bydDirectSOC       = 5;
+let _bydDirectSOCMrk    = 0;
+let _batsoc             = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR      
+let _max_pwr            = _mindischrg;
+let _tick               = 0;
+let _isTibber_active    = 0;
+
 let _notLadung = false;
-let _tick = 0;
-let _isTibber_active = 0;
+let _entladung_zeitfenster = false;
 
 // für tibber
-let _tibberNutzenSteuerung = true;    //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis) 
-let _tibberNutzenAutomatisch = _tibberNutzenSteuerung;
-let _tibberPreisJetzt = getState(tibberPreisJetztDP).val;
+let _tibberNutzenSteuerung      = true;    //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis) 
+let _tibberNutzenAutomatisch    = _tibberNutzenSteuerung;
+let _tibberPreisJetzt           = getState(tibberPreisJetztDP).val;
 
 // für prognose
-let _prognoseNutzenSteuerung = true;    //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis)
-let _prognoseNutzenAutomatisch = _prognoseNutzenSteuerung; //wird _prognoseNutzenAutomatisch benutzt
+let _prognoseNutzenSteuerung    = true;    //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis)
+let _prognoseNutzenAutomatisch  = _prognoseNutzenSteuerung; //wird _prognoseNutzenAutomatisch benutzt
 let _batterieLadenUebersteuernManuell = false;
 let _tomorrow_kW = 0;
 
 let _sunup    = '00:00';
 let _sundown  = '00:00';
-
 
 // tibber Preis Bereich
 let _snowmode = false;                  //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
@@ -310,6 +310,9 @@ async function processing() {
             console.info('Nachtfenster nach Astro : ' + _sundown + ' - ' + _sunup);
         }
 
+        let neuberechnen = false;
+        let sunriseTime = datumToTimestamp(_sunup, 0);
+
         if (!_snowmode) {    // ist genug PV da am tag   pvwh > (_baseLoad * hrstorun) &&
             for (let sd = 47; sd >= 0; sd--) {
                 const pow = getState(pvforecastTodayDP + sd + '.power').val;
@@ -318,44 +321,47 @@ async function processing() {
                     _sundown = getState(pvforecastTodayDP + sd + '.startTime').val;                                
                     break;
                 }                
-            }
+            }            
 
             for (let su = 0; su < 48; su++) {
-                if (_hhJetzt >= 0) {
-                    if (getState(pvforecastTodayDP + su + '.power').val >= _baseLoad) {
-                        _sunup = getState(pvforecastTodayDP + su + '.startTime').val;
-                        break;
-                    }
-                } else {
+                if (getState(pvforecastTodayDP + su + '.power').val >= _baseLoad) {
+                    _sunup = getState(pvforecastTodayDP + su + '.startTime').val;
+                    sunriseTime = datumToTimestamp(_sunup, 0);       // aufgang am nächsten tag  oder selben tag
+                    
+                    const sunupHH = parseInt(_sunup.slice(0, 2));
+                    
+                    if (hhJetztNum >= sunupHH) {
+                        neuberechnen = true;
+                    }                    
+                    break;
+                }
+            }
+
+            if (neuberechnen) {
+                for (let su = 0; su < 48; su++) {
                     if (getState(pvforecastTomorrowDP + su + '.power').val >= _baseLoad) {
                         _sunup = getState(pvforecastTomorrowDP + su + '.startTime').val;
+                        sunriseTime = datumToTimestamp(_sunup, 1);       // aufgang am nächsten tag  oder selben tag
                         break;
                     }
                 }
             }             
         }
         
-        let sundownTime             = datumToTimestamp(_sundown, 0);     // untergang
-        let sundownTimeOrginal      = datumToTimestamp(_sundown, 0);     // untergang
-        let tosundownTime           = datumToTimestamp(nowhour, 0);      // jetzt
-        let sunriseTime             = datumToTimestamp(_sunup, 1);       // aufgang am nächsten tag  
+        
+        let sundownTime           = datumToTimestamp(_sundown, 0);     // untergang
+        let sundownTimeToday      = sundownTime;                        // untergang heute
+        let tosundownTime         = datumToTimestamp(nowhour, 0);      // jetzt
+                     
 
-        let sundownhr = _sundown;
+ 
 
-        if (compareTime(_sundown, _sunup, 'between')) {
-            sundownTime = dateNow.getTime();        // ab Stunde jetzt
-            sundownhr = nowhour;  
-            
-            if (compareTime('00:00', _sunup, 'between')) {      // abhängig von Tageswechsel Nachts
-                sunriseTime = datumToTimestamp(_sunup, 0);         
-            }
-        }
 
-        hrstorun          = Math.min(aufrunden2(((sunriseTime  - sundownTime) / (1000 * 60 * 60))) , 24);
-        const tosundownhr = Math.max(aufrunden2(((sundownTimeOrginal - tosundownTime) / (1000 * 60 * 60))), 0);   // von jetzt bis zum sonnenuntergang
+        hrstorun          = Math.min(aufrunden2(Math.floor(Math.floor(sunriseTime  - sundownTime / (1000 * 60)) / 60)) , 24);
+        const tosundownhr = Math.max(aufrunden2((sundownTimeToday - tosundownTime) / (1000 * 60 * 60)), 0);   // von jetzt bis zum sonnenuntergang
 
         if (_debug) {
-            console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + ' bis zum Sonnenaufgang sind hrstorun ' + hrstorun + ' h und zum Untergang tosundownhr ' + tosundownhr);
+            console.info('Nachtfenster nach Berechnung : ' + _sundown + ' - ' + _sunup + ' bis zum Sonnenaufgang sind hrstorun ' + hrstorun + ' h und zum Untergang tosundownhr ' + tosundownhr);
         }        
 
 
@@ -483,7 +489,7 @@ async function processing() {
                 hrstorun = 1;    
             }
 
-            if (hrstorun > 0 && batlefthrs > 0 && _batsoc > 1 && _tibberPreisJetzt > _stop_discharge && _dc_now > 1) {      // wenn noch was im akku 
+            if (hrstorun > 0 && batlefthrs > 0 && _batsoc > 1 && _tibberPreisJetzt > _stop_discharge && _dc_now > 1 && _dc_now < _verbrauchJetzt) {      // wenn noch was im akku 
                 _SpntCom = _InitCom_Aus;    
                 macheNix = true;
                 _entladung_zeitfenster = true;
@@ -722,7 +728,7 @@ async function processing() {
 
             if (_debug) {
             //  console.info('pvfc ' + JSON.stringify(pvfc));
-                console.info('get_wh vor entzerren ' + get_wh);
+                console.info('Überschuss get_wh vor entzerren ' + get_wh);
             }
 
             let pvlimit_calc = pvlimit;
@@ -814,6 +820,12 @@ async function processing() {
         _max_pwr = _lastPercentageLoadWith;    
     }
  
+    if (isVehicleConn) {   // wenn fahrzeug dran übernimmt evcc das laden 
+        if (_debug) {
+            console.error('-->>      Fahrzeug ist dran. EVCC übernimmt');
+        }
+        _SpntCom = _InitCom_Aus;    
+    }
 
 // ----------------------------------------------------           write WR data 
 
@@ -1007,13 +1019,13 @@ async function berechneVerbrauch(pvNow) {
             _vehicleConsum = getState(vehicleConsumDP).val;
 
             if (_vehicleConsum < 0 || _vehicleConsum > max_VehicleConsum) { // sollte murks vom adapter kommen dann setze auf 0
-                 _vehicleConsum = 0;   
+                _vehicleConsum = 0;   
             }
         }
     }                                
 
-    const verbrauchJetzt   = 100 + (pvNow + battOut.val + netzbezug.val + _vehicleConsum) - (einspeisung + battIn.val);        // verbrauch in W , 100W reserve obendruaf
-    setState(momentan_VerbrauchDP, Math.round(((_verbrauchJetzt-100) /1000)*100)/100, true); // für die darstellung können die 100 W wieder raus
+    const verbrauchJetzt   = 100 + (pvNow + battOut.val + netzbezug.val) - (einspeisung + battIn.val);      // verbrauch in W , 100W reserve obendruaf _vehicleConsum nicht rein nehmen
+    setState(momentan_VerbrauchDP, Math.round(((_verbrauchJetzt-100) /1000)*100)/100, true);                // für die darstellung können die 100 W wieder raus
 
     return verbrauchJetzt;
 }
