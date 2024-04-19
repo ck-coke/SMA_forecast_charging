@@ -105,7 +105,7 @@ let _snowmode = false;                  //manuelles setzen des Schneemodus, dadu
 const _start_charge = 0.1805;             //Eigenverbrauchspreis
 const _lossfactor = 0.75;               //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
 const _loadfact = 1 / _lossfactor;      /// 1,33
-const _stop_discharge =  Math.round((_start_charge * _loadfact) * 10000) / 10000;    /// 0.19 * 1.33 = 0.2533 € 
+const _stop_discharge =  aufrunden4(_start_charge * _loadfact);    /// 0.19 * 1.33 = 0.2533 € 
 
 createUserStates(userDataDP, false, [tibberStromDP + 'debug', { 'name': 'debug', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
     setState(tibberDP + 'debug', _debug, true);
@@ -194,7 +194,6 @@ async function processing() {
         _tick = 0;   
     }
 
-    let dateNow = new Date();
     let macheNix = false;
     let wirdGeladen   = false;
 
@@ -210,7 +209,7 @@ async function processing() {
     if (dc_now_DP <= 0) {
         dc_now_DP = 0;
     } else {
-        dc_now_DP = Math.round((dc_now_DP /1000)*100)/100;
+        dc_now_DP = aufrunden2(dc_now_DP)/1000;
     }
 
     setState(pV_Leistung_aktuellDP, dc_now_DP, true);
@@ -232,9 +231,9 @@ async function processing() {
     }
    
     // Lademenge
-    let lademenge_full = Math.ceil((_batteryCapacity * (100 - _batsoc) / 100) * (1 / _wr_efficiency));                   //Energiemenge bis vollständige Ladung
-    let lademenge      = Math.max(Math.ceil((_batteryCapacity * (_batteryTarget - _batsoc) / 100) * (1 / _wr_efficiency)), 0);    //lademenge = Energiemenge bis vollständige Ladung
-    let restladezeit   = lademenge / _batteryLadePower;                                                                             //Ladezeit = Energiemenge bis vollständige Ladung / Ladeleistung WR
+    let lademenge_full = Math.ceil((_batteryCapacity * (100 - _batsoc) / 100) * (1 / _wr_efficiency));                             //Energiemenge bis vollständige Ladung
+    let lademenge      = Math.max(Math.ceil((_batteryCapacity * (_batteryTarget - _batsoc) / 100) * (1 / _wr_efficiency)), 0);     //lademenge = Energiemenge bis vollständige Ladung
+    let restladezeit   = Math.ceil(lademenge / _batteryLadePower);                                                                 //Ladezeit = Energiemenge bis vollständige Ladung / Ladeleistung WR
 
     if (restladezeit <= 0) {
         restladezeit = 0;
@@ -299,7 +298,7 @@ async function processing() {
             console.info('Erwarte ca______________________ ' + aufrunden2(pvwh / 1000) + ' kWh von PV');
         }
 
-        setState(tibberDP + 'extra.PV_Prognose', Math.round(pvwh), true);
+        setState(tibberDP + 'extra.PV_Prognose', aufrunden2(pvwh), true);
 
         _sundown       = getAstroDate('sunsetStart').getHours() + ':' + getAstroDate('sunsetStart').getMinutes().toString().padStart(2, '0');                               // aufgang
         const today    = new Date();
@@ -373,7 +372,7 @@ async function processing() {
                     pvwh = pvwh + (getState(pvforecastTodayDP + p + '.power').val / 2);
                 }
 
-                setState(tibberDP + 'extra.PV_Prognose_kurz', Math.round(pvwh), true);
+                setState(tibberDP + 'extra.PV_Prognose_kurz',aufrunden2(pvwh), true);
 
                 if (_debug) {
                     console.info('Erwarte ca______________________ ' + aufrunden2(pvwh / 1000) + ' kWh von PV verkürtzt');
@@ -438,7 +437,7 @@ async function processing() {
             if (chrglength > 0 && prclow.length > 0) {
                 for (let o = 0; o < chrglength; o++) {
                     if (_debug) {
-                        console.info('Nachladezeit: ' + prclow[o][1] + '-' + prclow[o][2] + ' (' + Math.round(chargewh - curbatwh) + ' Wh)');
+                        console.info('Nachladezeit: ' + prclow[o][1] + '-' + prclow[o][2] + ' (' + aufrunden2(chargewh - curbatwh) + ' Wh)');
                     }
                 }
                 // nachladung starten da in der zwischenzeit
@@ -739,14 +738,14 @@ async function processing() {
                     restladezeit = pvfc.length / 2;                          //entzerren des Ladevorganges
                 }
                 
-                pvlimit_calc = Math.max((Math.round(pvlimit - ((lademenge - get_wh) / restladezeit))), 0); //virtuelles reduzieren des pvlimits
+                pvlimit_calc = Math.max((Math.round(pvlimit - ((lademenge - get_wh) / restladezeit))), 0);      //virtuelles reduzieren des pvlimits
                 min_pwr      = Math.max(Math.round((lademenge - get_wh) / restladezeit), 0);                   
-                min_pwr      = min_pwr * -1;                                                                 // muss negativ sein ??
+                min_pwr      = min_pwr * -1;                                                                    // muss negativ sein ??
                 
                 get_wh = lademenge;       //daran liegts damit der unten immer rein geht ????                    
             }
 
-            get_wh = Math.round(get_wh * 100) / 100;     // aufrunden 2 stellen reichen
+            get_wh = aufrunden2(get_wh);     // aufrunden 2 stellen reichen
 
             if (_debug) {
                 console.info('-->   Verschiebe Einspeiselimit auf pvlimit_calc ' + pvlimit_calc + ' W' + ' mit mindestens ' + min_pwr + ' W  get_wh ' + get_wh + ' restladezeit ' + restladezeit);
@@ -757,10 +756,10 @@ async function processing() {
             if (lademenge > 0 && get_wh >= lademenge && _isTibber_active == 0) {                   // vielleicht so bei tibber = 21
                 restladezeit = pvfc.length / 2;
 
-                _max_pwr = Math.round(pvfc[0][1] - pvlimit_calc);
+                _max_pwr = Math.ceil(pvfc[0][1] - pvlimit_calc);
 
                 if (_max_pwr > current_pwr_diff) {
-                    _max_pwr = Math.round(current_pwr_diff);                       
+                    _max_pwr = Math.ceil(current_pwr_diff);                       
                 }
                 
                 if (_debug) { 
@@ -772,7 +771,7 @@ async function processing() {
                 console.info('Ausgabe A  :_max_pwr ' + _max_pwr + ' min_pwr ' + min_pwr + ' current_pwr_diff ' + current_pwr_diff);
             }
 
-            _max_pwr = Math.round(Math.min(Math.max(_max_pwr, min_pwr), _batteryLadePower)); //abfangen negativer werte, limitiere auf min_pwr orginal
+            _max_pwr = Math.ceil(Math.min(Math.max(_max_pwr, min_pwr), _batteryLadePower));     //abfangen negativer werte, limitiere auf min_pwr orginal
 
             if (_debug) {               
                 console.info('Ausgabe B  :_max_pwr ' + _max_pwr);
@@ -818,13 +817,6 @@ async function processing() {
 
     if (_batsoc > 90 && wirdGeladen) {     // letzten 5 % langsam laden
         _max_pwr = _lastPercentageLoadWith;    
-    }
- 
-    if (isVehicleConn) {   // wenn fahrzeug dran übernimmt evcc das laden 
-        if (_debug) {
-            console.error('-->>      Fahrzeug ist dran. EVCC übernimmt');
-        }
-        _SpntCom = _InitCom_Aus;    
     }
 
 // ----------------------------------------------------           write WR data 
@@ -1006,7 +998,7 @@ async function berechneVerbrauch(pvNow) {
         inputRegisters.powerOut = _sma_em + ".psurplus" /*aktuelle Einspeiseleistung am Netzanschlußpunkt, SMA-EM Adapter*/
     }
     
-    const einspeisung   = Math.round(getState(inputRegisters.powerOut).val);     // Einspeisung  in W
+    const einspeisung   = aufrunden2(getState(inputRegisters.powerOut).val);     // Einspeisung  in W
     const battOut       = await getStateAsync(inputRegisters.battOut);
     const battIn        = await getStateAsync(inputRegisters.battIn);
     const netzbezug     = await getStateAsync(inputRegisters.netzbezug);
@@ -1024,12 +1016,16 @@ async function berechneVerbrauch(pvNow) {
         }
     }                                
 
-    const verbrauchJetzt   = 100 + (pvNow + battOut.val + netzbezug.val) - (einspeisung + battIn.val);      // verbrauch in W , 100W reserve obendruaf _vehicleConsum nicht rein nehmen
-    setState(momentan_VerbrauchDP, Math.round(((_verbrauchJetzt-100) /1000)*100)/100, true);                // für die darstellung können die 100 W wieder raus
+    const verbrauchJetzt   = 100 + (pvNow + battOut.val + netzbezug.val) - (einspeisung + battIn.val);          // verbrauch in W , 100W reserve obendruaf _vehicleConsum nicht rein nehmen
+    setState(momentan_VerbrauchDP, aufrunden2(_verbrauchJetzt-100-_vehicleConsum)/1000, true);                  // für die darstellung können die 100 W wieder raus und fahrzeug auch
 
     return verbrauchJetzt;
 }
 
 function aufrunden2(zahl) {
     return +(Math.round(zahl + 'e+2') + 'e-2');
+}
+
+function aufrunden4(zahl) {
+    return +(Math.round(zahl + 'e+4') + 'e-4');
 }
