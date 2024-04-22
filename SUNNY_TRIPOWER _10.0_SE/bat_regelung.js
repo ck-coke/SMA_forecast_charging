@@ -102,7 +102,7 @@ let _sundown  = '00:00';
 
 // tibber Preis Bereich
 let _snowmode = false;                  //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
-const _start_charge = 0.1805;             //Eigenverbrauchspreis
+const _start_charge = 0.1805;           //Eigenverbrauchspreis
 const _lossfactor = 0.75;               //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
 const _loadfact = 1 / _lossfactor;      /// 1,33
 const _stop_discharge =  aufrunden4(_start_charge * _loadfact);    /// 0.19 * 1.33 = 0.2533 € 
@@ -322,13 +322,14 @@ async function processing() {
                 }                
             }            
 
-            for (let su = 0; su < 48; su++) {
+            let su = 0;
+            for (su = 0; su < 48; su++) {
                 if (getState(pvforecastTodayDP + su + '.power').val >= _baseLoad) {
                     _sunup = getState(pvforecastTodayDP + su + '.startTime').val;
                     sunriseTime = datumToTimestamp(_sunup, 0);       // aufgang am nächsten tag  oder selben tag
                     
                     const sunupHH = parseInt(_sunup.slice(0, 2));
-                    
+
                     if (hhJetztNum >= sunupHH) {
                         neuberechnen = true;
                     }                    
@@ -337,13 +338,8 @@ async function processing() {
             }
 
             if (neuberechnen) {
-                for (let su = 0; su < 48; su++) {
-                    if (getState(pvforecastTomorrowDP + su + '.power').val >= _baseLoad) {
-                        _sunup = getState(pvforecastTomorrowDP + su + '.startTime').val;
-                        sunriseTime = datumToTimestamp(_sunup, 1);       // aufgang am nächsten tag  oder selben tag
-                        break;
-                    }
-                }
+                _sunup = getState(pvforecastTomorrowDP + su + '.startTime').val;
+                sunriseTime = datumToTimestamp(_sunup, 1);       // aufgang am nächsten tag  oder selben tag
             }             
         }
         
@@ -351,12 +347,11 @@ async function processing() {
         let sundownTime           = datumToTimestamp(_sundown, 0);     // untergang
         let sundownTimeToday      = sundownTime;                        // untergang heute
         let tosundownTime         = datumToTimestamp(nowhour, 0);      // jetzt
-                     
 
- 
+    
 
+        hrstorun          = Math.min(aufrunden2(Math.floor(Math.floor(sunriseTime  - sundownTime) / (1000 * 60)) / 60) , 24);
 
-        hrstorun          = Math.min(aufrunden2(Math.floor(Math.floor(sunriseTime  - sundownTime / (1000 * 60)) / 60)) , 24);
         const tosundownhr = Math.max(aufrunden2((sundownTimeToday - tosundownTime) / (1000 * 60 * 60)), 0);   // von jetzt bis zum sonnenuntergang
 
         if (_debug) {
@@ -627,6 +622,7 @@ async function processing() {
 //      _isTibber_active = 98;   manuelles laden
 //      _isTibber_active = 99;   notladung
 
+    _max_pwr = aufrunden2(_max_pwr);
 
     if (_debug) {
         console.error('-->> Start der PV Prognose Sektion _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' macheNix ' + macheNix + ' _isTibber_active ' + _isTibber_active);
@@ -821,7 +817,7 @@ async function processing() {
 
 // ----------------------------------------------------           write WR data 
 
-    sendToWR(_SpntCom, _max_pwr);
+    sendToWR(_SpntCom, aufrunden2(_max_pwr));
 }
 
 
