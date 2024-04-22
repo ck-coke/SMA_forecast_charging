@@ -312,7 +312,7 @@ async function processing() {
         let neuberechnen = false;
         let sunriseTime = datumToTimestamp(_sunup, 0);
 
-        if (!_snowmode) {    // ist genug PV da am tag   pvwh > (_baseLoad * hrstorun) &&
+        if (!_snowmode) {    // ist genug PV da am tag  
             for (let sd = 47; sd >= 0; sd--) {
                 const pow = getState(pvforecastTodayDP + sd + '.power').val;
 
@@ -326,11 +326,11 @@ async function processing() {
             for (su = 0; su < 48; su++) {
                 if (getState(pvforecastTodayDP + su + '.power').val >= _baseLoad) {
                     _sunup = getState(pvforecastTodayDP + su + '.startTime').val;
-                    sunriseTime = datumToTimestamp(_sunup, 0);       // aufgang am nächsten tag  oder selben tag
+                    sunriseTime = datumToTimestamp(_sunup, 0);       // aufgang am welchen tag heute
                     
                     const sunupHH = parseInt(_sunup.slice(0, 2));
 
-                    if (hhJetztNum >= sunupHH) {
+                    if (hhJetztNum > sunupHH) {
                         neuberechnen = true;
                     }                    
                     break;
@@ -339,14 +339,14 @@ async function processing() {
 
             if (neuberechnen) {
                 _sunup = getState(pvforecastTomorrowDP + su + '.startTime').val;
-                sunriseTime = datumToTimestamp(_sunup, 1);       // aufgang am nächsten tag  oder selben tag
+                sunriseTime = datumToTimestamp(_sunup, 1);       // oder morgen laut der jetzigen Uhrzeit
             }             
         }
         
         
-        let sundownTime           = datumToTimestamp(_sundown, 0);     // untergang
+        let sundownTime           = datumToTimestamp(_sundown, 0);      // untergang heute
         let sundownTimeToday      = sundownTime;                        // untergang heute
-        let tosundownTime         = datumToTimestamp(nowhour, 0);      // jetzt
+        let tosundownTime         = datumToTimestamp(nowhour, 0);       // jetzt
 
     
 
