@@ -28,7 +28,7 @@ const _surplusLimit = 0;                                // PV-Einspeise-Limit in
 const _batteryTarget = 100;                             // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
 const _lastPercentageLoadWith = -500;                   // letzten 5 % laden mit xxx Watt
 const _baseLoad = 750;                                  // Grundverbrauch in Watt
-const _wr_efficiency = 0.9;                             // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
+const _wr_efficiency = 0.94;                             // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
 const _batteryLadePower = 5000;                         // Ladeleistung der Batterie in W, BYD mehr geht nicht
 const _batteryPowerEmergency = -4000;                   // Ladeleistung der Batterie in W notladung
 const _mindischrg = 0;                                  // 0 geht nicht da sonst max entladung .. also die kleinste mögliche Einheit 1
@@ -310,7 +310,6 @@ async function processing() {
         }
 
         let neuberechnen = false;
-        let sunriseTime = datumToTimestamp(_sunup, 0);
 
         if (!_snowmode) {    // ist genug PV da am tag  
             for (let sd = 47; sd >= 0; sd--) {
@@ -326,7 +325,6 @@ async function processing() {
             for (su = 0; su < 48; su++) {
                 if (getState(pvforecastTodayDP + su + '.power').val >= _baseLoad) {
                     _sunup = getState(pvforecastTodayDP + su + '.startTime').val;
-                    sunriseTime = datumToTimestamp(_sunup, 0);       // aufgang am welchen tag heute
                     
                     const sunupHH = parseInt(_sunup.slice(0, 2));
 
@@ -337,31 +335,22 @@ async function processing() {
                 }
             }
 
-            if (neuberechnen) {
+            if (neuberechnen) {                
                 _sunup = getState(pvforecastTomorrowDP + su + '.startTime').val;
-                sunriseTime = datumToTimestamp(_sunup, 1);       // oder morgen laut der jetzigen Uhrzeit
             }             
         }
-        
-        
-        let sundownTime           = datumToTimestamp(_sundown, 0);      // untergang heute
-        let sundownTimeToday      = sundownTime;                        // untergang heute
-        let tosundownTime         = datumToTimestamp(nowhour, 0);       // jetzt
-
-    
-
-        hrstorun          = Math.min(aufrunden(2, (Math.floor(Math.floor(sunriseTime  - sundownTime) / (1000 * 60)) / 60)) , 24);
-
-        const tosundownhr = Math.max(aufrunden(2, ((sundownTimeToday - tosundownTime) / (1000 * 60 * 60))), 0);   // von jetzt bis zum sonnenuntergang
+      
+        hrstorun          = Math.min(Number(zeitDifferenzInStunden(_sundown, _sunup)), 24);
+        const toSundownhr = Math.min(Number(zeitDifferenzInStunden(nowhour, _sundown)), 24);        
 
         if (_debug) {
-            console.info('Nachtfenster nach Berechnung : ' + _sundown + ' - ' + _sunup + ' bis zum Sonnenaufgang sind hrstorun ' + hrstorun + ' h und zum Untergang tosundownhr ' + tosundownhr);
+            console.info('Nachtfenster nach Berechnung : ' + _sundown + ' - ' + _sunup + ' differenz Sonnenuntergang bis Sonnenaufgang hrstorun ' + hrstorun + ' h und nur zum Untergang toSundownhr ' + toSundownhr);
         }        
 
 
-        if (tosundownhr >= 0) {                            
+        if (toSundownhr >= 0) {                            
             pvwh = 0;         // initialisiere damit die entladung läuft
-            if (tosundownhr > 1) { 
+            if (toSundownhr > 1) { 
             //wieviel wh kommen in etwa von PV die verkürzt
                 for (let p = hhJetztNum; p < hrstorun * 2; p++) {
                     pvwh = pvwh + (getState(pvforecastTodayDP + p + '.power').val / 2);
@@ -370,7 +359,7 @@ async function processing() {
                 setState(tibberDP + 'extra.PV_Prognose_kurz',aufrunden(2, pvwh), true);
 
                 if (_debug) {
-                    console.info('Erwarte ca______________________ ' + aufrunden(2, pvwh / 1000) + ' kWh von PV verkürtzt');
+                    console.info('Erwarte ca______________________ ' + aufrunden(2, pvwh / 1000) + ' kWh von PV verkürzt');
                 }
             }
         }
@@ -937,22 +926,6 @@ function sortiereNachUhrzeit(arr) {
     });
 }
 
-function datumToTimestamp(uhrzeit, tag) {
-    // Aktuelles Datum erstellen
-    let currentDate = new Date();
-
-    // Uhrzeit extrahieren und in Stunden und Minuten aufteilen
-    let [stunden, minuten] = uhrzeit.split(':').map(Number);
-
-    // Tag hinzufügen
-    currentDate.setDate(currentDate.getDate() + tag);
-
-    // Datum setzen
-    currentDate.setHours(stunden, minuten, 0, 0);
- 
-    return currentDate.getTime();
-}
-
 function filterUniquePrices(inputArray) {
     const uniquePrices = {}; // Ein Objekt, um eindeutige Preise zu verfolgen
     const outputArray = [];
@@ -1020,4 +993,31 @@ async function berechneVerbrauch(pvNow) {
 
 function aufrunden(stellen, zahl) {
     return +(Math.round(zahl + 'e+' + stellen) + 'e-' + stellen);
+}
+
+function zeitDifferenzInStunden(zeit1, zeit2) {
+    // Zeit 1 extrahieren
+    const [stunden1, minuten1] = zeit1.split(':').map(Number);
+    // Zeit 2 extrahieren
+    const [stunden2, minuten2] = zeit2.split(':').map(Number);
+    
+    // Zeit 1 in Minuten umwandeln
+    let zeit1InMinuten = stunden1 * 60 + minuten1;
+    // Zeit 2 in Minuten umwandeln
+    let zeit2InMinuten = stunden2 * 60 + minuten2;
+    
+    // Wenn Zeit 2 vor Zeit 1 liegt, füge 24 Stunden zu Zeit 2 hinzu (Tagesübergang)
+    if (zeit2InMinuten < zeit1InMinuten) {
+        zeit2InMinuten += 24 * 60;
+    }
+    
+    // Differenz berechnen
+    let differenzInMinuten = zeit2InMinuten - zeit1InMinuten;
+    
+    // Differenz in Stunden und Minuten aufteilen
+    const differenzStunden = Math.floor(differenzInMinuten / 60);
+    const differenzMinuten = differenzInMinuten % 60;
+
+    // Rückgabe der Differenz als formatierte Zeichenkette
+    return `${differenzStunden}.${(differenzMinuten < 10 ? '0' : '') + differenzMinuten}`;
 }
