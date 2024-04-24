@@ -511,28 +511,28 @@ async function processing() {
                                 }
 
                                 entladeZeitenArray.push(poihigh[d]);
-
-                                if (compareTime(poihigh[d][1], poihigh[d][2], "between")) {
-                                    if (_vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
-                                        break;
-                                    } else {
-                                        if (_dc_now <= _verbrauchJetzt) {           // entlade nur wenn sich das lohnt
-
-                                            macheNix = true;
-                                            _tibber_active_idx = 2;
-                                            _entladung_zeitfenster = true;
-                                        }
-                                    }
+                                entladeZeitenArray = filterUniquePrices(entladeZeitenArray);   
+                                entladeZeitenArray = sortiereNachStartzeitVIS(entladeZeitenArray);
+                                                            
+                            }
+                        }
+                    }
+                    
+                    for (let d = 0; d < lefthrs; d++) {
+                        if (compareTime(entladeZeitenArray[d][1], entladeZeitenArray[d][2], "between")) {
+                            if (_vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
+                                break;
+                            } else {
+                                if (_dc_now <= _verbrauchJetzt) {           // entlade nur wenn sich das lohnt
+                                    macheNix = true;
+                                    _tibber_active_idx = 2;
+                                    _entladung_zeitfenster = true;
                                 }
                             }
                         }
                     }
                 }
             }            
-
-            entladeZeitenArray = filterUniquePrices(entladeZeitenArray);   
-            entladeZeitenArray = sortiereNachStartzeitVIS(entladeZeitenArray);
-            console.info('entladeZeitenArray ' + JSON.stringify(entladeZeitenArray));
 
             setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArray, true);
 
