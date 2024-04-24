@@ -510,16 +510,16 @@ async function processing() {
                                     console.info('Entladezeiten: ' + poihigh[d][1] + '-' + poihigh[d][2] + ' Preis ' + poihigh[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
                                 }
 
-                                entladeZeitenArray.push(poihigh[d]);
-                                entladeZeitenArray = filterUniquePrices(entladeZeitenArray);   
-                                entladeZeitenArray = sortiereNachStartzeitVIS(entladeZeitenArray);
-                                                            
+                                entladeZeitenArray.push(poihigh[d]);                                
                             }
                         }
                     }
+
+                    entladeZeitenArray = filterUniquePrices(entladeZeitenArray);   
+                    entladeZeitenArray = sortiereNachStartzeitVIS(entladeZeitenArray);
                     
-                    for (let d = 0; d < lefthrs; d++) {
-                        if (compareTime(entladeZeitenArray[d][1], entladeZeitenArray[d][2], "between")) {
+                    for (let c = 0; c < entladeZeitenArray.length; c++) {
+                        if (compareTime(entladeZeitenArray[c][1], entladeZeitenArray[c][2], "between")) {
                             if (_vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
                                 break;
                             } else {
