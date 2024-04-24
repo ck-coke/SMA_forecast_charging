@@ -349,7 +349,7 @@ async function processing() {
         const toSundownhr = Math.min(Number(zeitDifferenzInStunden(nowhour, _sundown)), 24);        
 
         if (_debug) {
-            console.info('Nachtfenster nach Berechnung : ' + _sundown + ' - ' + _sunup + ' bis zum Sonnenaufgang sind es noch hrstorun ' + hrstorun + ' h und nur zum Untergang toSundownhr ' + toSundownhr);
+            console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + ' bis zum Sonnenaufgang sind es noch hrstorun ' + hrstorun + ' h und nur zum Untergang toSundownhr ' + toSundownhr);
         }        
 
 
