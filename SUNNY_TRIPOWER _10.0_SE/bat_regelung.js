@@ -340,19 +340,32 @@ async function processing() {
             }             
         }
       
-        hrstorun          = Math.min(Number(zeitDifferenzInStunden(_sundown, _sunup)), 24);
+        let sundownhr  = _sundown;
+        if (compareTime(_sundown, _sunup, 'between')) {
+            sundownhr  = nowhour;
+        }
+
+        hrstorun          = Math.min(Number(zeitDifferenzInStunden(sundownhr, _sunup)), 24);
         const toSundownhr = Math.min(Number(zeitDifferenzInStunden(nowhour, _sundown)), 24);        
 
         if (_debug) {
-            console.info('Nachtfenster nach Berechnung : ' + _sundown + ' - ' + _sunup + ' differenz Sonnenuntergang bis Sonnenaufgang hrstorun ' + hrstorun + ' h und nur zum Untergang toSundownhr ' + toSundownhr);
+            console.info('Nachtfenster nach Berechnung : ' + _sundown + ' - ' + _sunup + ' bis zum Sonnenaufgang sind es noch hrstorun ' + hrstorun + ' h und nur zum Untergang toSundownhr ' + toSundownhr);
         }        
 
 
-        if (toSundownhr >= 0) {                            
+        if (toSundownhr >= 0 && toSundownhr < 24) {                            
             pvwh = 0;         // initialisiere damit die entladung läuft
+            let t = 0;
             if (toSundownhr > 1) { 
             //wieviel wh kommen in etwa von PV die verkürzt
-                for (let p = hhJetztNum; p < hrstorun * 2; p++) {
+                for (t = 0; t < 48; t++) {           // suche nach jetziger zeit 
+                    const startT  = getState(pvforecastTodayDP + t + '.startTime').val; 
+                    const startHH = parseInt(startT.slice(0, 2));
+                    if (startHH == hhJetztNum) {                        
+                        break;
+                    }
+                }
+                for (let p = t; p < 48; p++) { // übernehme werte von jetzt aus
                     pvwh = pvwh + (getState(pvforecastTodayDP + p + '.power').val / 2);
                 }
 
