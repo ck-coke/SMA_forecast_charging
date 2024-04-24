@@ -28,7 +28,7 @@ const _surplusLimit = 0;                                // PV-Einspeise-Limit in
 const _batteryTarget = 100;                             // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
 const _lastPercentageLoadWith = -500;                   // letzten 5 % laden mit xxx Watt
 const _baseLoad = 750;                                  // Grundverbrauch in Watt
-const _wr_efficiency = 0.94;                             // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
+const _wr_efficiency = 0.93;                            // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
 const _batteryLadePower = 5000;                         // Ladeleistung der Batterie in W, BYD mehr geht nicht
 const _batteryPowerEmergency = -4000;                   // Ladeleistung der Batterie in W notladung
 const _mindischrg = 0;                                  // 0 geht nicht da sonst max entladung .. also die kleinste mögliche Einheit 1
@@ -349,7 +349,7 @@ async function processing() {
         const toSundownhr = Math.min(Number(zeitDifferenzInStunden(nowhour, _sundown)), 24);        
 
         if (_debug) {
-            console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + ' bis zum Sonnenaufgang sind es noch hrstorun ' + hrstorun + ' h und nur zum Untergang toSundownhr ' + toSundownhr);
+            console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + ' bis zum Sonnenaufgang sind es hrstorun ' + hrstorun + ' h und nur zum Untergang toSundownhr ' + toSundownhr);
         }        
 
 
@@ -496,6 +496,7 @@ async function processing() {
 // Entladezeit 
             if (lefthrs > 0 && lefthrs <= hrstorun * 2) { // && pvwh < _baseLoad * 24 * _wr_efficiency) {        //  16200 aus der berechung
                 macheNix = false;
+                
                 if (batlefthrs >= hrstorun && compareTime(nowhour, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
                     if (_debug) {
                         console.warn('Entladezeit reicht aus bis zum Sonnaufgang und genug PV');
@@ -546,11 +547,11 @@ async function processing() {
                 _SpntCom = _InitCom_An;   
 
 //entladung stoppen wenn preisschwelle erreicht aber nicht wenn ladung reicht bis zum nächsten sonnenaufgang
-                if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) && _entladung_zeitfenster && _isTibber_active == 2) {
+                if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) && _entladung_zeitfenster) { // } && _isTibber_active == 2) {
                     if (_debug) {
                         console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + aufrunden(2, _stop_discharge) + ' ct/kWh');
                     }
-                    _SpntCom = _InitCom_An;
+         //           _SpntCom = _InitCom_An;
                     _max_pwr = _mindischrg;                    
                     _isTibber_active = 3;
                 }
@@ -571,7 +572,7 @@ async function processing() {
                             if (_debug) {
                                 console.info('Starte Ladung: ' + lowprice[i][1] + '-' + lowprice[i][2] + ' Preis ' + lowprice[i][0]);
                             }
-                            _SpntCom = _InitCom_An;
+                //            _SpntCom = _InitCom_An;
                             _max_pwr = _pwrAtCom_def * -1;
                             _isTibber_active = 5;
                             _prognoseNutzenSteuerung = false;
@@ -585,7 +586,7 @@ async function processing() {
                     if (_debug) {
                         console.info('Stoppe Ladung, lowprice.length ' + lowprice.length);
                     }
-                    _SpntCom = _InitCom_An;
+            //        _SpntCom = _InitCom_An;
                     _max_pwr = _mindischrg;
                     _isTibber_active = 4;
                     _prognoseNutzenSteuerung = true;
