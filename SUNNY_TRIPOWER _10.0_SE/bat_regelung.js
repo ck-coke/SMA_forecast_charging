@@ -250,7 +250,7 @@ async function processing() {
 
     _tibber_active_idx      = 0;                // initialisiere
     _SpntCom                = _InitCom_Aus;     // initialisiere AUS
-    _max_pwr = _mindischrg; // initialisiere
+    _max_pwr                = _mindischrg;                     // initialisiere
     
     if (_dc_now > _verbrauchJetzt && _batsoc < 100) {
         _max_pwr = (_dc_now - _verbrauchJetzt) * -1;   // vorbelegung zum laden
@@ -479,12 +479,7 @@ async function processing() {
             }
 
             // Entladezeit  wenn reste im akku
-
-            if (hrstorun == 0 && _tibberPreisJetzt > _stop_discharge) { // wenn jetzige stunde genau auf Teuerpreis trifft
-                hrstorun = 1;
-            }
-
-            if (hrstorun > 0 && batlefthrs > 0 && _batsoc > 1 && _tibberPreisJetzt > _stop_discharge && _dc_now > 1 && _dc_now < _verbrauchJetzt) {      // wenn noch was im akku
+            if (batlefthrs > 0 && _batsoc > 1 && _tibberPreisJetzt > _stop_discharge && _dc_now > 1 && _dc_now < _verbrauchJetzt) {      // wenn noch was im akku
                 macheNix = true;
                 _entladung_zeitfenster = true;
                 _tibber_active_idx = 21;
