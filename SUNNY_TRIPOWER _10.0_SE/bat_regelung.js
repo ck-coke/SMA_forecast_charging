@@ -1016,16 +1016,6 @@ function zeitDifferenzInStunden(zeit1, zeit2) {
 function tibber_active_auswertung() {
     _max_pwr = _mindischrg;
   
-//      _tibber_active_idx = 0;    initial
-
-
-//      _tibber_active_idx = 21;   Entladezeit wenn akku > 0 aber keine entladezeit, aber der Preis hoch genug um zu sparen
-//      _tibber_active_idx = 22;   Entladezeit reicht aus bis zum Sonnaufgang
-//      _tibber_active_idx = 3;    entladung stoppen wenn preisschwelle erreicht
-//      _tibber_active_idx = 4;    ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
-//      _tibber_active_idx = 5;    starte die ladung
-//      _tibber_active_idx = 88;   notladung
-
     switch (_tibber_active_idx) {
         case 1:                             //      _tibber_active_idx = 1;    Nachladezeit
             _SpntCom = _InitCom_An;
