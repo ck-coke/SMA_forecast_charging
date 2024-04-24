@@ -27,7 +27,7 @@ const _batteryCapacity = 10240;                         // Netto Batterie Kapazi
 const _surplusLimit = 0;                                // PV-Einspeise-Limit in % 0 keine Einspeisung
 const _batteryTarget = 100;                             // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
 const _lastPercentageLoadWith = -500;                   // letzten 5 % laden mit xxx Watt
-const _baseLoad = 750;                                  // Grundverbrauch in Watt
+const _baseLoad = 850;                                  // Grundverbrauch in Watt
 const _wr_efficiency = 0.93;                            // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
 const _batteryLadePower = 5000;                         // Ladeleistung der Batterie in W, BYD mehr geht nicht
 const _batteryPowerEmergency = -4000;                   // Ladeleistung der Batterie in W notladung
@@ -89,23 +89,23 @@ let _entladung_zeitfenster = false;
 // für tibber
 let _tibberNutzenSteuerung      = true;    //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis)
 let _tibberNutzenAutomatisch    = _tibberNutzenSteuerung;
-let _tibberPreisJetzt                    = getState(tibberPreisJetztDP).val;
+let _tibberPreisJetzt           = getState(tibberPreisJetztDP).val;
 
 // für prognose
-let _prognoseNutzenSteuerung    = true;    //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis)
-let _prognoseNutzenAutomatisch  = _prognoseNutzenSteuerung; //wird _prognoseNutzenAutomatisch benutzt
-let _batterieLadenUebersteuernManuell = false;
+let _prognoseNutzenSteuerung            = true;    //wird _tibberNutzenAutomatisch benutzt (dyn. Strompreis)
+let _prognoseNutzenAutomatisch          = _prognoseNutzenSteuerung; //wird _prognoseNutzenAutomatisch benutzt
+let _batterieLadenUebersteuernManuell   = false;
 let _tomorrow_kW = 0;
 
 let _sunup    = '00:00';
 let _sundown  = '00:00';
 
 // tibber Preis Bereich
-let _snowmode = false;                  //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
-const _start_charge = 0.1805;           //Eigenverbrauchspreis
-const _lossfactor = 0.75;               //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
-const _loadfact = 1 / _lossfactor;      /// 1,33
-const _stop_discharge =  aufrunden(4, _start_charge * _loadfact);    /// 0.19 * 1.33 = 0.2533 €
+let _snowmode           = false;                    //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
+const _start_charge     = 0.1805;                   //Eigenverbrauchspreis
+const _lossfactor       = 0.75;                     //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
+const _loadfact         = 1 / _lossfactor;          /// 1,33
+const _stop_discharge   =  aufrunden(4, _start_charge * _loadfact);    /// 0.19 * 1.33 = 0.2533 €
 
 createUserStates(userDataDP, false, [tibberStromDP + 'debug', { 'name': 'debug', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
     setState(tibberDP + 'debug', _debug, true);
@@ -420,7 +420,7 @@ async function processing() {
             if (_debug) {
                 console.info('vor  chrglength ' + chrglength + ' curbatwh ' + curbatwh + ' chargewh ' + chargewh);
                 //    console.info('prclow  Nachladestunden ' + JSON.stringify(prclow));
-                //    console.info('poihigh Nachladestunden ' + JSON.stringify(prchigh));
+                //    console.info('prchigh Nachladestunden ' + JSON.stringify(prchigh));
             }
 
             if (chrglength > prclow.length) {
@@ -458,10 +458,12 @@ async function processing() {
             }
         }
 
+        
+
         let entladeZeitenArray = [];
 
         if (!macheNix) {
-            poihigh = filterTimes(poihigh); // übernehmen nur laufende und zukünftige werte
+            poihigh = filterTimes(poihigh, _sunup); // übernehmen nur laufende und zukünftige werte
 
             let lefthrs = batlefthrs * 2;             // batlefthrs Bat h verbleibend
 
@@ -526,9 +528,11 @@ async function processing() {
                         }
                     }
                 }
-            }
+            }            
 
-            entladeZeitenArray = filterUniquePrices(entladeZeitenArray);
+            entladeZeitenArray = filterUniquePrices(entladeZeitenArray);   
+            entladeZeitenArray = sortiereNachStartzeitVIS(entladeZeitenArray);
+            console.info('entladeZeitenArray ' + JSON.stringify(entladeZeitenArray));
 
             setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArray, true);
 
@@ -805,8 +809,8 @@ function sendToWR(commWR, pwrAtCom) {
             console.warn('------ > Daten gesendet an WR kommunikation : ' + commWR  + ' Wirkleistungvorgabe ' + pwrAtCom);
         }
         setState(communicationRegisters.fedInPwrAtCom, pwrAtCom);       // 40149_Wirkleistungvorgabe
-        setState(communicationRegisters.fedInSpntCom, commWR);        // 40151_Kommunikation
-        setState(spntComCheckDP, commWR, true);                       // check DP für vis
+        setState(communicationRegisters.fedInSpntCom, commWR);          // 40151_Kommunikation
+        setState(spntComCheckDP, commWR, true);                         // check DP für vis
     }
 
     if (_debug && !_batterieLadenUebersteuernManuell) {
@@ -929,18 +933,32 @@ function filterUniquePrices(inputArray) {
     return outputArray;
 }
 
-function filterTimes(array) {
+function filterTimes(array, sunUp) {
     const now = new Date();
     const currentTime = now.getHours() * 60 + now.getMinutes();
 
     const filteredArray = array.filter(item => {
         const startTime = parseInt(item[1].split(':')[0]) * 60 + parseInt(item[1].split(':')[1]);
-        const endTime = parseInt(item[2].split(':')[0]) * 60 + parseInt(item[2].split(':')[1]);
-        //return currentTime <= startTime || currentTime >= startTime && currentTime <= endTime;
-        return currentTime <= startTime || currentTime >= startTime;
+        return (currentTime <= startTime || currentTime >= startTime);
     });
 
-    return filteredArray;
+    let ausgabeArr = [];
+    for (let idx = 0; idx < filteredArray.length; idx++) {
+        const startZeit = filteredArray[idx][1];
+        
+        if (sunUp == startZeit) {
+            ausgabeArr.push(filteredArray[idx]);  
+            break;
+        }
+        
+        ausgabeArr.push(filteredArray[idx]);  
+    }
+
+    ausgabeArr.sort(function (a, b) {  // sortiere nach höchstpreis
+        return b[0] - a[0];
+    });
+
+    return ausgabeArr;
 }
 
 function getArrayDifference(array1, array2) {
@@ -1007,6 +1025,45 @@ function zeitDifferenzInStunden(zeit1, zeit2) {
     // Rückgabe der Differenz als formatierte Zeichenkette
     return `${differenzStunden}.${(differenzMinuten < 10 ? '0' : '') + differenzMinuten}`;
 }
+function sortiereNachStartzeitVIS(array) {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentTime = currentHour * 60 + currentMinute;
+
+    // Vergleichsfunktion für die absteigende Sortierung nach der Startzeit
+    function vergleicheStartzeitAbsteigend(a, b) {
+        const [stundeA, minuteA] = a[1].split(':').map(Number);
+        const [stundeB, minuteB] = b[1].split(':').map(Number);
+        const startzeitA = stundeA * 60 + minuteA;
+        const startzeitB = stundeB * 60 + minuteB;
+
+        // Berechnen der Differenz zur aktuellen Zeit
+        const differenzA = startzeitA < currentTime ? startzeitA + 1440 - currentTime : startzeitA - currentTime;
+        const differenzB = startzeitB < currentTime ? startzeitB + 1440 - currentTime : startzeitB - currentTime;
+
+        // Überprüfen, ob ein Tageswechsel zwischen den Startzeiten liegt
+        if (differenzA === differenzB) {
+            // Wenn ein Tageswechsel vorliegt, wird das Element mit der späteren Startzeit zuerst platziert
+            if (startzeitA > startzeitB) {
+                return -1;
+            } else if (startzeitA < startzeitB) {
+                return 1;
+            }
+        }
+
+        return differenzA - differenzB;
+    }
+
+    // Sortieren des Arrays nach der Startzeit in absteigender Reihenfolge
+    array.sort(vergleicheStartzeitAbsteigend);
+
+    // Das letzte Element an die erste Stelle des Arrays verschieben
+    const letztesElement = array.pop();
+    array.unshift(letztesElement);
+
+    return array;
+}
 
 function tibber_active_auswertung() {
     _max_pwr = _mindischrg;
@@ -1041,6 +1098,4 @@ function tibber_active_auswertung() {
         default:
             _SpntCom = _InitCom_Aus;
     }
-
 }
-
