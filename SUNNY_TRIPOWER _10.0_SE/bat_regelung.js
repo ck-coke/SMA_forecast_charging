@@ -503,21 +503,21 @@ async function processing() {
                 } else {
                     for (let d = 0; d < lefthrs; d++) {
                         if (poihigh[d] != null) {
-                            if (poihigh[d][0] > _stop_discharge) {
-                                _entladung_zeitfenster = false;
-
+                            if (poihigh[d][0] > _stop_discharge) {                               
                                 if (_debug) {
                                     console.info('Entladezeiten: ' + poihigh[d][1] + '-' + poihigh[d][2] + ' Preis ' + poihigh[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
                                 }
 
-                                entladeZeitenArray.push(poihigh[d]);                                
+                                entladeZeitenArray.push(poihigh[d]);    // alle passende höchstpreiszeiten                           
                             }
                         }
                     }
 
-                    entladeZeitenArray = filterUniquePrices(entladeZeitenArray);   
+                    entladeZeitenArray = filterUniquePrices(entladeZeitenArray);          
                     entladeZeitenArray = sortiereNachStartzeitVIS(entladeZeitenArray);
-                    
+
+                    _entladung_zeitfenster = false;
+
                     for (let c = 0; c < entladeZeitenArray.length; c++) {
                         if (compareTime(entladeZeitenArray[c][1], entladeZeitenArray[c][2], "between")) {
                             if (_vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
