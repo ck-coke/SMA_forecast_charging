@@ -194,8 +194,8 @@ async function processing() {
         _tick = 0;
     }
 
-    let macheNix = false;
-    let wirdGeladen   = false;
+    let macheNix        = false;
+    let wirdGeladen     = false;
 
     _bydDirectSOCMrk = 0
 
@@ -223,12 +223,7 @@ async function processing() {
     _tibberPreisJetzt = getState(tibberPreisJetztDP).val;
     _tomorrow_kW      = getState(tomorrow_kWDP).val;
 
-    if (_dc_now > _verbrauchJetzt && _batsoc < 100) {
-        _max_pwr = (_dc_now - _verbrauchJetzt) * -1;   // vorbelegung zum laden
-    } else {
-        _max_pwr = _mindischrg;
-    }
-
+    
     // Lademenge
     let lademenge_full = Math.ceil((_batteryCapacity * (100 - _batsoc) / 100) * (1 / _wr_efficiency));                             //Energiemenge bis vollständige Ladung
     let lademenge      = Math.max(Math.ceil((_batteryCapacity * (_batteryTarget - _batsoc) / 100) * (1 / _wr_efficiency)), 0);     //lademenge = Energiemenge bis vollständige Ladung
@@ -253,8 +248,14 @@ async function processing() {
 
     }
 
-    _tibber_active_idx    = 0;                // initialisiere
-    _SpntCom            = _InitCom_Aus;     // initialisiere AUS
+    _tibber_active_idx      = 0;                // initialisiere
+    _SpntCom                = _InitCom_Aus;     // initialisiere AUS
+    _max_pwr = _mindischrg; // initialisiere
+    
+    if (_dc_now > _verbrauchJetzt && _batsoc < 100) {
+        _max_pwr = (_dc_now - _verbrauchJetzt) * -1;   // vorbelegung zum laden
+    } 
+
 
     if (_tibberNutzenSteuerung) {
         if (_tibber_active_idx == 88) { // komme aus notladung
@@ -457,6 +458,8 @@ async function processing() {
             }
         }
 
+        let entladeZeitenArray = [];
+
         if (!macheNix) {
             poihigh = filterTimes(poihigh); // übernehmen nur laufende und zukünftige werte
 
@@ -467,32 +470,27 @@ async function processing() {
                 //    console.info('poihigh nach filter ' + JSON.stringify(poihigh));
             }
 
-
             if (lefthrs > 0 && lefthrs > poihigh.length) {        // limmitiere die Battlaufzeit wenn zu viel PV stunden
                 lefthrs = poihigh.length;
             }
-
-            let entladeZeitenArray = [];
 
             if (_debug) {
                 console.warn('-->>  lefthrs ' + lefthrs + ' batlefthrs ' + batlefthrs + ' hrstorun ' + hrstorun + ' pvwh ' + pvwh);
             }
 
-// Entladezeit  wenn reste im akku
+            // Entladezeit  wenn reste im akku
 
             if (hrstorun == 0 && _tibberPreisJetzt > _stop_discharge) { // wenn jetzige stunde genau auf Teuerpreis trifft
                 hrstorun = 1;
             }
 
             if (hrstorun > 0 && batlefthrs > 0 && _batsoc > 1 && _tibberPreisJetzt > _stop_discharge && _dc_now > 1 && _dc_now < _verbrauchJetzt) {      // wenn noch was im akku
-
                 macheNix = true;
                 _entladung_zeitfenster = true;
                 _tibber_active_idx = 21;
-                //       entladeZeitenArray.push(poihigh[1]);
             }
 
-// Entladezeit
+            // Entladezeit
             if (lefthrs > 0 && lefthrs <= hrstorun * 2) { // && pvwh < _baseLoad * 24 * _wr_efficiency) {        //  16200 aus der berechung
                 macheNix = false;
 
@@ -540,19 +538,15 @@ async function processing() {
             setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArray, true);
 
             if (!macheNix) {
-
-                _SpntCom = _InitCom_An;
-
-//entladung stoppen wenn preisschwelle erreicht aber nicht wenn ladung reicht bis zum nächsten sonnenaufgang
-                if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) && _entladung_zeitfenster) { // } && _tibber_active_idx == 2) {
+                //entladung stoppen wenn preisschwelle erreicht aber nicht wenn ladung reicht bis zum nächsten sonnenaufgang
+                if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) && _entladung_zeitfenster) { 
                     if (_debug) {
                         console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + aufrunden(2, _stop_discharge) + ' ct/kWh');
                     }
-
                     _tibber_active_idx = 3;
                 }
 
-// starte die ladung
+                // starte die ladung
                 if (_tibberPreisJetzt <= _start_charge) {
                     let length = Math.ceil(restladezeit);
 
@@ -568,7 +562,6 @@ async function processing() {
                             if (_debug) {
                                 console.info('Starte Ladung: ' + lowprice[i][1] + '-' + lowprice[i][2] + ' Preis ' + lowprice[i][0]);
                             }
-
                             _tibber_active_idx = 5;
                             _prognoseNutzenSteuerung = false;
                             break;
@@ -576,12 +569,11 @@ async function processing() {
                     }
                 }
 
-//ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
+                //ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
                 if (lowprice.length > 0 && restladezeit <= lowprice.length && _tibber_active_idx == 5) {
                     if (_debug) {
                         console.info('Stoppe Ladung, lowprice.length ' + lowprice.length);
                     }
-
                     _tibber_active_idx = 4;
                     _prognoseNutzenSteuerung = true;
                 }
@@ -597,8 +589,6 @@ async function processing() {
     }
 
     setState(tibberDP + 'extra.tibberProtokoll', _tibber_active_idx, true);
-
-
 
     // ----------------------------------------------------  Start der PV Prognose Sektion
 
@@ -1025,20 +1015,30 @@ function zeitDifferenzInStunden(zeit1, zeit2) {
 
 function tibber_active_auswertung() {
     _max_pwr = _mindischrg;
-    
+  
+//      _tibber_active_idx = 0;    initial
+
+
+//      _tibber_active_idx = 21;   Entladezeit wenn akku > 0 aber keine entladezeit, aber der Preis hoch genug um zu sparen
+//      _tibber_active_idx = 22;   Entladezeit reicht aus bis zum Sonnaufgang
+//      _tibber_active_idx = 3;    entladung stoppen wenn preisschwelle erreicht
+//      _tibber_active_idx = 4;    ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
+//      _tibber_active_idx = 5;    starte die ladung
+//      _tibber_active_idx = 88;   notladung
+
     switch (_tibber_active_idx) {
-        case 1:
+        case 1:                             //      _tibber_active_idx = 1;    Nachladezeit
             _SpntCom = _InitCom_An;
             _max_pwr = _pwrAtCom_def * -1;
             break;
-        case 2:
-        case 21:
-        case 22:
+        case 2:                             //      _tibber_active_idx = 2;    Entladezeiten
+        case 21:                            //      _tibber_active_idx = 21;   Entladezeit wenn akku > 0 aber keine entladezeit, aber der Preis hoch genug um zu sparen
+        case 22:                            //      _tibber_active_idx = 22;   Entladezeit reicht aus bis zum Sonnaufgang
             _SpntCom = _InitCom_Aus;
             break;
-        case 3:
+        case 3:                             //      _tibber_active_idx = 3;    entladung stoppen wenn preisschwelle erreicht
             _SpntCom = _InitCom_An;
-// wenn tibber  = 3 und PV deckt Verbrauch zu 30 % dann nimm aus der batterie ist vielleicht ne Wolke unterwegs
+// PV deckt Verbrauch zu 30 % dann nimm aus der batterie ist vielleicht ne Wolke unterwegs
             if (_tibber_active_idx == 3 && _dc_now >= (_verbrauchJetzt - (_verbrauchJetzt * 0.30))) {
                 if (_debug) {
                     console.error('Stoppe Zukauf da Verbrauch zu 30% gedeckt');
@@ -1046,10 +1046,10 @@ function tibber_active_auswertung() {
                 _SpntCom = _InitCom_Aus;
             }
             break;
-        case 4:
+        case 4:                             //      _tibber_active_idx = 4;    ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
             _SpntCom = _InitCom_An;
             break;
-        case 5:
+        case 5:                             //      _tibber_active_idx = 5;    starte die ladung
             _SpntCom = _InitCom_An;
             _max_pwr = _pwrAtCom_def * -1;
             break;
