@@ -262,24 +262,30 @@ async function processing() {
         if (_tibber_active_idx == 88) { // komme aus notladung
             setState(spntComCheckDP, 888, true);
         }
-
+        
+        let nowhour     = _hhJetzt + ':00'; // stunde jetzt zur laufzeit     
         _tibber_active_idx      = 0;    // initialisiere
 
-        let poi = [];
+        let tibberPoihigh         = getState(tibberPvForcastDP).val;
+        let tibberPoihighSorted   = sortArrayByStartTime(tibberPoihigh);
 
-        if (hhJetztNum > 13) {            // ab 14 Uhr nimm alle Preise 
-            for (let t = 0; t < 24; t++) {  
-                poi[t] = [getState(tibberDP + t + '.price').val, getState(tibberDP + t + '.startTime').val, getState(tibberDP + t + '.endTime').val];
-            }
-        } else {
-            for (let t = 0; t < 24; t++) {  
-                if (t > 13) {
-                    break;
-                }
-                poi[t] = [getState(tibberDP + t + '.price').val, getState(tibberDP + t + '.startTime').val, getState(tibberDP + t + '.endTime').val];
-            }
-        }
+        let poi = [];
         
+        for (let t = 0; t < 48; t++) { 
+            const zeitMM = tibberPoihighSorted[t][1].slice(3, 5);
+            const zeitHH = tibberPoihighSorted[t][1].slice(0, 2);
+            if (zeitMM == 30) {
+                if (_hhJetzt > 13) {
+                    poi.push([tibberPoihighSorted[t][0], tibberPoihighSorted[t][1].slice(0, 2)+':00', tibberPoihighSorted[t][2]]);
+                } else {
+                    poi.push([tibberPoihighSorted[t][0], tibberPoihighSorted[t][1].slice(0, 2)+':00', tibberPoihighSorted[t][2]]);
+                    if (zeitHH == 14) {
+                        break;
+                    }
+                }
+            }   
+        }
+                
         poi.sort(function (a, b) {  // niedrieg preis sort
             return a[0] - b[0];
         });
@@ -290,8 +296,6 @@ async function processing() {
                 lowprice.push(poi[x]);
             }
         }
-
-        let nowhour     = _hhJetzt + ':00'; // stunde jetzt zur laufzeit        
 
         let batlefthrs = aufrunden(2,((_batteryCapacity / 100) * _batsoc) / (_baseLoad / Math.sqrt(_lossfactor)));    /// 12800 / 100 * 30            
 
@@ -387,11 +391,9 @@ async function processing() {
             }
         }
 
-        let poihigh = getState(tibberPvForcastDP).val;
-
         if (_debug) {
-            console.info('Tibber poihigh.length ' + poihigh.length);
-            //    console.info('poihigh vor nachladen: ' + JSON.stringify(poihigh));
+            console.info('Tibber tibberPoihigh.length ' + tibberPoihigh.length);
+            //    console.info('tibberPoihigh vor nachladen: ' + JSON.stringify(tibberPoihigh));
         }
 
         // ggf nachladen?
@@ -400,12 +402,12 @@ async function processing() {
         let ladeZeitenArray = [];
 
         if (batlefthrs < hrstorun) {
-            for (let h = 0; h < poihigh.length; h++) {
-                if (poihigh[h][0] <= _start_charge) {
-                    prclow.push(poihigh[h]);
+            for (let h = 0; h < tibberPoihigh.length; h++) {
+                if (tibberPoihigh[h][0] <= _start_charge) {
+                    prclow.push(tibberPoihigh[h]);
                 }
-                if (poihigh[h][0] > _stop_discharge) {
-                    prchigh.push(poihigh[h]);
+                if (tibberPoihigh[h][0] > _stop_discharge) {
+                    prchigh.push(tibberPoihigh[h]);
                 }
             }
 
@@ -425,7 +427,7 @@ async function processing() {
             let curbatwh   = aufrunden(2, ((_batteryCapacity / 100) * _batsoc));
             let chrglength = aufrunden(2, (Math.max((chargewh - curbatwh) / (_batteryLadePower * _wr_efficiency), 0) * 2));
 
-            // neuaufbau poihigh ohne Nachladestunden
+            // neuaufbau tibberPoihigh ohne Nachladestunden
             if (_debug) {
                 console.info('vor  chrglength ' + chrglength + ' curbatwh ' + curbatwh + ' chargewh ' + chargewh);
                 //    console.info('prclow  Nachladestunden ' + JSON.stringify(prclow));
@@ -437,7 +439,6 @@ async function processing() {
             }
 
             if (_debug) {
-                //    console.info('poihigh ohne Nachladestunden ' + JSON.stringify(poihigh));
                 console.info('nach chrglength ' + chrglength + ' curbatwh ' + curbatwh);
             }
 
@@ -465,24 +466,22 @@ async function processing() {
                     }
                 }
             }
-        }
-
-        
+        }        
 
         let entladeZeitenArray = [];
 
         if (!macheNix) {
-            poihigh = filterTimes(poihigh, _sunup); // übernehmen nur laufende und zukünftige werte
+            let tibberPoihighNew = filterTimes(tibberPoihigh, _sunup, _hhJetzt);          // übernehmen nur laufende und zukünftige werte
 
-            let lefthrs = batlefthrs * 2;             // batlefthrs Bat h verbleibend
+            let lefthrs = batlefthrs * 2;                           // batlefthrs Bat h verbleibend
 
             if (_debug) {
-                console.info('poihigh.length '+ poihigh.length);
-                //    console.info('poihigh nach filter ' + JSON.stringify(poihigh));
+                console.info('tibberPoihighNew.length '+ tibberPoihighNew.length);
+                //    console.info('tibberPoihighNew nach filter ' + JSON.stringify(tibberPoihighNew));
             }
 
-            if (lefthrs > 0 && lefthrs > poihigh.length) {        // limmitiere die Battlaufzeit wenn zu viel PV stunden
-                lefthrs = poihigh.length;
+            if (lefthrs > 0 && lefthrs > tibberPoihighNew.length) {        // limmitiere die Battlaufzeit wenn zu viel PV stunden
+                lefthrs = tibberPoihighNew.length;
             }
 
             if (_debug) {
@@ -511,13 +510,13 @@ async function processing() {
                     entladeZeitenArray.push('--:--');  //  [0.2856,"19:30","20:00"]
                 } else {
                     for (let d = 0; d < lefthrs; d++) {
-                        if (poihigh[d] != null) {
-                            if (poihigh[d][0] > _stop_discharge) {                               
+                        if (tibberPoihighNew[d] != null) {
+                            if (tibberPoihighNew[d][0] > _stop_discharge) {                               
                                 if (_debug) {
-                                    console.info('alle Entladezeiten: ' + poihigh[d][1] + '-' + poihigh[d][2] + ' Preis ' + poihigh[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
+                                    console.info('alle Entladezeiten: ' + tibberPoihighNew[d][1] + '-' + tibberPoihighNew[d][2] + ' Preis ' + tibberPoihighNew[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
                                 }
 
-                                entladeZeitenArray.push(poihigh[d]);    // alle passende höchstpreiszeiten                           
+                                entladeZeitenArray.push(tibberPoihighNew[d]);    // alle passende höchstpreiszeiten                           
                             }
                         }
                     }
@@ -672,12 +671,7 @@ async function processing() {
             console.info('pvfc.length ' + pvfc.length + ' Restladezeit ' + restladezeit);
         }
 
-        if (restladezeit > 0 && (restladezeit * 2) <= pvfc.length) {  // wenn die ladedauer kleiner ist als die vorhersage
-            // Bugfix zur behebung der array interval von 30min und update interval 1h
-            //     if (compareTime(latesttime, null, '<=', null)) {
-            //         _max_pwr = _mindischrg;
-            //     }
-            //berechnung zur entzerrung entlang der pv kurve, oberhalb des einspeiselimits
+        if (restladezeit > 0 && (restladezeit * 2) <= pvfc.length) {  // wenn die ladedauer kleiner ist als die vorhersage           
             let get_wh = 0;
             let get_wh_einzeln = 0;
 
@@ -707,10 +701,9 @@ async function processing() {
 
             setState(tibberDP + 'extra.PV_Ueberschuss', get_wh, true);
 
-            pvfc = sortiereNachUhrzeit(pvfc);
+            pvfc = sortiereNachUhrzeitPV(pvfc);
 
             if (_debug) {
-                //  console.info('pvfc ' + JSON.stringify(pvfc));
                 console.info('Überschuss get_wh vor entzerren ' + get_wh);
             }
 
@@ -907,7 +900,36 @@ function notLadungCheck() {
     return false;
 }
 
-function sortiereNachUhrzeit(arr) {
+async function berechneVerbrauch(pvNow) {
+    if (_sma_em.length > 0) {
+        inputRegisters.powerOut = _sma_em + ".psurplus" /*aktuelle Einspeiseleistung am Netzanschlußpunkt, SMA-EM Adapter*/
+    }
+
+    const einspeisung   = aufrunden(2, getState(inputRegisters.powerOut).val);     // Einspeisung  in W
+    const battOut       = await getStateAsync(inputRegisters.battOut);
+    const battIn        = await getStateAsync(inputRegisters.battIn);
+    const netzbezug     = await getStateAsync(inputRegisters.netzbezug);
+
+    _vehicleConsum = 0;
+
+    if (considerVehicle) {
+        isVehicleConn = getState(isVehicleConnDP).val;
+        if (isVehicleConn) {
+            _vehicleConsum = getState(vehicleConsumDP).val;
+
+            if (_vehicleConsum < 0 || _vehicleConsum > max_VehicleConsum) { // sollte murks vom adapter kommen dann setze auf 0
+                _vehicleConsum = 0;
+            }
+        }
+    }
+
+    const verbrauchJetzt   = 100 + (pvNow + battOut.val + netzbezug.val) - (einspeisung + battIn.val);          // verbrauch in W , 100W reserve obendruaf _vehicleConsum nicht rein nehmen
+    setState(momentan_VerbrauchDP, aufrunden(2, _verbrauchJetzt-100-_vehicleConsum)/1000, true);                  // für die darstellung können die 100 W wieder raus und fahrzeug auch
+
+    return verbrauchJetzt;
+}
+
+function sortiereNachUhrzeitPV(arr) {
     return arr.sort((a, b) => {
         const zeitA = a[3];
         const zeitB = b[3];
@@ -941,66 +963,24 @@ function filterUniquePrices(inputArray) {
     return outputArray;
 }
 
-function filterTimes(array, sunUp) {
-    
-    const currentTime = _today.getHours() * 60 + _today.getMinutes();
+function filterTimes(array, sunUp, hhJetzt) {
+    const pois = sortByStartTimeFromHH(array, hhJetzt); // sortiert nach zeit ab jetzt
+    let poisToSunUp = [];
 
-    const filteredArray = array.filter(item => {
-        const startTime = parseInt(item[1].split(':')[0]) * 60 + parseInt(item[1].split(':')[1]);
-        return (currentTime <= startTime || currentTime >= startTime);
-    });
-
-    let ausgabeArr = [];
-    for (let idx = 0; idx < filteredArray.length; idx++) {
-        const startZeit = filteredArray[idx][1];
+    for (let p = 0; p < pois.length; p++) { // übernehme werte von jetzt aus
+        const hh = pois[p][1];
+        poisToSunUp.push([pois[p][0],pois[p][1],pois[p][2]]);
         
-        if (sunUp == startZeit) {
-            ausgabeArr.push(filteredArray[idx]);  
+        if (hh == sunUp) {
             break;
         }
-        
-        ausgabeArr.push(filteredArray[idx]);  
     }
 
-    ausgabeArr.sort(function (a, b) {  // sortiere nach höchstpreis
-        return b[0] - a[0];
+    poisToSunUp.sort(function (b, a) {
+        return a[0] - b[0];
     });
 
-    return ausgabeArr;
-}
-
-function getArrayDifference(array1, array2) {
-    const map = new Map(array1.map(item => [item.toString(), item]));
-    return array2.filter(item => !map.has(item.toString()));
-}
-
-async function berechneVerbrauch(pvNow) {
-    if (_sma_em.length > 0) {
-        inputRegisters.powerOut = _sma_em + ".psurplus" /*aktuelle Einspeiseleistung am Netzanschlußpunkt, SMA-EM Adapter*/
-    }
-
-    const einspeisung   = aufrunden(2, getState(inputRegisters.powerOut).val);     // Einspeisung  in W
-    const battOut       = await getStateAsync(inputRegisters.battOut);
-    const battIn        = await getStateAsync(inputRegisters.battIn);
-    const netzbezug     = await getStateAsync(inputRegisters.netzbezug);
-
-    _vehicleConsum = 0;
-
-    if (considerVehicle) {
-        isVehicleConn = getState(isVehicleConnDP).val;
-        if (isVehicleConn) {
-            _vehicleConsum = getState(vehicleConsumDP).val;
-
-            if (_vehicleConsum < 0 || _vehicleConsum > max_VehicleConsum) { // sollte murks vom adapter kommen dann setze auf 0
-                _vehicleConsum = 0;
-            }
-        }
-    }
-
-    const verbrauchJetzt   = 100 + (pvNow + battOut.val + netzbezug.val) - (einspeisung + battIn.val);          // verbrauch in W , 100W reserve obendruaf _vehicleConsum nicht rein nehmen
-    setState(momentan_VerbrauchDP, aufrunden(2, _verbrauchJetzt-100-_vehicleConsum)/1000, true);                  // für die darstellung können die 100 W wieder raus und fahrzeug auch
-
-    return verbrauchJetzt;
+    return poisToSunUp;
 }
 
 function aufrunden(stellen, zahl) {
@@ -1032,6 +1012,23 @@ function zeitDifferenzInStunden(zeit1, zeit2) {
 
     // Rückgabe der Differenz als formatierte Zeichenkette
     return `${differenzStunden}.${(differenzMinuten < 10 ? '0' : '') + differenzMinuten}`;
+}
+function sortArrayByStartTime(array) {
+// Sortiere den Array nach der Startzeit
+    array.sort((a, b) => {
+        const timeA = a[1].split(":").map(Number);
+        const timeB = b[1].split(":").map(Number);
+        
+        // Vergleiche Stunden
+        if (timeA[0] !== timeB[0]) {
+            return timeA[0] - timeB[0];
+        }
+        
+        // Wenn Stunden gleich sind, vergleiche Minuten
+        return timeA[1] - timeB[1];
+    });
+
+    return array;
 }
 function sortiereNachStartzeitVIS(array) {
    
@@ -1065,12 +1062,34 @@ function sortiereNachStartzeitVIS(array) {
 
     // Sortieren des Arrays nach der Startzeit in absteigender Reihenfolge
     array.sort(vergleicheStartzeitAbsteigend);
-
-    // Das letzte Element an die erste Stelle des Arrays verschieben
-    const letztesElement = array.pop();
-    array.unshift(letztesElement);
-
     return array;
+}
+
+function sortByStartTimeFromHH(array, currentHour) {  
+    // Sortiere den Array nach der Startzeit
+    array.sort((a, b) => {
+        const timeA = a[1].split(":").map(Number);
+        const timeB = b[1].split(":").map(Number);
+        
+        // Vergleiche Stunden
+        if (timeA[0] !== timeB[0]) {
+            return timeA[0] - timeB[0];
+        }
+        
+        // Wenn Stunden gleich sind, vergleiche Minuten
+        return timeA[1] - timeB[1];
+    });
+
+    // Finde den Index des aktuellen Zeitpunkts
+    let startIndex = array.findIndex(item => {
+        const time = item[1].split(":").map(Number);
+        return time[0] >= currentHour || (time[0] === currentHour && time[1] >= 30);
+    });
+
+    // Schneide den Array ab startIndex und setze ihn an das Ende
+    const sortedArray = array.slice(startIndex).concat(array.slice(0, startIndex));
+
+    return sortedArray;
 }
 
 function tibber_active_auswertung() {
