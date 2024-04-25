@@ -772,8 +772,7 @@ async function processing() {
                     if (_debug) {
                         console.warn('-->> Bingo ladezeit mit überschuss _max_pwr ' + _max_pwr + '  ' + pvfc[h][0] + ' ' + pvfc[h][1]);
                     }
-                    _SpntCom = _InitCom_An;
-
+                    
                     if (_max_pwr > _dc_now - _verbrauchJetzt) {  // wenn das ermittelte wert grösser ist als die realität dann limmitiere, check nochmal besser ist es
                         _max_pwr = _dc_now - _verbrauchJetzt;
                         if (_debug) {
@@ -781,6 +780,7 @@ async function processing() {
                         }
                     }
 
+                    _SpntCom = _InitCom_An;
                     _max_pwr = _max_pwr * -1;
 
                     if (_batsoc < 100) {  // batterie ist nicht voll
