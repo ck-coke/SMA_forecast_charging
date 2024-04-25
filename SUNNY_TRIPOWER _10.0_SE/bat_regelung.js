@@ -196,6 +196,7 @@ async function processing() {
 
     let macheNix        = false;
     let wirdGeladen     = false;
+    let hhJetztNum      = Number(_hhJetzt);
 
     _bydDirectSOCMrk = 0
 
@@ -249,7 +250,7 @@ async function processing() {
     }
     
     _SpntCom                = _InitCom_Aus;     // initialisiere AUS
-    _max_pwr                = _mindischrg;                     // initialisiere
+    _max_pwr                = _mindischrg;      // initialisiere
     
     if (_dc_now > _verbrauchJetzt && _batsoc < 100) {
         _max_pwr = (_dc_now - _verbrauchJetzt) * -1;   // vorbelegung zum laden
@@ -261,28 +262,34 @@ async function processing() {
             setState(spntComCheckDP, 888, true);
         }
 
-        _tibber_active_idx      = 0;                // initialisiere
+        _tibber_active_idx      = 0;    // initialisiere
 
         let poi = [];
-        for (let t = 0; t < 24; t++) {  // nur bis 13 uhr da um 14 nächste Preise
-            if (t < 13) {
+        if (_hhJetzt > 13) {            // ab 14 Uhr nimm alle Preise 
+            for (let t = 0; t < 24; t++) {  
+                poi[t] = [getState(tibberDP + t + '.price').val, getState(tibberDP + t + '.startTime').val, getState(tibberDP + t + '.endTime').val];
+            }
+        } else {
+            for (let t = 0; t < 24; t++) {  
+                if (t > 13) {
+                    break
+                }
                 poi[t] = [getState(tibberDP + t + '.price').val, getState(tibberDP + t + '.startTime').val, getState(tibberDP + t + '.endTime').val];
             }
         }
-
-        poi.sort(function (a, b) {  // niedrieg preis um
+        
+        poi.sort(function (a, b) {  // niedrieg preis sort
             return a[0] - b[0];
         });
 
-        let lowprice = []; //wieviele Ladestunden unter Startcharge Preis
+        let lowprice = [];          //wieviele Ladestunden unter Startcharge Preis
         for (let x = 0; x < poi.length; x++) {
             if (poi[x][0] <= _start_charge) {
                 lowprice.push(poi[x]);
             }
         }
 
-        let nowhour     = _hhJetzt + ':00'; // stunde jetzt zur laufzeit
-        let hhJetztNum  = Number(_hhJetzt);
+        let nowhour     = _hhJetzt + ':00'; // stunde jetzt zur laufzeit        
 
         let batlefthrs = ((_batteryCapacity / 100) * _batsoc) / (_baseLoad / Math.sqrt(_lossfactor));    /// 12800 / 100 * 30
         batlefthrs = aufrunden(2, batlefthrs);
