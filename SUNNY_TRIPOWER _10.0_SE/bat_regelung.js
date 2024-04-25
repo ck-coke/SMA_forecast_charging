@@ -247,8 +247,7 @@ async function processing() {
         console.info('Restladezeit____________________ ' + aufrunden(2, restladezeit) + ' h');
 
     }
-
-    _tibber_active_idx      = 0;                // initialisiere
+    
     _SpntCom                = _InitCom_Aus;     // initialisiere AUS
     _max_pwr                = _mindischrg;                     // initialisiere
     
@@ -261,6 +260,8 @@ async function processing() {
         if (_tibber_active_idx == 88) { // komme aus notladung
             setState(spntComCheckDP, 888, true);
         }
+
+        _tibber_active_idx      = 0;                // initialisiere
 
         let poi = [];
         for (let t = 0; t < 24; t++) {  // nur bis 13 uhr da um 14 nächste Preise
@@ -505,7 +506,7 @@ async function processing() {
                         if (poihigh[d] != null) {
                             if (poihigh[d][0] > _stop_discharge) {                               
                                 if (_debug) {
-                                    console.info('Entladezeiten: ' + poihigh[d][1] + '-' + poihigh[d][2] + ' Preis ' + poihigh[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
+                                    console.info('alle Entladezeiten: ' + poihigh[d][1] + '-' + poihigh[d][2] + ' Preis ' + poihigh[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
                                 }
 
                                 entladeZeitenArray.push(poihigh[d]);    // alle passende höchstpreiszeiten                           
@@ -848,9 +849,9 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, async function () {  // aktu
         _batterieLadenUebersteuernManuell   = getState(batterieLadenManuellStartDP).val;
 
         if (_batterieLadenUebersteuernManuell || (_tibberNutzenManuell && _hhJetzt == _tibberNutzenManuellHH)) {       // wird durch anderes script geregelt
-            _tibberNutzenSteuerung      = false;     // der steuert intern ob lauf gültig  für tibber laden/entladen
-            _prognoseNutzenSteuerung    = false;   // der steuert intern ob lauf gültig  für pv laden
-            _lastSpntCom                = 98;
+            _tibberNutzenSteuerung      = false;    // der steuert intern ob lauf gültig  für tibber laden/entladen
+            _prognoseNutzenSteuerung    = false;    // der steuert intern ob lauf gültig  für pv laden
+            _lastSpntCom                = 98;       // manuellel laden
         }
 
         if (_debug) {
@@ -860,11 +861,9 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, async function () {  // aktu
         // ---     check ob notladung nötig
         _notLadung = notLadungCheck();
 
-        if (_notLadung) {
-            _tibberNutzenSteuerung      = false;
-            _prognoseNutzenSteuerung    = false;
-            _tibber_active_idx            = 88      // notladung mrk
-            sendToWR(_InitCom_Aus, _batteryPowerEmergency);
+        if (_notLadung) {         
+            _tibber_active_idx            = 88          // notladung mrk
+            sendToWR(_InitCom_An, _batteryPowerEmergency);
         } else {
             processing();             /*start processing in interval*/
         }
