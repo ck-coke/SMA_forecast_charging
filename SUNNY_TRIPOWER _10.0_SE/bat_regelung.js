@@ -471,7 +471,7 @@ async function processing() {
         let entladeZeitenArray = [];
 
         if (!macheNix) {
-            let tibberPoihighNew = filterTimes(tibberPoihigh, _sunup, _hhJetzt);          // übernehmen nur laufende und zukünftige werte
+            let tibberPoihighNew = filterTimes(tibberPoihigh, _sunup, Number(_sundown.slice(0, 2))-1);          // übernehmen nur laufende und zukünftige werte
 
             let lefthrs = batlefthrs * 2;                           // batlefthrs Bat h verbleibend
 
@@ -963,8 +963,35 @@ function filterUniquePrices(inputArray) {
     return outputArray;
 }
 
-function filterTimes(array, sunUp, hhJetzt) {
-    const pois = sortByStartTimeFromHH(array, hhJetzt); // sortiert nach zeit ab jetzt
+function filterTimes(array, sunUp, fromTime) {    
+    function sortByStartTimeFromHH(array, fromTime) {  
+        // Sortiere den Array nach der Startzeit
+        array.sort((a, b) => {
+            const timeA = a[1].split(":").map(Number);
+            const timeB = b[1].split(":").map(Number);
+            
+            // Vergleiche Stunden
+            if (timeA[0] !== timeB[0]) {
+                return timeA[0] - timeB[0];
+            }
+            
+            // Wenn Stunden gleich sind, vergleiche Minuten
+            return timeA[1] - timeB[1];
+        });
+
+        // Finde den Index des aktuellen Zeitpunkts
+        let startIndex = array.findIndex(item => {
+            const time = item[1].split(":").map(Number);
+            return time[0] >= fromTime || (time[0] === fromTime && time[1] >= 30);
+        });
+
+        // Schneide den Array ab startIndex und setze ihn an das Ende
+        const sortedArray = array.slice(startIndex).concat(array.slice(0, startIndex));
+
+        return sortedArray;
+    }
+        
+    const pois = sortByStartTimeFromHH(array, fromTime); // sortiert nach zeit ab jetzt
     let poisToSunUp = [];
 
     for (let p = 0; p < pois.length; p++) { // übernehme werte von jetzt aus
@@ -1063,33 +1090,6 @@ function sortiereNachStartzeitVIS(array) {
     // Sortieren des Arrays nach der Startzeit in absteigender Reihenfolge
     array.sort(vergleicheStartzeitAbsteigend);
     return array;
-}
-
-function sortByStartTimeFromHH(array, currentHour) {  
-    // Sortiere den Array nach der Startzeit
-    array.sort((a, b) => {
-        const timeA = a[1].split(":").map(Number);
-        const timeB = b[1].split(":").map(Number);
-        
-        // Vergleiche Stunden
-        if (timeA[0] !== timeB[0]) {
-            return timeA[0] - timeB[0];
-        }
-        
-        // Wenn Stunden gleich sind, vergleiche Minuten
-        return timeA[1] - timeB[1];
-    });
-
-    // Finde den Index des aktuellen Zeitpunkts
-    let startIndex = array.findIndex(item => {
-        const time = item[1].split(":").map(Number);
-        return time[0] >= currentHour || (time[0] === currentHour && time[1] >= 30);
-    });
-
-    // Schneide den Array ab startIndex und setze ihn an das Ende
-    const sortedArray = array.slice(startIndex).concat(array.slice(0, startIndex));
-
-    return sortedArray;
 }
 
 function tibber_active_auswertung() {
