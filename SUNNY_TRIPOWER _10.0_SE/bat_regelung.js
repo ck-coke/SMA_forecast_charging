@@ -82,6 +82,7 @@ let _batsoc             = Math.min(getState(inputRegisters.batSoC).val, 100);   
 let _max_pwr            = _mindischrg;
 let _tick               = 0;
 let _tibber_active_idx  = 0;
+let _today              = new Date();
 
 let _notLadung = false;
 let _entladung_zeitfenster = false;
@@ -265,14 +266,15 @@ async function processing() {
         _tibber_active_idx      = 0;    // initialisiere
 
         let poi = [];
-        if (_hhJetzt > 13) {            // ab 14 Uhr nimm alle Preise 
+
+        if (hhJetztNum > 13) {            // ab 14 Uhr nimm alle Preise 
             for (let t = 0; t < 24; t++) {  
                 poi[t] = [getState(tibberDP + t + '.price').val, getState(tibberDP + t + '.startTime').val, getState(tibberDP + t + '.endTime').val];
             }
         } else {
             for (let t = 0; t < 24; t++) {  
                 if (t > 13) {
-                    break
+                    break;
                 }
                 poi[t] = [getState(tibberDP + t + '.price').val, getState(tibberDP + t + '.startTime').val, getState(tibberDP + t + '.endTime').val];
             }
@@ -291,8 +293,7 @@ async function processing() {
 
         let nowhour     = _hhJetzt + ':00'; // stunde jetzt zur laufzeit        
 
-        let batlefthrs = ((_batteryCapacity / 100) * _batsoc) / (_baseLoad / Math.sqrt(_lossfactor));    /// 12800 / 100 * 30
-        batlefthrs = aufrunden(2, batlefthrs);
+        let batlefthrs = aufrunden(2,((_batteryCapacity / 100) * _batsoc) / (_baseLoad / Math.sqrt(_lossfactor)));    /// 12800 / 100 * 30            
 
         //wieviel wh kommen in etwa von PV in den nächsten 24h
         let hrstorun = 24;
@@ -309,9 +310,9 @@ async function processing() {
 
         setState(tibberDP + 'extra.PV_Prognose', aufrunden(2, pvwh), true);
 
-        _sundown       = getAstroDate('sunsetStart').getHours() + ':' + getAstroDate('sunsetStart').getMinutes().toString().padStart(2, '0');                               // aufgang
-        const today    = new Date();
-        const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+        const tomorrow = new Date(_today.getFullYear(), _today.getMonth(), _today.getDate() + 1);
+
+        _sundown       = getAstroDate('sunsetStart').getHours() + ':' + getAstroDate('sunsetStart').getMinutes().toString().padStart(2, '0');                           // aufgang      
         _sunup         = getAstroDate('sunriseEnd', tomorrow).getHours() + ':' + getAstroDate('sunriseEnd', tomorrow).getMinutes().toString().padStart(2, '0');         // untergang
 
         if (_debug) {
@@ -690,8 +691,8 @@ async function processing() {
 
                 if (compareTime(pvfc[k][3], pvfc[k][4], 'between')) {
                     //rechne restzeit aus
-                    const now = new Date();
-                    const nowTime = now.toLocaleTimeString('de-DE', _options);
+                    
+                    const nowTime = _today.toLocaleTimeString('de-DE', _options);
                     const startsplit = nowTime.split(':');
                     const endsplit = pvfc[k][4].split(':');
                     const minutescalc = (Number(endsplit[0]) * 60 + Number(endsplit[1])) - (Number(startsplit[0]) * 60 + Number(startsplit[1]));
@@ -836,11 +837,12 @@ function sendToWR(commWR, pwrAtCom) {
 on({ id: inputRegisters.triggerDP, change: 'any' }, async function () {  // aktualisiere laut adapter abfrageintervall
     setTimeout(async function () {
         _hhJetzt                    = getHH();
+        _today                      = new Date();
         _batsoc                     = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR
         _debug                      = getState(tibberDP + 'debug').val;
         _dc_now                     = getState(inputRegisters.dc1).val + getState(inputRegisters.dc2).val;  // pv vom Dach zusammen in W
 
-        _verbrauchJetzt = await berechneVerbrauch(_dc_now);
+        _verbrauchJetzt             = await berechneVerbrauch(_dc_now);
 
         _snowmode                   = getState(userDataDP + '.strom.tibber.extra.PV_Schneebedeckt').val;
         _tibberNutzenAutomatisch    = getState(tibberDP + 'extra.tibberNutzenAutomatisch').val;           // aus dem DP kommend sollte true sein für vis
@@ -940,8 +942,8 @@ function filterUniquePrices(inputArray) {
 }
 
 function filterTimes(array, sunUp) {
-    const now = new Date();
-    const currentTime = now.getHours() * 60 + now.getMinutes();
+    
+    const currentTime = _today.getHours() * 60 + _today.getMinutes();
 
     const filteredArray = array.filter(item => {
         const startTime = parseInt(item[1].split(':')[0]) * 60 + parseInt(item[1].split(':')[1]);
@@ -1032,9 +1034,9 @@ function zeitDifferenzInStunden(zeit1, zeit2) {
     return `${differenzStunden}.${(differenzMinuten < 10 ? '0' : '') + differenzMinuten}`;
 }
 function sortiereNachStartzeitVIS(array) {
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
+   
+    const currentHour = _today.getHours();
+    const currentMinute = _today.getMinutes();
     const currentTime = currentHour * 60 + currentMinute;
 
     // Vergleichsfunktion für die absteigende Sortierung nach der Startzeit
