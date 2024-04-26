@@ -284,8 +284,8 @@ async function processing() {
                     }
                 }
             }   
-        }
-                
+        }       
+
         poi.sort(function (a, b) {  // niedrieg preis sort
             return a[0] - b[0];
         });
@@ -471,7 +471,7 @@ async function processing() {
         let entladeZeitenArray = [];
 
         if (!macheNix) {
-            let tibberPoihighNew = filterTimes(tibberPoihigh, _sunup, Number(_sundown.slice(0, 2))-1);          // übernehmen nur laufende und zukünftige werte
+            let tibberPoihighNew = filterTimes(tibberPoihigh);         
 
             let lefthrs = batlefthrs * 2;                           // batlefthrs Bat h verbleibend
 
@@ -548,7 +548,7 @@ async function processing() {
                 //entladung stoppen wenn preisschwelle erreicht aber nicht wenn ladung reicht bis zum nächsten sonnenaufgang
                 if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) && _entladung_zeitfenster) { 
                     if (_debug) {
-                        console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + aufrunden(2, _stop_discharge) + ' ct/kWh');
+                        console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + aufrunden(2, _stop_discharge) + ' ct/kWh oder battSoc = 0');
                     }
                     _tibber_active_idx = 3;
                 }
@@ -776,6 +776,7 @@ async function processing() {
 
                     _SpntCom = _InitCom_An;
                     _max_pwr = _max_pwr * -1;
+                    _lastSpntCom = 95;    // damit der WR auf jedenfall daten bekommt
 
                     if (_batsoc < 100) {  // batterie ist nicht voll
                         wirdGeladen = true;
@@ -963,51 +964,18 @@ function filterUniquePrices(inputArray) {
     return outputArray;
 }
 
-function filterTimes(array, sunUp, fromTime) {    
-    function sortByStartTimeFromHH(array, fromTime) {  
-        // Sortiere den Array nach der Startzeit
-        array.sort((a, b) => {
-            const timeA = a[1].split(":").map(Number);
-            const timeB = b[1].split(":").map(Number);
-            
-            // Vergleiche Stunden
-            if (timeA[0] !== timeB[0]) {
-                return timeA[0] - timeB[0];
-            }
-            
-            // Wenn Stunden gleich sind, vergleiche Minuten
-            return timeA[1] - timeB[1];
-        });
+function filterTimes(array) {
+    const now = new Date();
+    const currentTime = now.getHours() * 60 + now.getMinutes();
 
-        // Finde den Index des aktuellen Zeitpunkts
-        let startIndex = array.findIndex(item => {
-            const time = item[1].split(":").map(Number);
-            return time[0] >= fromTime || (time[0] === fromTime && time[1] >= 30);
-        });
-
-        // Schneide den Array ab startIndex und setze ihn an das Ende
-        const sortedArray = array.slice(startIndex).concat(array.slice(0, startIndex));
-
-        return sortedArray;
-    }
-        
-    const pois = sortByStartTimeFromHH(array, fromTime); // sortiert nach zeit ab jetzt
-    let poisToSunUp = [];
-
-    for (let p = 0; p < pois.length; p++) { // übernehme werte von jetzt aus
-        const hh = pois[p][1];
-        poisToSunUp.push([pois[p][0],pois[p][1],pois[p][2]]);
-        
-        if (hh == sunUp) {
-            break;
-        }
-    }
-
-    poisToSunUp.sort(function (b, a) {
-        return a[0] - b[0];
+    const filteredArray = array.filter(item => {
+        const startTime = parseInt(item[1].split(':')[0]) * 60 + parseInt(item[1].split(':')[1]);
+        const endTime = parseInt(item[2].split(':')[0]) * 60 + parseInt(item[2].split(':')[1]);
+        //return currentTime <= startTime || currentTime >= startTime && currentTime <= endTime;
+        return currentTime <= startTime || currentTime >= startTime;
     });
 
-    return poisToSunUp;
+    return filteredArray;
 }
 
 function aufrunden(stellen, zahl) {
