@@ -474,7 +474,7 @@ async function processing() {
         let entladeZeitenArray = [];
 
         if (!macheNix) {
-            let tibberPoihighNew = filterTimes(tibberPoihigh);         
+            let tibberPoihighNew = filterTimes(tibberPoihigh);    // gebraucht wird sortiert nach preis und nur grösser jetzt
 
             let lefthrs = batlefthrs * 2;                           // batlefthrs Bat h verbleibend
 
@@ -525,7 +525,6 @@ async function processing() {
                     }
 
                     entladeZeitenArray = filterUniquePrices(entladeZeitenArray);          
-                    entladeZeitenArray = sortiereNachStartzeitVIS(entladeZeitenArray);
 
                     _entladung_zeitfenster = false;
 
@@ -551,7 +550,7 @@ async function processing() {
                 //entladung stoppen wenn preisschwelle erreicht aber nicht wenn ladung reicht bis zum nächsten sonnenaufgang
                 if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) && _entladung_zeitfenster) { 
                     if (_debug) {
-                        console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + aufrunden(2, _stop_discharge) + ' ct/kWh oder battSoc = 0 ' + _batsoc );
+                        console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + aufrunden(2, _stop_discharge) + ' ct/kWh oder battSoc = 0 ist ' + _batsoc );
                     }
                     _tibber_active_idx = 3;
                 }
@@ -973,14 +972,25 @@ function filterTimes(arrZeit) {
     const now = new Date();
     const currentTime = now.getHours() * 60 + now.getMinutes();
 
-    const filteredArray = arrZeit.filter(item => {
+    const sortedArray = arrZeit.filter(item => {                // sortiert nach stunde ab jetzt
         const startTime = parseInt(item[1].split(':')[0]) * 60 + parseInt(item[1].split(':')[1]);
-        const endTime = parseInt(item[2].split(':')[0]) * 60 + parseInt(item[2].split(':')[1]);
-        //return currentTime <= startTime || currentTime >= startTime && currentTime <= endTime;
         return currentTime <= startTime || currentTime >= startTime;
     });
 
-    return filteredArray;
+    const newArray = [];
+    for (let i = 0; i < sortedArray.length; i++) {
+        const startTime = parseInt(sortedArray[i][1].split(':')[0]);
+        newArray.push(sortedArray[i]);
+        if (startTime == 14) {
+            break;    
+        }
+    }
+
+    newArray.sort(function (a, b) {  // niedrieg preis sort
+        return b[0] - a[0];
+    });
+
+    return newArray;
 }
 
 function aufrunden(stellen, zahl) {
@@ -1047,40 +1057,6 @@ function sortArrayByCurrentHour(findeIndex, zeiten, currentHour) {
     return sortedArray;
 }
 
-function sortiereNachStartzeitVIS(zeitenVis) {
-   
-    const currentHour = _today.getHours();
-    const currentMinute = _today.getMinutes();
-    const currentTime = currentHour * 60 + currentMinute;
-
-    // Vergleichsfunktion für die absteigende Sortierung nach der Startzeit
-    function vergleicheStartzeitAbsteigend(a, b) {
-        const [stundeA, minuteA] = a[1].split(':').map(Number);
-        const [stundeB, minuteB] = b[1].split(':').map(Number);
-        const startzeitA = stundeA * 60 + minuteA;
-        const startzeitB = stundeB * 60 + minuteB;
-
-        // Berechnen der Differenz zur aktuellen Zeit
-        const differenzA = startzeitA < currentTime ? startzeitA + 1440 - currentTime : startzeitA - currentTime;
-        const differenzB = startzeitB < currentTime ? startzeitB + 1440 - currentTime : startzeitB - currentTime;
-
-        // Überprüfen, ob ein Tageswechsel zwischen den Startzeiten liegt
-        if (differenzA === differenzB) {
-            // Wenn ein Tageswechsel vorliegt, wird das Element mit der späteren Startzeit zuerst platziert
-            if (startzeitA > startzeitB) {
-                return -1;
-            } else if (startzeitA < startzeitB) {
-                return 1;
-            }
-        }
-
-        return differenzA - differenzB;
-    }
-
-    // Sortieren des Arrays nach der Startzeit in absteigender Reihenfolge
-    zeitenVis.sort(vergleicheStartzeitAbsteigend);
-    return zeitenVis;
-}
 
 function tibber_active_auswertung() {
     _max_pwr = _mindischrg;
