@@ -135,10 +135,10 @@ createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberProtokoll', { 
 //createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuellHH', { 'name': 'nutze Tibber Preise manuell ab Stunde ', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0 }], function () {
 //    setState(tibberDP + 'extra.tibberNutzenManuellHH', 0, true);
 //});
-createUserStates(userDataDP, false, [tibberStromDP + 'extra.entladeZeitenArray', { 'name': 'entladezeiten als array', 'type': 'array', 'read': true, 'write': false, 'role': 'object' }], function () {
+createUserStates(userDataDP, false, [tibberStromDP + 'extra.entladeZeitenArray', { 'name': 'entladezeiten als array', 'type': 'array', 'read': true, 'write': false, 'role': 'json' }], function () {
     setState(tibberDP + 'extra.entladeZeitenArray', [], true);
 });
-createUserStates(userDataDP, false, [tibberStromDP + 'extra.ladeZeitenArray', { 'name': 'lade- und nachladezeiten als array', 'type': 'array', 'read': true, 'write': false, 'role': 'object' }], function () {
+createUserStates(userDataDP, false, [tibberStromDP + 'extra.ladeZeitenArray', { 'name': 'lade- und nachladezeiten als array', 'type': 'array', 'read': true, 'write': false, 'role': 'json' }], function () {
     setState(tibberDP + 'extra.ladeZeitenArray', [], true);
 });
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.PV_Prognose', { 'name': 'PV_Prognose', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'unit': 'kWh', 'def': 0 }], function () {
@@ -224,7 +224,6 @@ async function processing() {
 
     _tibberPreisJetzt = getState(tibberPreisJetztDP).val;
     _tomorrow_kW      = getState(tomorrow_kWDP).val;
-
     
     // Lademenge
     let lademenge_full = Math.ceil((_batteryCapacity * (100 - _batsoc) / 100) * (1 / _wr_efficiency));                             //Energiemenge bis vollständige Ladung
@@ -257,17 +256,21 @@ async function processing() {
         _max_pwr = (_dc_now - _verbrauchJetzt) * -1;   // vorbelegung zum laden
     } 
 
-
     if (_tibberNutzenSteuerung) {
         if (_tibber_active_idx == 88) { // komme aus notladung
             setState(spntComCheckDP, 888, true);
         }
         
-        let nowhour     = _hhJetzt + ':00'; // stunde jetzt zur laufzeit     
-        _tibber_active_idx      = 0;    // initialisiere
+        let nowhour         = _hhJetzt + ':00'; // stunde jetzt zur laufzeit     
+        _tibber_active_idx  = 0;    // initialisiere
 
-        let tibberPoihigh         = getState(tibberPvForcastDP).val;
-        let tibberPoihighSorted   = sortArrayByStartTime(tibberPoihigh);
+        const tibberPoihigh         = sortArrayByCurrentHour(true, getState(tibberPvForcastDP).val, _hhJetzt);
+        // console.info('tibberPoihigh  ' + JSON.stringify(tibberPoihigh));
+        
+        const tibberPoihighSorted   = sortArrayByCurrentHour(false, getState(tibberPvForcastDP).val, '00');
+
+        // console.info('tibberPoihighSorted  ' + JSON.stringify(tibberPoihighSorted));
+
 
         let poi = [];
         
@@ -548,7 +551,7 @@ async function processing() {
                 //entladung stoppen wenn preisschwelle erreicht aber nicht wenn ladung reicht bis zum nächsten sonnenaufgang
                 if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) && _entladung_zeitfenster) { 
                     if (_debug) {
-                        console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + aufrunden(2, _stop_discharge) + ' ct/kWh oder battSoc = 0');
+                        console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + aufrunden(2, _stop_discharge) + ' ct/kWh oder battSoc = 0 ' + _batsoc );
                     }
                     _tibber_active_idx = 3;
                 }
@@ -829,14 +832,16 @@ function sendToWR(commWR, pwrAtCom) {
 /* ***************************************************************************************************************************************** */
 
 on({ id: inputRegisters.triggerDP, change: 'any' }, async function () {  // aktualisiere laut adapter abfrageintervall
-    setTimeout(async function () {
+        const dc1 = await getStateAsync(inputRegisters.dc1);
+        const dc2 = await getStateAsync(inputRegisters.dc2);
+
+        _dc_now                     = dc1.val + dc2.val;  // pv vom Dach zusammen in W
+        _verbrauchJetzt             = await berechneVerbrauch(_dc_now);
+    
         _hhJetzt                    = getHH();
         _today                      = new Date();
         _batsoc                     = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR
         _debug                      = getState(tibberDP + 'debug').val;
-        _dc_now                     = getState(inputRegisters.dc1).val + getState(inputRegisters.dc2).val;  // pv vom Dach zusammen in W
-
-        _verbrauchJetzt             = await berechneVerbrauch(_dc_now);
 
         _snowmode                   = getState(userDataDP + '.strom.tibber.extra.PV_Schneebedeckt').val;
         _tibberNutzenAutomatisch    = getState(tibberDP + 'extra.tibberNutzenAutomatisch').val;           // aus dem DP kommend sollte true sein für vis
@@ -874,7 +879,7 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, async function () {  // aktu
         if (_debug) {
             console.info('tibberNutzenSteuerung ' + _tibberNutzenSteuerung + ' prognoseNutzenSteuerung ' + _prognoseNutzenSteuerung);
         }
-    }, 300);
+    
 
 });
 
@@ -929,7 +934,7 @@ async function berechneVerbrauch(pvNow) {
 
     return verbrauchJetzt;
 }
-
+// ------------------------------------------- functions
 function sortiereNachUhrzeitPV(arr) {
     return arr.sort((a, b) => {
         const zeitA = a[3];
@@ -964,11 +969,11 @@ function filterUniquePrices(inputArray) {
     return outputArray;
 }
 
-function filterTimes(array) {
+function filterTimes(arrZeit) {
     const now = new Date();
     const currentTime = now.getHours() * 60 + now.getMinutes();
 
-    const filteredArray = array.filter(item => {
+    const filteredArray = arrZeit.filter(item => {
         const startTime = parseInt(item[1].split(':')[0]) * 60 + parseInt(item[1].split(':')[1]);
         const endTime = parseInt(item[2].split(':')[0]) * 60 + parseInt(item[2].split(':')[1]);
         //return currentTime <= startTime || currentTime >= startTime && currentTime <= endTime;
@@ -1008,9 +1013,10 @@ function zeitDifferenzInStunden(zeit1, zeit2) {
     // Rückgabe der Differenz als formatierte Zeichenkette
     return `${differenzStunden}.${(differenzMinuten < 10 ? '0' : '') + differenzMinuten}`;
 }
-function sortArrayByStartTime(array) {
-// Sortiere den Array nach der Startzeit
-    array.sort((a, b) => {
+
+function sortArrayByCurrentHour(findeIndex, zeiten, currentHour) {
+    // Sortiere den Array nach der Startzeit
+    zeiten.sort((a, b) => {
         const timeA = a[1].split(":").map(Number);
         const timeB = b[1].split(":").map(Number);
         
@@ -1023,9 +1029,25 @@ function sortArrayByStartTime(array) {
         return timeA[1] - timeB[1];
     });
 
-    return array;
+    let sortedArray = [];
+    
+    if (findeIndex) {
+        // Finde den Index des aktuellen Zeitpunkts
+        let startIndex = zeiten.findIndex(item => {
+            const time = item[1].split(":").map(Number);
+            return time[0] >= currentHour || (time[0] === currentHour && time[1] >= 30);
+        });
+
+    // Schneide den Array ab startIndex und setze ihn an das Ende
+        sortedArray = zeiten.slice(startIndex).concat(zeiten.slice(0, startIndex));
+    } else {
+        sortedArray = zeiten;   
+    }
+
+    return sortedArray;
 }
-function sortiereNachStartzeitVIS(array) {
+
+function sortiereNachStartzeitVIS(zeitenVis) {
    
     const currentHour = _today.getHours();
     const currentMinute = _today.getMinutes();
@@ -1056,8 +1078,8 @@ function sortiereNachStartzeitVIS(array) {
     }
 
     // Sortieren des Arrays nach der Startzeit in absteigender Reihenfolge
-    array.sort(vergleicheStartzeitAbsteigend);
-    return array;
+    zeitenVis.sort(vergleicheStartzeitAbsteigend);
+    return zeitenVis;
 }
 
 function tibber_active_auswertung() {
