@@ -720,7 +720,7 @@ async function processing() {
 
             let current_pwr_diff = _dc_now - _verbrauchJetzt;
 
-            if (lademenge > 0 && get_wh >= lademenge) {                   // vielleicht so bei tibber = 21
+            if (lademenge > 0 && get_wh >= lademenge && current_pwr_diff > 0) {                   
                 restladezeit = pvfc.length / 2;
 
                 _max_pwr = Math.ceil(pvfc[0][0] - pvlimit_calc);   // wir zögern es aus
