@@ -534,8 +534,6 @@ async function processing() {
                         }
                     }
 
-                    entladeZeitenArray = filterUniquePrices(entladeZeitenArray);          
-
                     _entladung_zeitfenster = false;
 
                     for (let c = 0; c < entladeZeitenArray.length; c++) {
@@ -657,7 +655,7 @@ async function processing() {
         });
 
         // verschieben des Ladevorgangs in den Bereich der PV Limitierung. batterie ist nicht in notladebetrieb
-        if (_debug) {
+        if (_debug && latesttime) {
             console.info('Abschluss PV bis ' + latesttime);
             console.info('pvfc.length ' + pvfc.length + ' Restladezeit ' + restladezeit);
         //    console.warn('pvfc ' + JSON.stringify(pvfc));
@@ -942,23 +940,6 @@ function sortiereNachUhrzeitPV(arr) {
             return minutenA - minutenB;
         }
     });
-}
-
-function filterUniquePrices(inputArray) {
-    const uniquePrices = {}; // Ein Objekt, um eindeutige Preise zu verfolgen
-    const outputArray = [];
-
-    inputArray.forEach(element => {
-        const price = element[0];
-
-        // Wenn der Preis noch nicht im eindeutigen Preisobjekt vorhanden ist
-        if (!uniquePrices[price]) {
-            uniquePrices[price] = true; // Markiere ihn als bereits gesehen
-            outputArray.push(element); // Füge das Element dem Ausgabearray hinzu
-        }
-    });
-
-    return outputArray;
 }
 
 function filterTimes(arrZeit) {
