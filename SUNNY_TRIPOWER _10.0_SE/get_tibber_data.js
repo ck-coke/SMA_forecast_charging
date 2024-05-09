@@ -57,9 +57,9 @@ function holePreis(preisHeute,preisMorgen) {
         const startsAt  = getState(idStart).val;
         const start = new Date(startsAt);        
         const end = new Date(Date.parse(startsAt)).getTime()+3600000;            
-        const startTime = start.toLocaleTimeString('de-DE', options);
+        const startTime = start.toLocaleTimeString('de-DE', _options);
         const startDate = start.toLocaleDateString('de-DE');        
-        const endTime = new Date(end).toLocaleTimeString('de-DE', options);
+        const endTime = new Date(end).toLocaleTimeString('de-DE', _options);
         
         obj.start = start.getHours();
         const preis =  getState(idPreis).val;
@@ -98,9 +98,9 @@ function holePreis(preisHeute,preisMorgen) {
         const startsAt  = getState(idStart).val;
         const start = new Date(startsAt);        
         const end = new Date(Date.parse(startsAt)).getTime()+3600000;            
-        const startTime = start.toLocaleTimeString('de-DE', options);
+        const startTime = start.toLocaleTimeString('de-DE', _options);
         const startDate = start.toLocaleDateString('de-DE');        
-        const endTime = new Date(end).toLocaleTimeString('de-DE', options);
+        const endTime = new Date(end).toLocaleTimeString('de-DE', _options);
         
         obj.start = start.getHours();
         const preis =  getState(idPreis).val;
