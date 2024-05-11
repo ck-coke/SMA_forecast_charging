@@ -139,9 +139,6 @@ createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuell'
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberProtokoll', { 'name': 'Tibberprotokoll', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0 }], function () {
     setState(tibberDP + 'extra.tibberProtokoll', 0, true);
 });
-//createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuellHH', { 'name': 'nutze Tibber Preise manuell ab Stunde ', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0 }], function () {
-//    setState(tibberDP + 'extra.tibberNutzenManuellHH', 0, true);
-//});
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.entladeZeitenArray', { 'name': 'entladezeiten als array', 'type': 'array', 'read': true, 'write': false, 'role': 'json' }], function () {
     setState(tibberDP + 'extra.entladeZeitenArray', [], true);
 });
@@ -170,23 +167,26 @@ createUserStates(userDataDP, false, ['strom.batterieLadenUhrzeit', { 'name': 'Ba
     setState(batterieLadenUhrzeitDP, 15, true);
 });
 
-/*
+//            zum einmaligen Erzeugen der Datenpunkte 
+
+/*   Zeile entfernen 
+createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuellHH', { 'name': 'nutze Tibber Preise manuell ab Stunde ', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0 }], function () {
+    setState(tibberDP + 'extra.tibberNutzenManuellHH', 0, true);
+});
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.PV_Schneebedeckt', { 'name': 'ist die PV mit Schnee bedekt ', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
     setState(tibberDP + 'extra.PV_Schneebedeckt', false, true);
 });
-
 createUserStates(userDataDP, false, ['strom.40151_Kommunikation_Check', { 'name': '40151_Kommunikation_Check', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 803 }], function () {
     setState(spntComCheckDP, _InitCom_Aus, true);
 });
-
 createUserStates(userDataDP, false, [strom.Momentan_Verbrauch', { 'name': 'Momentan_Verbrauch', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0, 'unit': 'kW', }], function () {
     setState(momentan_VerbrauchDP, 0, true);
 });
-
 createUserStates(userDataDP, false, ['strom.PV_Leistung_aktuell', { 'name': 'PV_Leistung_aktuell dc1 + dc2', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0, 'unit': 'kW', }], function () {
     setState(pV_Leistung_aktuellDP, 0, true);
 });
-*/
+
+Zeile entfernen  */ 
 
 setState(communicationRegisters.fedInSpntCom, _InitCom_Aus);
 setState(spntComCheckDP, _InitCom_Aus, true);
@@ -843,7 +843,7 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, async function () {  // aktu
         _batsoc                     = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR
         _debug                      = getState(tibberDP + 'debug').val;
 
-        _snowmode                   = getState(userDataDP + '.strom.tibber.extra.PV_Schneebedeckt').val;
+        _snowmode                   = getState(tibberDP + 'extra.PV_Schneebedeckt').val;
         _tibberNutzenAutomatisch    = getState(tibberDP + 'extra.tibberNutzenAutomatisch').val;           // aus dem DP kommend sollte true sein für vis
         _prognoseNutzenAutomatisch  = getState(tibberDP + 'extra.prognoseNutzenAutomatisch').val;       // aus dem DP kommend sollte true sein für vis
 
