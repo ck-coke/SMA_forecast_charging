@@ -176,7 +176,7 @@ createUserStates(userDataDP, false, [tibberStromDP + 'extra.PV_Schneebedeckt', {
 });
 
 createUserStates(userDataDP, false, ['strom.40151_Kommunikation_Check', { 'name': '40151_Kommunikation_Check', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 803 }], function () {
-    setState(spntComCheckDP, 803, true);
+    setState(spntComCheckDP, _InitCom_Aus, true);
 });
 
 createUserStates(userDataDP, false, [strom.Momentan_Verbrauch', { 'name': 'Momentan_Verbrauch', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0, 'unit': 'kW', }], function () {
