@@ -22,8 +22,8 @@ let _debug = getState(tibberDP + 'debug').val == null ? false : getState(tibberD
 
 //-------------------------------------------------------------------------------------
 const _pvPeak = 13100;                                  // PV-Anlagenleistung in Wp
-//const _batteryCapacity = 12800;                       // Netto Batterie Kapazität in Wh 2.56 pro Modul
-const _batteryCapacity = 10240;                         // Netto Batterie Kapazität in Wh
+const _batteryCapacity = 12800;                       // Netto Batterie Kapazität in Wh 2.56 pro Modul
+//const _batteryCapacity = 10240;                         // Netto Batterie Kapazität in Wh
 const _surplusLimit = 0;                                // PV-Einspeise-Limit in % 0 keine Einspeisung
 const _batteryTarget = 100;                             // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
 const _lastPercentageLoadWith = -500;                   // letzten 5 % laden mit xxx Watt
@@ -171,6 +171,14 @@ createUserStates(userDataDP, false, ['strom.batterieLadenUhrzeit', { 'name': 'Ba
 });
 
 /*
+createUserStates(userDataDP, false, [tibberStromDP + 'extra.PV_Schneebedeckt', { 'name': 'ist die PV mit Schnee bedekt ', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
+    setState(tibberDP + 'extra.PV_Schneebedeckt', false, true);
+});
+
+createUserStates(userDataDP, false, ['strom.40151_Kommunikation_Check', { 'name': '40151_Kommunikation_Check', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 803 }], function () {
+    setState(strom.40151_Kommunikation_Check, 803, true);
+});
+
 createUserStates(userDataDP, false, [strom.Momentan_Verbrauch', { 'name': 'Momentan_Verbrauch', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0, 'unit': 'kW', }], function () {
     setState(momentan_VerbrauchDP, 0, true);
 });
@@ -551,6 +559,8 @@ async function processing() {
                     }
                 }
             }            
+
+            entladeZeitenArray = sortArrayByCurrentHour(true, entladeZeitenArray, _hhJetzt);
 
             setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArray, true);
 
