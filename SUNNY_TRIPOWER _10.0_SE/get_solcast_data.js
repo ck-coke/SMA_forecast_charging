@@ -312,7 +312,7 @@ async function kWAnlegen(seite) {
         setStateAsync(dp1 + 'today_kW', 0, true);
     });
 
-    createUserStates('0_userdata.0', true, [mainObjectToday + '.JSONGraph', { 'name': 'power90', 'type': 'number', 'read': true, 'write': false, 'role': 'json', 'def': '{}' }], function () {
+    createUserStates('0_userdata.0', true, [mainObjectToday + '.JSONGraph', { 'name': 'power90', 'type': 'string', 'read': true, 'write': false, 'role': 'json', 'def': '{}' }], function () {
         setStateAsync(mainObjectToday + '.JSONGraph', '{}', true);
     });
 
@@ -322,7 +322,7 @@ async function kWAnlegen(seite) {
         setStateAsync(dp2 + 'tomorrow_kW', 0, true);
     });
 
-    createUserStates('0_userdata.0', true, [mainObjectTomorrow + '.JSONGraph', { 'name': 'power90', 'type': 'number', 'read': true, 'write': false, 'role': 'json', 'def': '{}' }], function () {
+    createUserStates('0_userdata.0', true, [mainObjectTomorrow + '.JSONGraph', { 'name': 'power90', 'type': 'string', 'read': true, 'write': false, 'role': 'json', 'def': '{}' }], function () {
         setStateAsync(mainObjectTomorrow + '.JSONGraph', '{}', true);
     });
 
