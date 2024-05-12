@@ -22,7 +22,7 @@ let _debug = getState(tibberDP + 'debug').val == null ? false : getState(tibberD
 
 //-------------------------------------------------------------------------------------
 const _pvPeak = 13100;                                  // PV-Anlagenleistung in Wp
-const _batteryCapacity = 12800;                       // Netto Batterie Kapazität in Wh 2.56 pro Modul
+const _batteryCapacity = 12800;                         // Netto Batterie Kapazität in Wh BYD 2.56 pro Modul
 //const _batteryCapacity = 10240;                         // Netto Batterie Kapazität in Wh
 const _surplusLimit = 0;                                // PV-Einspeise-Limit in % 0 keine Einspeisung
 const _batteryTarget = 100;                             // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
@@ -34,6 +34,14 @@ const _batteryPowerEmergency = -4000;                   // Ladeleistung der Batt
 const _mindischrg = 0;                                  // 0 geht nicht da sonst max entladung .. also die kleinste mögliche Einheit 1
 const _pwrAtCom_def = _batteryLadePower * (253 / 230);  // max power bei 253V = 5500 W
 const _sma_em = 'sma-em.0.3015242334';                  // Name der SMA EnergyMeter/HM2 Instanz bei installierten SAM-EM Adapter, leer lassen wenn nicht vorhanden
+
+
+// tibber Preis Bereich
+let _snowmode           = false;                    //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
+let _start_charge       = 0.1840;                   //Eigenverbrauchspreis
+const _lossfactor       = 0.75;                     //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
+const _loadfact         = 1 / _lossfactor;          /// 1,33
+const _stop_discharge   = aufrunden(4, _start_charge * _loadfact);    /// 0.19 * 1.33 = 0.2533 €
 
 
 // Fahrzeug mit berücksichtigen in Verbrauchsrechnung EVCC Adapter benötigt
@@ -67,7 +75,7 @@ const inputRegisters = {
 
 const bydDirectSOCDP            = 'bydhvs.0.State.SOC';                            // battSOC netto direkt von der Batterie
 
-let _dc_now                     = getState(inputRegisters.dc1).val + getState(inputRegisters.dc2).val;  // pv vom Dach zusammen in W
+let _dc_now                     = 0;  // pv vom Dach zusammen in W
 
 const _InitCom_Aus              = 803;
 const _InitCom_An               = 802;
@@ -108,12 +116,6 @@ let _sundown     = '00:00';
 let _ladezeitVon = '00:00';
 let _ladezeitBis = '00:00';
 
-// tibber Preis Bereich
-let _snowmode           = false;                    //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
-let _start_charge       = 0.1840;                   //Eigenverbrauchspreis
-const _lossfactor       = 0.75;                     //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
-const _loadfact         = 1 / _lossfactor;          /// 1,33
-const _stop_discharge   = aufrunden(4, _start_charge * _loadfact);    /// 0.19 * 1.33 = 0.2533 €
 
 createUserStates(userDataDP, false, [tibberStromDP + 'debug', { 'name': 'debug', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
     setState(tibberDP + 'debug', _debug, true);
@@ -528,7 +530,7 @@ async function processing() {
                     macheNix = true;
                     _tibber_active_idx = 22;
                     _entladung_zeitfenster = true;
-                    entladeZeitenArray.push('--:--');  //  [0.2856,"19:30","20:00"]
+                    entladeZeitenArray.push([0.0,"--:--","--:--"]);  //  [[0.0,"--:--","--:--"]] 
                 } else {
                     for (let d = 0; d < lefthrs; d++) {
                         if (tibberPoihighNew[d] != null) {
@@ -1091,7 +1093,7 @@ async function holePVDatenAb() {
     }
 }
 
-function tibber_active_auswertung(pvfc) {
+function tibber_active_auswertung() {
     _max_pwr = _mindischrg;
   
     switch (_tibber_active_idx) {
@@ -1115,7 +1117,7 @@ function tibber_active_auswertung(pvfc) {
             if (_dc_now >= (_verbrauchJetzt - (_verbrauchJetzt * 0.30)) ) {      
                 if (compareTime(_ladezeitVon, _ladezeitBis, 'between')) {
                     if (_debug) {
-                        console.warn('Verbrauch zu 30% gedeckt, vielleicht Wolke unterwegs');
+                        console.warn('Verbrauch zu 70% gedeckt, vielleicht Wolke unterwegs');
                     }
                     _SpntCom = _InitCom_Aus;           
                 }
