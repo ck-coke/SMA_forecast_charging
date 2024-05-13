@@ -71,11 +71,14 @@ const inputRegisters = {
     battIn: 'modbus.0.inputRegisters.3.31393_Momentane_Batterieladung',
     dc1: 'modbus.0.inputRegisters.3.30773_DC-Leistung_1',
     dc2: 'modbus.0.inputRegisters.3.30961_DC-Leistung_2',
+    powerAC: 'modbus.0.inputRegisters.3.30775_AC-Leistung',
 }
 
 const bydDirectSOCDP            = 'bydhvs.0.State.SOC';                            // battSOC netto direkt von der Batterie
 
 let _dc_now                     = 0;  // pv vom Dach zusammen in W
+let _einspeisung                = 0;
+let _powerAC                    = 0;
 
 const _InitCom_Aus              = 803;
 const _InitCom_An               = 802;
@@ -243,7 +246,8 @@ async function processing() {
 
     _tibberPreisJetzt = getState(tibberPreisJetztDP).val;
     _tomorrow_kW      = getState(tomorrow_kWDP).val;
-    
+    _powerAC          = getState(inputRegisters.powerAC).val * -1;
+
     // Lademenge
     let lademenge_full = Math.ceil((_batteryCapacity * (100 - _batsoc) / 100) * (1 / _wr_efficiency));                             //Energiemenge bis vollständige Ladung
     let lademenge      = Math.max(Math.ceil((_batteryCapacity * (_batteryTarget - _batsoc) / 100) * (1 / _wr_efficiency)), 0);     //lademenge = Energiemenge bis vollständige Ladung
@@ -495,7 +499,7 @@ async function processing() {
         if (!macheNix) {
             let tibberPoihighNew = filterTimes(tibberPoihigh);    // gebraucht wird sortiert nach preis und nur grösser jetzt
 
-            let lefthrs = batlefthrs * 2;                           // batlefthrs Bat h verbleibend
+            let lefthrs = batlefthrs;                           // batlefthrs Bat h verbleibend
 
             if (_debug) {
                 console.info('tibberPoihighNew.length '+ tibberPoihighNew.length);
@@ -519,7 +523,7 @@ async function processing() {
             }
 
             // Entladezeit
-            if (lefthrs > 0 && lefthrs <= hrstorun * 2) { // && pvwh < _baseLoad * 24 * _wr_efficiency) {        //  16200 aus der berechung
+            if (lefthrs > 0 && lefthrs <= hrstorun) { // && pvwh < _baseLoad * 24 * _wr_efficiency) {        //  16200 aus der berechung
                 macheNix = false;
 
                 if (batlefthrs >= hrstorun && compareTime(nowhour, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
@@ -673,6 +677,8 @@ async function processing() {
         //    console.warn('pvfc ' + JSON.stringify(pvfc));
         }
 
+        pvfc = sortiereNachUhrzeitPV(pvfc);
+
         if (restladezeit > 0 && (restladezeit * 2) <= pvfc.length) {  // wenn die ladedauer kleiner ist als die vorhersage           
             let get_wh = 0;
             let get_wh_einzeln = 0;
@@ -701,9 +707,7 @@ async function processing() {
                 get_wh = get_wh + aufrunden(2, get_wh_einzeln);
             }
 
-            setState(tibberDP + 'extra.PV_Ueberschuss', get_wh, true);
-
-            pvfc = sortiereNachUhrzeitPV(pvfc);
+            setState(tibberDP + 'extra.PV_Ueberschuss', get_wh, true);            
 
             if (_debug) {
                 //console.warn('pvfc sortiereNachUhrzeitPV ' + JSON.stringify(pvfc));
@@ -720,7 +724,7 @@ async function processing() {
 
                 pvlimit_calc = Math.max((Math.round(pvlimit - ((lademenge - get_wh) / restladezeit))), 0);      //virtuelles reduzieren des pvlimits
                 min_pwr      = Math.max(Math.round((lademenge - get_wh) / restladezeit), 0);
-                min_pwr      = min_pwr * -1;                                                                    // muss negativ sein ??
+                min_pwr      = min_pwr * -1;                                                                    // muss negativ sein 
 
                 get_wh = lademenge;       //daran liegts damit der unten immer rein geht ????
             }
@@ -728,19 +732,29 @@ async function processing() {
             get_wh = aufrunden(2, get_wh);     // aufrunden 2 stellen reichen
 
             if (_debug) {
-                console.info('-->   Verschiebe Einspeiselimit auf pvlimit_calc ' + pvlimit_calc + ' W' + ' mit mindestens ' + min_pwr + ' W  get_wh ' + get_wh + ' restladezeit ' + restladezeit);
+                console.info('-->  Verschiebe Einspeiselimit auf pvlimit_calc ' + pvlimit_calc + ' W' + ' mit mindestens ' + min_pwr + ' W  get_wh ' + get_wh + ' restladezeit ' + restladezeit );
             }
 
-            let current_pwr_diff = _dc_now - _verbrauchJetzt;
+            let current_pwr_diff = 0;
 
-            if (lademenge > 0 && get_wh >= lademenge && current_pwr_diff > 0) {                   
+            if (lademenge > 0 && get_wh >= lademenge) {                   
                 restladezeit = pvfc.length / 2;
 
-                _max_pwr = Math.ceil(pvfc[0][0] - pvlimit_calc);   // wir zögern es aus
-                //    _max_pwr = Math.ceil(pvfc[0][1] - pvlimit_calc);
+                current_pwr_diff  = 100 - pvlimit_calc + _einspeisung;         
+                // _max_pwr = Math.ceil(pvfc[0][0] - pvlimit_calc);   
+                // _max_pwr = Math.ceil(pvfc[0][1] - pvlimit_calc);
 
-                if (_max_pwr > current_pwr_diff) {
-                    _max_pwr = Math.ceil(current_pwr_diff);
+                _max_pwr = Math.round(_powerAC + current_pwr_diff);
+                
+                if (_powerAC <= 0 && current_pwr_diff < 0) {
+                    _max_pwr = _mindischrg;
+                }               
+
+                if (_powerAC <= 10 && current_pwr_diff > 0 ){ 
+                    _max_pwr = Math.ceil(pvfc[0][0] - pvlimit_calc);
+                    if (current_pwr_diff > _max_pwr) {
+                        _max_pwr = Math.round(current_pwr_diff);                        
+                    }
                 }
 
                 if (_debug) {
@@ -764,8 +778,8 @@ async function processing() {
                 _max_pwr = _mindischrg;
             }           
 
-            for (let h = 0; h < (restladezeit * 2) && _dc_now >= _verbrauchJetzt; h++) {  // nur wenn überschuss wirklich da ist
-                if (compareTime(pvfc[h][3], pvfc[h][4], 'between')) {
+            for (let h = 0; h < (restladezeit *2); h++) {  // nur wenn überschuss wirklich da ist
+                if ((compareTime(pvfc[h][3], pvfc[h][4], 'between')) || (_einspeisung + _powerAC) >= (pvlimit - 100)) {
                     _ladezeitVon = pvfc[h][3];
                     _ladezeitBis = pvfc[h][4];
                     if (_debug) {
@@ -913,7 +927,7 @@ async function berechneVerbrauch(pvNow) {
         inputRegisters.powerOut = _sma_em + ".psurplus" /*aktuelle Einspeiseleistung am Netzanschlußpunkt, SMA-EM Adapter*/
     }
 
-    const einspeisung   = aufrunden(2, getState(inputRegisters.powerOut).val);     // Einspeisung  in W
+    _einspeisung        = aufrunden(2, getState(inputRegisters.powerOut).val);     // Einspeisung  in W
     const battOut       = await getStateAsync(inputRegisters.battOut);
     const battIn        = await getStateAsync(inputRegisters.battIn);
     const netzbezug     = await getStateAsync(inputRegisters.netzbezug);
@@ -931,7 +945,7 @@ async function berechneVerbrauch(pvNow) {
         }
     }
 
-    const verbrauchJetzt   = 100 + (pvNow + battOut.val + netzbezug.val) - (einspeisung + battIn.val);          // verbrauch in W , 100W reserve obendruaf _vehicleConsum nicht rein nehmen
+    const verbrauchJetzt   = 100 + (pvNow + battOut.val + netzbezug.val) - (_einspeisung + battIn.val);          // verbrauch in W , 100W reserve obendruaf _vehicleConsum nicht rein nehmen
     setState(momentan_VerbrauchDP, aufrunden(2, _verbrauchJetzt-100-_vehicleConsum)/1000, true);                  // für die darstellung können die 100 W wieder raus und fahrzeug auch
 
     return verbrauchJetzt;
