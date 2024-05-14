@@ -29,12 +29,12 @@ const _batteryTarget = 100;                             // Gewünschtes Ladeziel
 const _lastPercentageLoadWith = -500;                   // letzten 5 % laden mit xxx Watt
 const _baseLoad = 850;                                  // Grundverbrauch in Watt
 const _wr_efficiency = 0.93;                            // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
-const _batteryLadePower = 5000;                         // Ladeleistung der Batterie in W, BYD mehr geht nicht
 const _batteryPowerEmergency = -4000;                   // Ladeleistung der Batterie in W notladung
-const _mindischrg = 0;                                  // 0 geht nicht da sonst max entladung .. also die kleinste mögliche Einheit 1
-const _pwrAtCom_def = _batteryLadePower * (253 / 230);  // max power bei 253V = 5500 W
-const _sma_em = 'sma-em.0.3015242334';                  // Name der SMA EnergyMeter/HM2 Instanz bei installierten SAM-EM Adapter, leer lassen wenn nicht vorhanden
-
+const _mindischrg = 0;                                      // min entlade W
+const _batteryLadePowerMax = 5000;                          // 0 geht nicht da sonst max entladung .. also die kleinste mögliche Einheit 1
+const _pwrAtCom_def = _batteryLadePowerMax * (253 / 230);   // max power bei 253V = 5500 W
+const _sma_em = 'sma-em.0.3015242334';                      // Name der SMA EnergyMeter/HM2 Instanz bei installierten SAM-EM Adapter, leer lassen wenn nicht vorhanden
+let _batteryLadePower = _batteryLadePowerMax;               // Ladeleistung laufend der Batterie in W
 
 // tibber Preis Bereich
 let _snowmode           = false;                    //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
@@ -135,6 +135,9 @@ createUserStates(userDataDP, false, [tibberStromDP + 'extra.schwellenwert_Ladung
 });
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.PV_Ueberschuss', { 'name': 'wie viele Wh Überschuss', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'unit': 'Wh', 'def': 0 }], function () {
     setState(tibberDP + 'extra.PV_Ueberschuss', 0, true);
+});
+createUserStates(userDataDP, false, [tibberStromDP + 'extra.max_Batterieladung', { 'name': 'wie viele Wh Überschuss', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'unit': 'W', 'def': 0 }], function () {
+    setState(tibberDP + 'extra.max_Batterieladung', 0, true);
 });
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenAutomatisch', { 'name': 'mit tibber laden erlauben', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': true }], function () {
     setState(tibberDP + 'extra.tibberNutzenAutomatisch', _tibberNutzenAutomatisch, true);
@@ -245,6 +248,12 @@ async function processing() {
     /* Default Werte setzen*/
     let battStatus = getState(inputRegisters.betriebszustandBatterie).val;
 
+    _batteryLadePower = getState(tibberDP + 'extra.max_Batterieladung').val;
+
+    if (_batteryLadePower == 0) {
+        _batteryLadePower = _batteryLadePowerMax;
+    }
+
     _tibberPreisJetzt = getState(tibberPreisJetztDP).val;
     _tomorrow_kW      = getState(tomorrow_kWDP).val;
     _powerAC          = getState(inputRegisters.powerAC).val * -1;
@@ -263,7 +272,7 @@ async function processing() {
         console.info('pvlimit        _________________ ' + pvlimit + ' W');
         console.info('Verbrauch jetzt_________________ ' + _verbrauchJetzt + ' W');
         console.info('PV Produktion___________________ ' + _dc_now + ' W');
-        console.info('Ladeleistung Batterie___________ ' + _batteryLadePower + ' W');
+        console.info('Ladeleistung max Batterie_______ ' + _batteryLadePower + ' W');
         console.info('Batt_SOC________________________ ' + _batsoc + ' %');
         const battsts = battStatus == 2291 ? 'Batterie Standby' : battStatus == 3664 ? 'Notladebetrieb' : battStatus == 2292 ? 'Batterie laden' : battStatus == 2293 ? 'Batterie entladen' : 'Aus';
         console.info('Batt_Status_____________________ ' + battsts + ' = ' + battStatus);
@@ -833,6 +842,8 @@ function sendToWR(commWR, pwrAtCom) {
         setState(communicationRegisters.fedInPwrAtCom, pwrAtCom);       // 40149_Wirkleistungvorgabe
         setState(communicationRegisters.fedInSpntCom, commWR);          // 40151_Kommunikation
         setState(spntComCheckDP, commWR, true);                         // check DP für vis
+        
+        setState(tibberDP + 'extra.max_Batterieladung', pwrAtCom * -1, true);
     }
 
     if (_debug && !_batterieLadenUebersteuernManuell) {
