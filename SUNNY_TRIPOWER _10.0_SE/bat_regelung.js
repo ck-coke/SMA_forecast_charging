@@ -21,27 +21,26 @@ const _options = { hour12: false, hour: '2-digit', minute: '2-digit' };
 let _debug = getState(tibberDP + 'debug').val == null ? false : getState(tibberDP + 'debug').val;
 
 //-------------------------------------------------------------------------------------
-const _pvPeak = 13100;                                  // PV-Anlagenleistung in Wp
-const _batteryCapacity = 12800;                         // Netto Batterie Kapazität in Wh BYD 2.56 pro Modul
-//const _batteryCapacity = 10240;                         // Netto Batterie Kapazität in Wh
-const _surplusLimit = 0;                                // PV-Einspeise-Limit in % 0 keine Einspeisung
-const _batteryTarget = 100;                             // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
-const _lastPercentageLoadWith = -500;                   // letzten 5 % laden mit xxx Watt
-const _baseLoad = 850;                                  // Grundverbrauch in Watt
-const _wr_efficiency = 0.93;                            // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
-const _batteryPowerEmergency = -4000;                   // Ladeleistung der Batterie in W notladung
-const _mindischrg = 0;                                      // min entlade W
-const _batteryLadePowerMax = 5000;                          // 0 geht nicht da sonst max entladung .. also die kleinste mögliche Einheit 1
-const _pwrAtCom_def = _batteryLadePowerMax * (253 / 230);   // max power bei 253V = 5500 W
-const _sma_em = 'sma-em.0.3015242334';                      // Name der SMA EnergyMeter/HM2 Instanz bei installierten SAM-EM Adapter, leer lassen wenn nicht vorhanden
-let _batteryLadePower = _batteryLadePowerMax;               // Ladeleistung laufend der Batterie in W
+const _pvPeak                   = 13100;                                // PV-Anlagenleistung in Wp
+const _batteryCapacity          = 12800;                                // Netto Batterie Kapazität in Wh BYD 2.56 pro Modul
+const _surplusLimit             = 0;                                    // PV-Einspeise-Limit in %  . 0 keine Einspeisung
+const _batteryTarget            = 100;                                  // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
+const _lastPercentageLoadWith   = -500;                                 // letzten 5 % laden mit xxx Watt
+const _baseLoad                 = 850;                                  // Grundverbrauch in Watt
+const _wr_efficiency            = 0.93;                                 // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
+const _batteryPowerEmergency    = -4000;                                // Ladeleistung der Batterie in W notladung
+const _mindischrg               = 0;                                    // min entlade W
+const _batteryLadePowerMax      = 5000;                                 // max Batterie ladung 
+const _pwrAtCom_def             = _batteryLadePowerMax * (253 / 230);   // max power bei 253V = 5500 W
+const _sma_em                   = 'sma-em.0.3015242334';                // Name der SMA EnergyMeter/HM2 Instanz bei installierten SAM-EM Adapter, leer lassen wenn nicht vorhanden
+let _batteryLadePower           = _batteryLadePowerMax;                 // Ladeleistung laufend der Batterie in W
 
 // tibber Preis Bereich
-let _snowmode           = false;                    //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
-let _start_charge       = 0.1840;                   //Eigenverbrauchspreis
-const _lossfactor       = 0.75;                     //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
-const _loadfact         = 1 / _lossfactor;          /// 1,33
-const _stop_discharge   = aufrunden(4, _start_charge * _loadfact);    /// 0.19 * 1.33 = 0.2533 €
+let _snowmode           = false;                                        //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
+let _start_charge       = 0.1840;                                       //Eigenverbrauchspreis
+const _lossfactor       = 0.75;                                         //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
+const _loadfact         = 1 / _lossfactor;                              // 1,33
+const _stop_discharge   = aufrunden(4, _start_charge * _loadfact);      // 0.19 * 1.33 = 0.2533 €
 
 
 // Fahrzeug mit berücksichtigen in Verbrauchsrechnung EVCC Adapter benötigt
@@ -58,7 +57,6 @@ let _hhJetzt = getHH();
 const communicationRegisters = {
     fedInSpntCom: 'modbus.0.holdingRegisters.3.40151_Kommunikation', // (802 active, 803 inactive)
     fedInPwrAtCom: 'modbus.0.holdingRegisters.3.40149_Wirkleistungvorgabe',
-    wMaxCha: 'modbus.0.holdingRegisters.3.40189_max_Ladeleistung_BatWR',        // Max Ladeleistung BatWR
 }
 
 const inputRegisters = {
@@ -361,7 +359,7 @@ async function processing() {
 
         let neuberechnen = false;
 
-        if (!_snowmode) {    // ist genug PV da am tag
+        if (!_snowmode) {    
             for (let sd = 47; sd >= 0; sd--) {
                 const pow = _pvforecastTodayArray[sd][2];
 
@@ -386,7 +384,7 @@ async function processing() {
             }
  
             if (neuberechnen) {
-                _sunup = _pvforecastTomorrowArray[su][0];;
+                _sunup = _pvforecastTomorrowArray[su][0];
             }
         }
 
@@ -518,7 +516,7 @@ async function processing() {
                 //    console.info('tibberPoihighNew nach filter ' + JSON.stringify(tibberPoihighNew));
             }
 
-            if (lefthrs > 0 && lefthrs > tibberPoihighNew.length) {        // limmitiere die Battlaufzeit wenn zu viel PV stunden
+            if (lefthrs > 0 && lefthrs > tibberPoihighNew.length) {        // limmitiere auf Tibber höchstpreise
                 lefthrs = tibberPoihighNew.length;
             }
 
@@ -545,7 +543,7 @@ async function processing() {
                     macheNix = true;
                     _tibber_active_idx = 22;
                     _entladung_zeitfenster = true;
-                    entladeZeitenArray.push([0.0,"--:--","--:--"]);  //  [[0.0,"--:--","--:--"]] 
+                    entladeZeitenArray.push([0.0,"--:--","--:--"]);  //  initialisiere für Vis
                 } else {
                     for (let d = 0; d < lefthrs; d++) {
                         if (tibberPoihighNew[d] != null) {
@@ -667,7 +665,6 @@ async function processing() {
         }
 
         let latesttime;
-
         let pvfc = getPvErtrag(pvlimit);
 
         setState(tibberDP + 'extra.PV_Abschluss', '--:--', true);
@@ -703,8 +700,6 @@ async function processing() {
                 }
 
                 if (compareTime(pvfc[k][3], pvfc[k][4], 'between')) {
-                    //rechne restzeit aus
-                    
                     const nowTime = _today.toLocaleTimeString('de-DE', _options);
                     const startsplit = nowTime.split(':');
                     const endsplit = pvfc[k][4].split(':');
@@ -713,8 +708,7 @@ async function processing() {
                         minutes = minutescalc;
                     }
                 }
-                get_wh_einzeln = (((pvpower / 2) - ((pvlimit + _baseLoad) / 2)) * (minutes / 30)); // wieviele Wh Überschuss???
-
+                get_wh_einzeln = (((pvpower / 2) - ((pvlimit + _baseLoad) / 2)) * (minutes / 30)); 
                 get_wh = get_wh + aufrunden(2, get_wh_einzeln);
             }
 
@@ -900,27 +894,25 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, async function () {  // aktu
             _tibber_active_idx            = 88          // notladung mrk
             sendToWR(_InitCom_An, _batteryPowerEmergency);
         } else {
-            processing();             /*start processing in interval*/
+            processing();             
         }
 
         if (_debug) {
             console.info('tibberNutzenSteuerung ' + _tibberNutzenSteuerung + ' prognoseNutzenSteuerung ' + _prognoseNutzenSteuerung);
         }
-    
-
 });
 
 
 on({id: [tibberDP + 'extra.tibberNutzenAutomatisch',
-        tibberDP + 'extra.prognoseNutzenAutomatisch',
-    ], change: 'any', val: false}, function () {
+         tibberDP + 'extra.prognoseNutzenAutomatisch',
+        ], change: 'any', val: false}, function () {
     _lastSpntCom = 97;
 });
 
 
 
 function notLadungCheck() {
-    _bydDirectSOC = getState(bydDirectSOCDP).val;   // nimm den bydSoc da der WR nicht immer diesen übermittelt
+    _bydDirectSOC = getState(bydDirectSOCDP).val;   // nimm den bydSoc da der WR nicht oft diesen übermittelt
 
     if (_bydDirectSOC < 5 && _dc_now < _verbrauchJetzt) {
         if (_bydDirectSOC != _bydDirectSOCMrk) {
@@ -1009,14 +1001,10 @@ function aufrunden(stellen, zahl) {
 }
 
 function zeitDifferenzInStunden(zeit1, zeit2) {
-    // Zeit 1 extrahieren
     const [stunden1, minuten1] = zeit1.split(':').map(Number);
-    // Zeit 2 extrahieren
     const [stunden2, minuten2] = zeit2.split(':').map(Number);
 
-    // Zeit 1 in Minuten umwandeln
     let zeit1InMinuten = stunden1 * 60 + minuten1;
-    // Zeit 2 in Minuten umwandeln
     let zeit2InMinuten = stunden2 * 60 + minuten2;
 
     // Wenn Zeit 2 vor Zeit 1 liegt, füge 24 Stunden zu Zeit 2 hinzu (Tagesübergang)
@@ -1031,7 +1019,6 @@ function zeitDifferenzInStunden(zeit1, zeit2) {
     const differenzStunden = Math.floor(differenzInMinuten / 60);
     const differenzMinuten = differenzInMinuten % 60;
 
-    // Rückgabe der Differenz als formatierte Zeichenkette
     return `${differenzStunden}.${(differenzMinuten < 10 ? '0' : '') + differenzMinuten}`;
 }
 
@@ -1120,6 +1107,7 @@ async function holePVDatenAb() {
 
 function tibber_active_auswertung() {
     _max_pwr = _mindischrg;
+    _maxchrg = _max_pwr;
   
     switch (_tibber_active_idx) {
         case 0:
@@ -1139,7 +1127,6 @@ function tibber_active_auswertung() {
             break;
         case 3:                             //      _tibber_active_idx = 3;    entladung stoppen wenn preisschwelle erreicht
             _SpntCom = _InitCom_An;
-            _maxchrg = _max_pwr; 
             
 // PV deckt Verbrauch zu 70 % dann nimm aus der batterie ist vielleicht ne Wolke unterwegs            
             if (_dc_now >= (_verbrauchJetzt - (_verbrauchJetzt * 0.30)) ) {      
