@@ -775,7 +775,7 @@ async function processing() {
                 console.info('Ausgabe A  :_max_pwr ' + _max_pwr + ' min_pwr ' + min_pwr + ' current_pwr_diff ' + current_pwr_diff);
             }
 
-            _max_pwr = Math.ceil(Math.min(Math.max(_max_pwr, min_pwr), _batteryLadePower));     //abfangen negativer werte, limitiere auf min_pwr orginal
+            _max_pwr = Math.ceil(Math.min(Math.max(_max_pwr, min_pwr), _batteryLadePowerMax));     //abfangen negativer werte, limitiere auf min_pwr orginal
 
             if (_debug) {
                 console.info('Ausgabe B  :_max_pwr ' + _max_pwr);
