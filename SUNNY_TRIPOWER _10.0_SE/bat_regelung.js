@@ -91,6 +91,7 @@ let _bydDirectSOC               = 5;
 let _bydDirectSOCMrk            = 0;
 let _batsoc                     = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR
 let _max_pwr                    = _mindischrg;
+let _maxchrg                    = _mindischrg;
 let _tick                       = 0;
 let _tibber_active_idx          = 0;
 let _today                      = new Date();
@@ -274,6 +275,7 @@ async function processing() {
     
     _SpntCom                = _InitCom_Aus;     // initialisiere AUS
     _max_pwr                = _mindischrg;      // initialisiere
+    _maxchrg                = _mindischrg;      // initialisiere
     
     if (_dc_now > _verbrauchJetzt && _batsoc < 100) {
         _max_pwr = (_dc_now - _verbrauchJetzt) * -1;   // vorbelegung zum laden
@@ -756,13 +758,11 @@ async function processing() {
                         _max_pwr = Math.round(current_pwr_diff);                        
                     }
                 }
-
-                if (_debug) {
-                    console.info('nach der Begrenzung  :_max_pwr ' + _max_pwr + ' pvfc[0][1] ' + pvfc[0][1] + ' startzeit ' + pvfc[0][3] + ' pvlimit_calc ' + pvlimit_calc);
-                }
             }
 
             if (_debug) {
+                console.info('restladezeit ' + restladezeit + ' _powerAC ' + _powerAC);
+                console.info('nach der Begrenzung  :_max_pwr ' + _max_pwr + ' pvfc[0][1] ' + pvfc[0][1] + ' startzeit ' + pvfc[0][3] + ' pvlimit_calc ' + pvlimit_calc);
                 console.info('Ausgabe A  :_max_pwr ' + _max_pwr + ' min_pwr ' + min_pwr + ' current_pwr_diff ' + current_pwr_diff);
             }
 
@@ -789,12 +789,12 @@ async function processing() {
                     if (_max_pwr > _dc_now - _verbrauchJetzt) {  // wenn das ermittelte wert grösser ist als die realität dann limmitiere, check nochmal besser ist es
                         _max_pwr = _dc_now - _verbrauchJetzt;
                         if (_debug) {
-                            console.warn('-->> Bingo ladezeit limmitiere auf ' + _max_pwr);
+                            console.warn('-->> Bingo limmitiere auf ' + _max_pwr);
                         }
                     }
 
                     _SpntCom = _InitCom_An;
-                    _max_pwr = _max_pwr * -1;
+                    _maxchrg = _max_pwr * -1;
                     _lastSpntCom = 95;    // damit der WR auf jedenfall daten bekommt
 
                     if (_batsoc < 100) {  // batterie ist nicht voll
@@ -814,12 +814,12 @@ async function processing() {
 // ---------------------------------------------------- Ende der PV Prognose Sektion
 
     if (_batsoc > 90 && wirdGeladen) {     // letzten 5 % langsam laden
-        _max_pwr = _lastPercentageLoadWith;
+        _maxchrg = _lastPercentageLoadWith;
     }
 
 // ----------------------------------------------------           write WR data
 
-    sendToWR(_SpntCom, aufrunden(0, _max_pwr));
+    sendToWR(_SpntCom, aufrunden(0, _maxchrg));
 }
 
 
@@ -828,7 +828,7 @@ function sendToWR(commWR, pwrAtCom) {
 
     if ((_lastpwrAtCom != pwrAtCom || commWR != commNow || commWR != _lastSpntCom) && !_batterieLadenUebersteuernManuell) {
         if (_debug) {
-            console.warn('------ > Daten gesendet an WR kommunikation : ' + commWR  + ' Wirkleistungvorgabe ' + pwrAtCom);
+            console.error('------ > Daten gesendet an WR kommunikation : ' + commWR  + ' Wirkleistungvorgabe ' + pwrAtCom);
         }
         setState(communicationRegisters.fedInPwrAtCom, pwrAtCom);       // 40149_Wirkleistungvorgabe
         setState(communicationRegisters.fedInSpntCom, commWR);          // 40151_Kommunikation
@@ -946,7 +946,7 @@ async function berechneVerbrauch(pvNow) {
     }
 
     const verbrauchJetzt   = 100 + (pvNow + battOut.val + netzbezug.val) - (_einspeisung + battIn.val);          // verbrauch in W , 100W reserve obendruaf _vehicleConsum nicht rein nehmen
-    setState(momentan_VerbrauchDP, aufrunden(2, _verbrauchJetzt-100-_vehicleConsum)/1000, true);                  // für die darstellung können die 100 W wieder raus und fahrzeug auch
+    setState(momentan_VerbrauchDP, aufrunden(2, (_verbrauchJetzt - 100 - _vehicleConsum)) /1000, true);                  // für die darstellung können die 100 W wieder raus und fahrzeug auch
 
     return verbrauchJetzt;
 }
@@ -1119,6 +1119,7 @@ function tibber_active_auswertung() {
         case 1:                             //      _tibber_active_idx = 1;    Nachladezeit
             _SpntCom = _InitCom_An;
             _max_pwr = _pwrAtCom_def * -1;
+            _maxchrg = _max_pwr; 
             break;
         case 2:                             //      _tibber_active_idx = 2;    Entladezeiten
         case 21:                            //      _tibber_active_idx = 21;   Entladezeit wenn akku > 0 aber keine entladezeit, aber der Preis hoch genug um zu sparen
@@ -1127,6 +1128,8 @@ function tibber_active_auswertung() {
             break;
         case 3:                             //      _tibber_active_idx = 3;    entladung stoppen wenn preisschwelle erreicht
             _SpntCom = _InitCom_An;
+            _maxchrg = _max_pwr; 
+            
 // PV deckt Verbrauch zu 70 % dann nimm aus der batterie ist vielleicht ne Wolke unterwegs            
             if (_dc_now >= (_verbrauchJetzt - (_verbrauchJetzt * 0.30)) ) {      
                 if (compareTime(_ladezeitVon, _ladezeitBis, 'between')) {
@@ -1143,6 +1146,7 @@ function tibber_active_auswertung() {
         case 5:                             //      _tibber_active_idx = 5;    starte die ladung
             _SpntCom = _InitCom_An;
             _max_pwr = _pwrAtCom_def * -1;
+            _maxchrg = _max_pwr; 
             break;
         default:
             _SpntCom = _InitCom_Aus;        
