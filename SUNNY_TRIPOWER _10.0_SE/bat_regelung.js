@@ -37,7 +37,7 @@ let _batteryLadePower           = _batteryLadePowerMax;                 // Ladel
 
 // tibber Preis Bereich
 let _snowmode           = false;                                        //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
-let _start_charge       = 0.1840;                                       //Eigenverbrauchspreis
+let _start_charge       = 0.1880;                                       //Eigenverbrauchspreis
 const _lossfactor       = 0.75;                                         //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
 const _loadfact         = 1 / _lossfactor;                              // 1,33
 const _stop_discharge   = aufrunden(4, _start_charge * _loadfact);      // 0.19 * 1.33 = 0.2533 €
@@ -405,7 +405,7 @@ async function processing() {
         const toSundownhr = Math.min(Number(zeitDifferenzInStunden(nowhour, _sundown)), 24);
 
         if (_debug) {
-            console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + ' bis zum Sonnenaufgang sind es hrstorun ' + hrstorun + ' h und nur zum Untergang toSundownhr ' + toSundownhr);
+            console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + ' bis zum Sonnenaufgang sind es hrstorun ' + hrstorun + ' h und zum Untergang toSundownhr ' + toSundownhr);
         }
 
 
@@ -514,9 +514,10 @@ async function processing() {
         let entladeZeitenArray = [];
 
         if (!macheNix) {
-            let tibberPoihighNew = filterTimes(tibberPoihigh);    // gebraucht wird sortiert nach preis und nur grösser jetzt
+            let tibberPoihighNew = filterTimes(tibberPoihigh);      // gebraucht wird sortiert nach preis und nur grösser jetzt
 
-            let lefthrs = batlefthrs;                           // Batterielaufzeit laut SOC
+            let lefthrs = batlefthrs;                               // Batterielaufzeit laut SOC
+            let tibberPoihighNewHrs = tibberPoihighNew.length /2;   // laufzeit hoche Preise stunden
 
             if (_debug) {
                 console.info('tibberPoihighNew.length '+ tibberPoihighNew.length);
@@ -524,8 +525,8 @@ async function processing() {
                 //    console.info('tibberPoihighNew nach filter ' + JSON.stringify(tibberPoihighNew));
             }
 
-            if (lefthrs > 0 && lefthrs > tibberPoihighNew.length) {        // limmitiere auf Tibber höchstpreise
-                lefthrs = tibberPoihighNew.length;
+            if (lefthrs > 0 && lefthrs > tibberPoihighNewHrs) {        // limmitiere auf Tibber höchstpreise
+                lefthrs = tibberPoihighNewHrs;
             }
 
             if (_debug) {
@@ -540,7 +541,7 @@ async function processing() {
             }
 
             // Entladezeit
-            if (lefthrs > 0 && lefthrs >= hrstorun) { // && pvwh < _baseLoad * 24 * _wr_efficiency) {        //  16200 aus der berechung
+            if (lefthrs > 0 && lefthrs >= hrstorun && pvwh < _baseLoad * 24 * _wr_efficiency) {        //  16200 aus der berechung
                 macheNix = false;
 
                 if (compareTime(nowhour, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
