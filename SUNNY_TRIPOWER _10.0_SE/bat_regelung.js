@@ -152,6 +152,9 @@ createUserStates(userDataDP, false, [tibberStromDP + 'extra.entladeZeitenArray',
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.ladeZeitenArray', { 'name': 'lade- und nachladezeiten als array', 'type': 'array', 'read': true, 'write': false, 'role': 'json' }], function () {
     setState(tibberDP + 'extra.ladeZeitenArray', [], true);
 });
+createUserStates(userDataDP, false, [tibberStromDP + 'extra.pVladeZeitenArray', { 'name': 'PV Ladezeiten als array', 'type': 'array', 'read': true, 'write': false, 'role': 'json' }], function () {
+    setState(tibberDP + 'extra.pVladeZeitenArray', [], true);
+});
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.PV_Prognose', { 'name': 'PV_Prognose', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'unit': 'kWh', 'def': 0 }], function () {
     setState(tibberDP + 'extra.PV_Prognose', 0, true);
 });
@@ -277,6 +280,7 @@ async function processing() {
         console.info('Lademenge bis voll______________ ' + lademenge_full + ' Wh');
         console.info('Lademenge_______________________ ' + lademenge + ' Wh');
         console.info('Restladezeit____________________ ' + aufrunden(2, restladezeit) + ' h');
+        console.info('Einspeisung____________________ ' + aufrunden(2, _einspeisung) + ' W');
 
     }
     
@@ -625,6 +629,7 @@ async function processing() {
         ladeZeitenArray.sort(function (a, b) {
             return b[1] - a[1];
         });
+        
         setState(tibberDP + 'extra.ladeZeitenArray', ladeZeitenArray, true);
 
         tibber_active_auswertung();
@@ -775,7 +780,7 @@ async function processing() {
                 console.info('Ausgabe B  :_max_pwr ' + _max_pwr);
             }
 
-            setState(tibberDP + 'extra.ladeZeitenArray', pvfc, true);
+            setState(tibberDP + 'extra.pVladeZeitenArray', pvfc, true);
 
             if (_dc_now < _verbrauchJetzt && _tibber_active_idx == 0)       {
                 _max_pwr = _mindischrg;
