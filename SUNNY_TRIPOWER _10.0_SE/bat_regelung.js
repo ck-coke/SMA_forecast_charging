@@ -139,6 +139,9 @@ createUserStates(userDataDP, false, [tibberStromDP + 'extra.PV_Ueberschuss', { '
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.max_Batterieladung', { 'name': 'wie viele Wh Überschuss', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'unit': 'W', 'def': 0 }], function () {
     setState(tibberDP + 'extra.max_Batterieladung', 0, true);
 });
+createUserStates(userDataDP, false, [tibberStromDP + 'extra.Batterielaufzeit', { 'name': 'Batterielaufzeit laut SOC', 'type': 'string', 'read': true, 'write': false, 'role': 'value', 'unit': 'h'}], function () {
+    setState(tibberDP + 'extra.Batterielaufzeit', '00:00', true);
+});
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenAutomatisch', { 'name': 'mit tibber laden erlauben', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': true }], function () {
     setState(tibberDP + 'extra.tibberNutzenAutomatisch', _tibberNutzenAutomatisch, true);
 });
@@ -335,7 +338,12 @@ async function processing() {
             }
         }
 
-        let batlefthrs = aufrunden(2,((_batteryCapacity / 100) * _batsoc) / (_baseLoad / Math.sqrt(_lossfactor)));    /// 12800 / 100 * 30  Batterielaufzeit laut SOC          
+
+        let restLaufzeit = _batsoc * _batteryCapacity / 100;
+        let batlefthrs = aufrunden(2, restLaufzeit / (_baseLoad / Math.sqrt(_lossfactor)));    /// 12800 / 100 * 30  Batterielaufzeit laut SOC          
+
+        restLaufzeit = Math.round((restLaufzeit / 1000) * 60);
+        setState(tibberDP + 'extra.Batterielaufzeit', getMinHours(restLaufzeit), true);
 
         //wieviel wh kommen in etwa von PV in den nächsten 24h
         let hrstorun = 24;
@@ -1121,6 +1129,13 @@ async function holePVDatenAb() {
 
         _pvforecastTomorrowArray.push([startTime,endTime,power,power90]);
     }
+}
+function getMinHours(minutes) {
+    let mins = minutes;
+    let m = mins % 60;
+    let h = (mins - m) / 60;
+    let HHMM = (h < 10 ? '0' : '') + h.toString() + ':' + (m < 10 ? '0' : '') + m.toString();
+    return HHMM;
 }
 
 function tibber_active_auswertung() {
