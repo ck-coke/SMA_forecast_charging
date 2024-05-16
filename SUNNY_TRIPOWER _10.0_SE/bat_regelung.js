@@ -327,11 +327,11 @@ async function processing() {
             return a[0] - b[0];
         });
 
-        let lowprice = [];          //wieviele Ladestunden unter Startcharge Preis
+        let tibberPoilow = [];          //wieviele Ladestunden unter Startcharge Preis
 
         for (let x = 0; x < poi.length; x++) {
             if (poi[x][0] <= _start_charge) {
-                lowprice.push(poi[x]);
+                tibberPoilow.push(poi[x]);
             }
         }
 
@@ -521,7 +521,7 @@ async function processing() {
 
             if (_debug) {
                 console.info('tibberPoihighNew.length '+ tibberPoihighNew.length);
-                console.info('tibberPoilow.length '+ lowprice.length);
+                console.info('tibberPoilow.length '+ tibberPoilow.length);
                 //    console.info('tibberPoihighNew nach filter ' + JSON.stringify(tibberPoihighNew));
             }
 
@@ -555,29 +555,31 @@ async function processing() {
                     entladeZeitenArray.push([0.0,"--:--","--:--"]);  //  initialisiere für Vis
                 }
             } else {
-                for (let d = 0; d < lefthrs; d++) {
-                    if (tibberPoihighNew[d] != null) {
-                        if (tibberPoihighNew[d][0] > _stop_discharge) {                               
-                            if (_debug) {
-                                console.info('alle Entladezeiten: ' + tibberPoihighNew[d][1] + '-' + tibberPoihighNew[d][2] + ' Preis ' + tibberPoihighNew[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
-                            }
+                if (lefthrs > 0) {                                     // ganzen tag nur klein preise oder battSoc 0 dann mach nix
+                    for (let d = 0; d < lefthrs; d++) {
+                        if (tibberPoihighNew[d] != null) {
+                            if (tibberPoihighNew[d][0] > _stop_discharge) {                               
+                                if (_debug) {
+                                    console.info('alle Entladezeiten: ' + tibberPoihighNew[d][1] + '-' + tibberPoihighNew[d][2] + ' Preis ' + tibberPoihighNew[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
+                                }
 
-                            entladeZeitenArray.push(tibberPoihighNew[d]);    // alle passende höchstpreiszeiten                           
+                                entladeZeitenArray.push(tibberPoihighNew[d]);    // alle passende höchstpreiszeiten                           
+                            }
                         }
                     }
-                }
 
-                _entladung_zeitfenster = false;
+                    _entladung_zeitfenster = false;
 
-                for (let c = 0; c < entladeZeitenArray.length; c++) {
-                    if (compareTime(entladeZeitenArray[c][1], entladeZeitenArray[c][2], "between")) {
-                        if (_vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
-                            break;
-                        } else {
-                            if (_dc_now <= _verbrauchJetzt) {           // entlade nur wenn sich das lohnt
-                                macheNix = true;
-                                _tibber_active_idx = 2;
-                                _entladung_zeitfenster = true;
+                    for (let c = 0; c < entladeZeitenArray.length; c++) {
+                        if (compareTime(entladeZeitenArray[c][1], entladeZeitenArray[c][2], "between")) {
+                            if (_vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
+                                break;
+                            } else {
+                                if (_dc_now <= _verbrauchJetzt) {           // entlade nur wenn sich das lohnt
+                                    macheNix = true;
+                                    _tibber_active_idx = 2;
+                                    _entladung_zeitfenster = true;
+                                }
                             }
                         }
                     }
@@ -601,17 +603,17 @@ async function processing() {
                 if (_tibberPreisJetzt <= _start_charge) {
                     let length = Math.ceil(restladezeit);
 
-                    if (length > lowprice.length) {
-                        length = lowprice.length;
+                    if (length > tibberPoilow.length) {
+                        length = tibberPoilow.length;
                         if (_debug) {
-                            console.info('Starte Ladung : ' + JSON.stringify(lowprice));
+                            console.info('Starte Ladung : ' + JSON.stringify(tibberPoilow));
                         }
                     }
                     for (let i = 0; i < length; i++) {
-                        ladeZeitenArray.push(lowprice[i]);
-                        if (compareTime(lowprice[i][1], lowprice[i][2], 'between') && _dc_now < _verbrauchJetzt) {
+                        ladeZeitenArray.push(tibberPoilow[i]);
+                        if (compareTime(tibberPoilow[i][1], tibberPoilow[i][2], 'between') && _dc_now < _verbrauchJetzt) {
                             if (_debug) {
-                                console.info('Starte Ladung: ' + lowprice[i][1] + '-' + lowprice[i][2] + ' Preis ' + lowprice[i][0]);
+                                console.info('Starte Ladung: ' + tibberPoilow[i][1] + '-' + tibberPoilow[i][2] + ' Preis ' + tibberPoilow[i][0]);
                             }
                             _tibber_active_idx = 5;
                             _prognoseNutzenSteuerung = false;
@@ -622,9 +624,9 @@ async function processing() {
                 }
 
                 //ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
-                if (lowprice.length > 0 && restladezeit <= lowprice.length && _tibber_active_idx == 5) {
+                if (tibberPoilow.length > 0 && restladezeit <= tibberPoilow.length && _tibber_active_idx == 5) {
                     if (_debug) {
-                        console.info('Stoppe Ladung, lowprice.length ' + lowprice.length);
+                        console.info('Stoppe Ladung, tibberPoilow.length ' + tibberPoilow.length);
                     }
                     _tibber_active_idx = 4;
                     _prognoseNutzenSteuerung = true;
@@ -797,6 +799,11 @@ async function processing() {
                 if ((compareTime(pvfc[h][3], pvfc[h][4], 'between')) || (_einspeisung + _powerAC) >= (pvlimit - 100)) {
                     _ladezeitVon = pvfc[h][3];
                     _ladezeitBis = pvfc[h][4];
+
+                    if (_dc_now < _verbrauchJetzt) { // kann sein dass die prognose nicht stimmt und wir haben ladezeiten aber draussen regnets
+                        break;
+                    }
+
                     if (_debug) {
                         console.warn('-->> Bingo ladezeit mit überschuss _max_pwr ' + _max_pwr + '  ' + pvfc[h][0] + ' ' + pvfc[h][1]);
                     }
@@ -816,7 +823,7 @@ async function processing() {
                         wirdGeladen = true;
                     }
 
-                    break;
+                    break;                        
                 }
             }
         }
