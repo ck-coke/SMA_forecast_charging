@@ -74,7 +74,7 @@ const inputRegisters = {
 
 const bydDirectSOCDP            = 'bydhvs.0.State.SOC';                            // battSOC netto direkt von der Batterie
 
-let _dc_now                     = 0;  // pv vom Dach zusammen in W
+let _dc_now                     = 0;  
 let _einspeisung                = 0;
 let _powerAC                    = 0;
 
@@ -87,7 +87,7 @@ let _lastSpntCom                = 0;
 let _lastpwrAtCom               = 0;
 let _bydDirectSOC               = 5;
 let _bydDirectSOCMrk            = 0;
-let _batsoc                     = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR
+let _batsoc                     = 0;
 let _max_pwr                    = _mindischrg;
 let _maxchrg                    = _mindischrg;
 let _tick                       = 0;
@@ -207,7 +207,7 @@ console.info('***************************************************');
 console.info('starte ladenNachPrognose mit debug ' + _debug);
 
 // bei start immer initialisieren
-if (_tibberPreisJetzt <= _stop_discharge || _batsoc <= 1 && _dc_now <= _verbrauchJetzt) {
+if (_tibberPreisJetzt <= _stop_discharge && _dc_now <= _verbrauchJetzt) {
     console.warn('starte direkt mit Begrenzung da Preis unter schwelle');
     _entladung_zeitfenster = true;
 }
@@ -228,7 +228,7 @@ async function processing() {
     let wirdGeladen     = false;
     let hhJetztNum      = Number(_hhJetzt);
 
-    _bydDirectSOCMrk = 0
+    _bydDirectSOCMrk = 0;
 
     if (_dc_now < 10) {              // alles was unter 10 KW kann weg
         _dc_now = 0;
@@ -335,7 +335,7 @@ async function processing() {
             }
         }
 
-        let batlefthrs = aufrunden(2,((_batteryCapacity / 100) * _batsoc) / (_baseLoad / Math.sqrt(_lossfactor)));    /// 12800 / 100 * 30            
+        let batlefthrs = aufrunden(2,((_batteryCapacity / 100) * _batsoc) / (_baseLoad / Math.sqrt(_lossfactor)));    /// 12800 / 100 * 30  Batterielaufzeit laut SOC          
 
         //wieviel wh kommen in etwa von PV in den nächsten 24h
         let hrstorun = 24;
@@ -516,7 +516,7 @@ async function processing() {
         if (!macheNix) {
             let tibberPoihighNew = filterTimes(tibberPoihigh);    // gebraucht wird sortiert nach preis und nur grösser jetzt
 
-            let lefthrs = batlefthrs;                           // batlefthrs Bat h verbleibend
+            let lefthrs = batlefthrs;                           // Batterielaufzeit laut SOC
 
             if (_debug) {
                 console.info('tibberPoihighNew.length '+ tibberPoihighNew.length);
@@ -533,17 +533,17 @@ async function processing() {
             }
 
             // Entladezeit  wenn reste im akku
-            if (batlefthrs > 0 && _batsoc > 1 && _tibberPreisJetzt > _stop_discharge && _dc_now > 1 && _dc_now < _verbrauchJetzt) {      // wenn noch was im akku
+            if (_batsoc > 1 && _tibberPreisJetzt > _stop_discharge && _dc_now > 1 && _dc_now < _verbrauchJetzt) {      // wenn noch was im akku
                 macheNix = true;
                 _entladung_zeitfenster = true;
                 _tibber_active_idx = 21;
             }
 
             // Entladezeit
-            if (lefthrs > 0 && lefthrs > hrstorun) { // && pvwh < _baseLoad * 24 * _wr_efficiency) {        //  16200 aus der berechung
+            if (lefthrs > 0 && lefthrs >= hrstorun) { // && pvwh < _baseLoad * 24 * _wr_efficiency) {        //  16200 aus der berechung
                 macheNix = false;
 
-                if (batlefthrs >= hrstorun && compareTime(nowhour, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
+                if (compareTime(nowhour, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
                     if (_debug) {
                         console.warn('Entladezeit reicht aus bis zum Sonnaufgang und genug PV');
                     }
@@ -866,20 +866,21 @@ on({ id: inputRegisters.triggerDP, change: 'any' }, async function () {  // aktu
         const dc1 = await getStateAsync(inputRegisters.dc1);
         const dc2 = await getStateAsync(inputRegisters.dc2);
 
-        _dc_now                     = dc1.val + dc2.val;  // pv vom Dach zusammen in W
+        _dc_now                     = dc1.val + dc2.val;                                                    // pv vom Dach zusammen in W
         _verbrauchJetzt             = await berechneVerbrauch(_dc_now);
     
         _hhJetzt                    = getHH();
         _today                      = new Date();
-        _batsoc                     = Math.min(getState(inputRegisters.batSoC).val, 100);    //batsoc = Batterieladestand vom WR
+        _batsoc                     = getState(inputRegisters.batSoC).val;                                  //batsoc = Batterieladestand vom WR
+        _bydDirectSOC               = getState(bydDirectSOCDP).val;                                         // nimm den bydSoc da der WR nicht oft diesen übermittelt
         _debug                      = getState(tibberDP + 'debug').val;
 
         _snowmode                   = getState(tibberDP + 'extra.PV_Schneebedeckt').val;
-        _tibberNutzenAutomatisch    = getState(tibberDP + 'extra.tibberNutzenAutomatisch').val;           // aus dem DP kommend sollte true sein für vis
-        _prognoseNutzenAutomatisch  = getState(tibberDP + 'extra.prognoseNutzenAutomatisch').val;       // aus dem DP kommend sollte true sein für vis
+        _tibberNutzenAutomatisch    = getState(tibberDP + 'extra.tibberNutzenAutomatisch').val;             // aus dem DP kommend sollte true sein für vis
+        _prognoseNutzenAutomatisch  = getState(tibberDP + 'extra.prognoseNutzenAutomatisch').val;           // aus dem DP kommend sollte true sein für vis
 
-        _tibberNutzenSteuerung      = _tibberNutzenAutomatisch;       // init
-        _prognoseNutzenSteuerung    = _prognoseNutzenAutomatisch;      // init
+        _tibberNutzenSteuerung      = _tibberNutzenAutomatisch;         // init
+        _prognoseNutzenSteuerung    = _prognoseNutzenAutomatisch;       // init
 
         // übersteuern nach prio manuell zuerst dann autoamtisch oder battsoc unter 5 %
         const _tibberNutzenManuell          = getState(tibberDP + 'extra.tibberNutzenManuell').val;
@@ -921,9 +922,7 @@ on({id: [tibberDP + 'extra.tibberNutzenAutomatisch',
 
 
 
-function notLadungCheck() {
-    _bydDirectSOC = getState(bydDirectSOCDP).val;   // nimm den bydSoc da der WR nicht oft diesen übermittelt
-
+function notLadungCheck() {    
     if (_bydDirectSOC < 5 && _dc_now < _verbrauchJetzt) {
         if (_bydDirectSOC != _bydDirectSOCMrk) {
             console.error(' -----------------    Batterie NOTLADEN ' + _bydDirectSOC + ' %' + ' um ' + _hhJetzt + ':00');
