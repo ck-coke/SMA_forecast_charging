@@ -615,6 +615,7 @@ async function processing() {
                             }
                             _tibber_active_idx = 5;
                             _prognoseNutzenSteuerung = false;
+                            wirdGeladen = true;
                             break;
                         }
                     }
@@ -739,7 +740,7 @@ async function processing() {
 
                 pvlimit_calc = Math.max((Math.round(pvlimit - ((lademenge - get_wh) / restladezeit))), 0);      //virtuelles reduzieren des pvlimits
                 min_pwr      = Math.max(Math.round((lademenge - get_wh) / restladezeit), 0);
-                min_pwr      = min_pwr * -1;                                                                    // muss negativ sein 
+            //    min_pwr      = min_pwr * -1;                                                                    // muss negativ sein 
 
                 get_wh = lademenge;       //daran liegts damit der unten immer rein geht ????
             }
@@ -818,17 +819,17 @@ async function processing() {
                     break;
                 }
             }
-
-            if (_tibber_active_idx == 2 || _tibber_active_idx == 22) {
-                wirdGeladen = true;
-            }
         }
     }
 
-// ---------------------------------------------------- Ende der PV Prognose Sektion
 
-    if (_batsoc > 90 && wirdGeladen) {     // letzten 5 % langsam laden
-        _maxchrg = _lastPercentageLoadWith;
+
+// ---------------------------------------------------- Ende der PV Prognose Sektion
+    if (_batsoc > 90 && wirdGeladen) {              // letzten 10 % langsam laden
+        const maxCharge = _maxchrg * -1;
+        if (maxCharge > 500) {
+            _maxchrg = _lastPercentageLoadWith;
+        }        
     }
 
 // ----------------------------------------------------           write WR data
