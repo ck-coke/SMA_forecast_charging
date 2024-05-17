@@ -675,7 +675,7 @@ async function processing() {
 
     if (_debug) {
         console.error('-->> Verlasse Tibber Sektion mit _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' macheNix ' + macheNix + ' _tibber_active_idx ' + _tibber_active_idx);
-        console.error('-->  PV ' + _dc_now + ' Verbrauch ' + _verbrauchJetzt);
+        console.error('-->  PV ' + _dc_now + ' Verbrauch ' + _verbrauchJetzt + ' Restladezeit ' + restladezeit);
     }
 
     if ((batterieLadenUhrzeitStart && _hhJetzt >= batterieLadenUhrzeit)) {    // laden übersteuern ab bestimmter uhrzeit
@@ -712,13 +712,13 @@ async function processing() {
         // verschieben des Ladevorgangs in den Bereich der PV Limitierung. batterie ist nicht in notladebetrieb
         if (_debug && latesttime) {
             console.info('Abschluss PV bis ' + latesttime);
-            console.info('pvfc.length ' + pvfc.length + ' Restladezeit ' + restladezeit);
+            console.info('pvfc.length ' + pvfc.length + ' Restladezeit nach pvfc Ermittlung ' + restladezeit);
         //    console.warn('pvfc ' + JSON.stringify(pvfc));
         }
 
         pvfc = sortiereNachUhrzeitPV(pvfc);
 
-        if (restladezeit > 0) {  
+        if (_batsoc < 100) {  
             let get_wh = 0;
             let get_wh_einzeln = 0;
 
