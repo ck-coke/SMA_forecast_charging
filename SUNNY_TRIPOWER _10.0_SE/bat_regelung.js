@@ -668,10 +668,8 @@ async function processing() {
 //      _tibber_active_idx = 5;    starte die ladung
 //      _tibber_active_idx = 88;   notladung
 
-    _max_pwr = aufrunden(2, _max_pwr);
-
     if (_debug) {
-        console.error('-->> Start der PV Prognose Sektion _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' macheNix ' + macheNix + ' _tibber_active_idx ' + _tibber_active_idx);
+        console.error('-->> Verlasse Tibber Sektion mit _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' macheNix ' + macheNix + ' _tibber_active_idx ' + _tibber_active_idx);
         console.error('-->  PV ' + _dc_now + ' Verbrauch ' + _verbrauchJetzt);
     }
 
@@ -827,7 +825,7 @@ async function processing() {
                     }
 
                     _SpntCom = _InitCom_An;
-                    _maxchrg = _max_pwr * -1;
+                    _max_pwr = _max_pwr * -1;
                     _lastSpntCom = 95;    // damit der WR auf jedenfall daten bekommt
 
                     if (_batsoc < 100) {  // batterie ist nicht voll
@@ -838,9 +836,13 @@ async function processing() {
                 }
             }
         }
+
+        if (_max_pwr > 0) {        // hier muss immer was negatives rauskommen.. sonst keine pv ladung
+            _max_pwr = _mindischrg;          
+        }
     }
 
-
+    _maxchrg = _max_pwr;
 
 // ---------------------------------------------------- Ende der PV Prognose Sektion
     if (_batsoc > 90 && wirdGeladen) {              // letzten 10 % langsam laden
@@ -1145,7 +1147,6 @@ function getMinHours(minutes) {
 
 function tibber_active_auswertung() {
     _max_pwr = _mindischrg;
-    _maxchrg = _max_pwr;
   
     switch (_tibber_active_idx) {
         case 0:
@@ -1155,8 +1156,7 @@ function tibber_active_auswertung() {
             break;
         case 1:                             //      _tibber_active_idx = 1;    Nachladezeit
             _SpntCom = _InitCom_An;
-            _max_pwr = _pwrAtCom_def * -1;
-            _maxchrg = _max_pwr; 
+            _max_pwr = _pwrAtCom_def * -1;            
             break;
         case 2:                             //      _tibber_active_idx = 2;    Entladezeiten
         case 21:                            //      _tibber_active_idx = 21;   Entladezeit wenn akku > 0 aber keine entladezeit, aber der Preis hoch genug um zu sparen
@@ -1182,7 +1182,6 @@ function tibber_active_auswertung() {
         case 5:                             //      _tibber_active_idx = 5;    starte die ladung
             _SpntCom = _InitCom_An;
             _max_pwr = _pwrAtCom_def * -1;
-            _maxchrg = _max_pwr; 
             break;
         default:
             _SpntCom = _InitCom_Aus;        
