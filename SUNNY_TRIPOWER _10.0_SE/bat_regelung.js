@@ -29,7 +29,7 @@ const _lastPercentageLoadWith   = -500;                                 // letzt
 const _baseLoad                 = 850;                                  // Grundverbrauch in Watt
 const _wr_efficiency            = 0.93;                                 // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
 const _batteryPowerEmergency    = -4000;                                // Ladeleistung der Batterie in W notladung
-const _mindischrg               = 0;                                    // min entlade W
+const _mindischrg               = 0;                                    // min entlade W für Ladungerhaltung 
 const _batteryLadePowerMax      = 5000;                                 // max Batterie ladung 
 const _pwrAtCom_def             = _batteryLadePowerMax * (253 / 230);   // max power bei 253V = 5500 W
 const _sma_em                   = 'sma-em.0.3015242334';                // Name der SMA EnergyMeter/HM2 Instanz bei installierten SAM-EM Adapter, leer lassen wenn nicht vorhanden
