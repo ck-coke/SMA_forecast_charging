@@ -274,8 +274,13 @@ async function processing() {
         lademenge = lademenge_full;
     }
 
+    if (restladezeit > 24) {
+        restladezeit = 24;
+    }
+
     if (_debug) {
-        console.info('pvlimit        _________________ ' + pvlimit + ' W');
+        console.info('_batteryLadePower_______________ ' + _batteryLadePower + ' W');
+        console.info('pvlimit_________________________ ' + pvlimit + ' W');
         console.info('Verbrauch jetzt_________________ ' + _verbrauchJetzt + ' W');
         console.info('PV Produktion___________________ ' + _dc_now + ' W');
         console.info('Ladeleistung max Batterie_______ ' + _batteryLadePower + ' W');
@@ -689,6 +694,10 @@ async function processing() {
         let latesttime;
         let pvfc = getPvErtrag(pvlimit);
 
+        if ((restladezeit * 2) <= pvfc.length) {
+            restladezeit = pvfc.length / 2;                          //entzerren des Ladevorganges
+        }
+
         setState(tibberDP + 'extra.PV_Abschluss', '--:--', true);
 
         if (pvfc.length > 0) {
@@ -709,7 +718,7 @@ async function processing() {
 
         pvfc = sortiereNachUhrzeitPV(pvfc);
 
-        if (restladezeit > 0 && (restladezeit * 2) <= pvfc.length) {  // wenn die ladedauer kleiner ist als die vorhersage           
+        if (restladezeit > 0) {  
             let get_wh = 0;
             let get_wh_einzeln = 0;
 
@@ -745,10 +754,6 @@ async function processing() {
             let min_pwr = 0;
 
             if (lademenge > 0 && lademenge > get_wh) {
-                if ((restladezeit * 2) <= pvfc.length) {
-                    restladezeit = pvfc.length / 2;                          //entzerren des Ladevorganges
-                }
-
                 pvlimit_calc = Math.max((Math.round(pvlimit - ((lademenge - get_wh) / restladezeit))), 0);      //virtuelles reduzieren des pvlimits
                 min_pwr      = Math.max(Math.round((lademenge - get_wh) / restladezeit), 0);
             //    min_pwr      = min_pwr * -1;                                                                    // muss negativ sein 
@@ -765,7 +770,6 @@ async function processing() {
             let current_pwr_diff = 0;
 
             if (lademenge > 0 && get_wh >= lademenge) {                   
-                restladezeit = pvfc.length / 2;
 
                 current_pwr_diff  = 100 - pvlimit_calc + _einspeisung;         
                 // _max_pwr = Math.ceil(pvfc[0][0] - pvlimit_calc);   
@@ -817,7 +821,7 @@ async function processing() {
                     
                     if (_dc_now < _verbrauchJetzt) { // kann sein dass die prognose nicht stimmt und wir haben ladezeiten aber draussen regnets
                         if (_debug) {
-                            console.warn('-->> breche ab da nicht genug Sonne ' );
+                            console.warn('-->> breche ab, da nicht genug Sonne ' );
                         }
                         if (_tibber_active_idx == 2) {   // komme aus der entladung 
                             _SpntCom = _InitCom_Aus;
@@ -837,7 +841,10 @@ async function processing() {
                     }
            
                     _max_pwr = _max_pwr * -1;
-                    _lastSpntCom = 95;    // damit der WR auf jedenfall daten bekommt
+
+                    if (_lastpwrAtCom != _max_pwr) {
+                        _lastSpntCom = 95;    // damit der WR auf jedenfall daten bekommt
+                    }
 
                     if (_batsoc < 100) {  // batterie ist nicht voll
                         wirdGeladen = true;
@@ -847,13 +854,14 @@ async function processing() {
                 }
             }
 
-            if (_tibber_active_idx == 2 || _tibber_active_idx == 22) {
+            if ((_tibber_active_idx == 2 || _tibber_active_idx == 22) && !wirdGeladen) {
                 _SpntCom = _InitCom_Aus;
                 wirdGeladen = true;
             }       
         }
 
         if (_max_pwr > 0) {        // hier muss immer was negatives rauskommen.. sonst keine pv ladung
+            console.warn('-->> problem ' + _max_pwr);
             _max_pwr = _mindischrg;          
         }
     }
