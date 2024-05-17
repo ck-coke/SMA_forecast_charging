@@ -805,6 +805,8 @@ async function processing() {
             }           
 
             for (let h = 0; h < (restladezeit *2); h++) {  // nur wenn überschuss wirklich da ist
+                _SpntCom = _InitCom_An;
+
                 if ((compareTime(pvfc[h][3], pvfc[h][4], 'between')) || (_einspeisung + _powerAC) >= (pvlimit - 100)) {
                     _ladezeitVon = pvfc[h][3];
                     _ladezeitBis = pvfc[h][4];
@@ -823,8 +825,7 @@ async function processing() {
                             console.warn('-->> Bingo limmitiere auf ' + _max_pwr);
                         }
                     }
-
-                    _SpntCom = _InitCom_An;
+           
                     _max_pwr = _max_pwr * -1;
                     _lastSpntCom = 95;    // damit der WR auf jedenfall daten bekommt
 
@@ -835,6 +836,10 @@ async function processing() {
                     break;                        
                 }
             }
+
+            if (_tibber_active_idx == 2 || _tibber_active_idx == 22) {
+                wirdGeladen = true;
+            }       
         }
 
         if (_max_pwr > 0) {        // hier muss immer was negatives rauskommen.. sonst keine pv ladung
@@ -868,7 +873,11 @@ function sendToWR(commWR, pwrAtCom) {
         setState(communicationRegisters.fedInSpntCom, commWR);          // 40151_Kommunikation
         setState(spntComCheckDP, commWR, true);                         // check DP für vis
         
-        setState(tibberDP + 'extra.max_Batterieladung', pwrAtCom * -1, true);
+        if (pwrAtCom == -1) {              
+            setState(tibberDP + 'extra.max_Batterieladung', 0, true);
+        } else {
+            setState(tibberDP + 'extra.max_Batterieladung', pwrAtCom *-1, true);
+        }
     }
 
     if (_debug && !_batterieLadenUebersteuernManuell) {
@@ -1089,9 +1098,9 @@ function getPvErtrag(pvlimit) {
     let pvfc = [];
     let f = 0;
 
-    for (let p = 0; p < _pvforecastTodayArray.length; p++) { /* 48 = 24h a 30min Fenster*/
+    for (let p = 0; p < 48; p++) { /* 48 = 24h a 30min Fenster*/
         const pvstarttime = _pvforecastTodayArray[p][0];
-        const pvendtime   = _pvforecastTodayArray[p][1];              
+        const pvendtime   = _pvforecastTodayArray[p][1];               
         const pvpower50   = _pvforecastTodayArray[p][2];
         const pvpower90   = _pvforecastTodayArray[p][3];
 
