@@ -810,19 +810,29 @@ async function processing() {
                 if ((compareTime(pvfc[h][3], pvfc[h][4], 'between')) || (_einspeisung + _powerAC) >= (pvlimit - 100)) {
                     _ladezeitVon = pvfc[h][3];
                     _ladezeitBis = pvfc[h][4];
-
+                    
+                    if (_debug) {
+                        console.warn('-->> Bingo ladezeit' );
+                    }
+                    
                     if (_dc_now < _verbrauchJetzt) { // kann sein dass die prognose nicht stimmt und wir haben ladezeiten aber draussen regnets
+                        if (_debug) {
+                            console.warn('-->> breche ab da nicht genug Sonne ' );
+                        }
+                        if (_tibber_active_idx == 2) {   // komme aus der entladung 
+                            _SpntCom = _InitCom_Aus;
+                        }
                         break;
                     }
 
                     if (_debug) {
-                        console.warn('-->> Bingo ladezeit mit überschuss _max_pwr ' + _max_pwr + '  ' + pvfc[h][0] + ' ' + pvfc[h][1]);
+                        console.warn('-->> mit überschuss _max_pwr ' + _max_pwr + '  ' + pvfc[h][0] + ' ' + pvfc[h][1]);
                     }
                     
                     if (_max_pwr > _dc_now - _verbrauchJetzt) {  // wenn das ermittelte wert grösser ist als die realität dann limmitiere, check nochmal besser ist es
                         _max_pwr = _dc_now - _verbrauchJetzt;
                         if (_debug) {
-                            console.warn('-->> Bingo limmitiere auf ' + _max_pwr);
+                            console.warn('-->> limmitiere auf ' + _max_pwr);
                         }
                     }
            
@@ -838,6 +848,7 @@ async function processing() {
             }
 
             if (_tibber_active_idx == 2 || _tibber_active_idx == 22) {
+                _SpntCom = _InitCom_Aus;
                 wirdGeladen = true;
             }       
         }
