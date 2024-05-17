@@ -542,8 +542,7 @@ async function processing() {
             }
 
             // Entladezeit  wenn reste im akku
-            if (_batsoc > 1 && _tibberPreisJetzt > _stop_discharge && _dc_now > 1 && _dc_now < _verbrauchJetzt) {      // wenn noch was im akku
-                macheNix = true;
+            if (_batsoc > 1 && _tibberPreisJetzt > _stop_discharge && _dc_now > 1 && _dc_now < _verbrauchJetzt) {      // wenn noch was im akku            
                 _entladung_zeitfenster = true;
                 _tibber_active_idx = 21;
             }
@@ -577,6 +576,10 @@ async function processing() {
                     }
 
                     _entladung_zeitfenster = false;
+
+                    if (_tibber_active_idx == 21 && entladeZeitenArray.length > 1) {       // wenn entladezeiten da sind und aus dem 21 kommend
+                        _tibber_active_idx = 3;    
+                    }
 
                     for (let c = 0; c < entladeZeitenArray.length; c++) {
                         if (compareTime(entladeZeitenArray[c][1], entladeZeitenArray[c][2], "between")) {
@@ -841,8 +844,7 @@ async function processing() {
 
 // ---------------------------------------------------- Ende der PV Prognose Sektion
     if (_batsoc > 90 && wirdGeladen) {              // letzten 10 % langsam laden
-        const maxCharge = _maxchrg * -1;
-        if (maxCharge > 500) {
+        if (_maxchrg < _lastPercentageLoadWith) {
             _maxchrg = _lastPercentageLoadWith;
         }        
     }
@@ -1085,7 +1087,7 @@ function getPvErtrag(pvlimit) {
     let pvfc = [];
     let f = 0;
 
-    for (let p = 0; p < 48; p++) { /* 48 = 24h a 30min Fenster*/
+    for (let p = 0; p < _pvforecastTodayArray.length; p++) { /* 48 = 24h a 30min Fenster*/
         const pvstarttime = _pvforecastTodayArray[p][0];
         const pvendtime   = _pvforecastTodayArray[p][1];              
         const pvpower50   = _pvforecastTodayArray[p][2];
@@ -1108,6 +1110,8 @@ function getPvErtrag(pvlimit) {
 
 //  reduzierung lesezugroffe, hole die PV nur wenn sich was geändert hat
 on({id: '0_userdata.0.strom.pvforecast.lastUpdated', change: 'any'}, async function() {  
+    _pvforecastTodayArray       = [];
+    _pvforecastTomorrowArray    = [];
     await holePVDatenAb();
 });
 
@@ -1130,6 +1134,7 @@ async function holePVDatenAb() {
         _pvforecastTomorrowArray.push([startTime,endTime,power,power90]);
     }
 }
+
 function getMinHours(minutes) {
     let mins = minutes;
     let m = mins % 60;
