@@ -34,6 +34,9 @@ const _batteryLadePowerMax      = 5000;                                 // max B
 const _pwrAtCom_def             = _batteryLadePowerMax * (253 / 230);   // max power bei 253V = 5500 W
 const _sma_em                   = 'sma-em.0.3015242334';                // Name der SMA EnergyMeter/HM2 Instanz bei installierten SAM-EM Adapter, leer lassen wenn nicht vorhanden
 let _batteryLadePower           = _batteryLadePowerMax;                 // Ladeleistung laufend der Batterie in W
+let _power50Reduzierung         = 0;                                    // manuelles reduzieren der pv prognose pro stunde bewölkt
+let _power90Reduzierung         = 0;                                    // manuelles reduzieren der pv prognose pro stunde ohne wolken
+
 
 // tibber Preis Bereich
 let _snowmode           = false;                                        //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
@@ -116,10 +119,8 @@ let _sunupAstro         = '00:00';
 let _sundown            = '00:00';
 let _sundownAstro       = '00:00';
 let _sunupTodayAstro    = '00:00';
-
 let _ladezeitVon        = '00:00';
 let _ladezeitBis        = '00:00';
-
 
 createUserStates(userDataDP, false, [tibberStromDP + 'debug', { 'name': 'debug', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
     setState(tibberDP + 'debug', _debug, true);
@@ -242,21 +243,19 @@ async function processing() {
     if (dc_now_DP <= 0) {
         dc_now_DP = 0;
     } else {
-        dc_now_DP = aufrunden(2, dc_now_DP)/1000;
+        dc_now_DP = aufrunden(2, dc_now_DP)/1000;  // in kW
     }
 
     setState(pV_Leistung_aktuellDP, dc_now_DP, true);
 
-    let pvlimit                       = (_pvPeak / 100 * _surplusLimit);                       //pvlimit = 12000/100*0 = 0
+    let pvlimit                       = (_pvPeak / 100 * _surplusLimit);                       //pvlimit = 13100/100*0 = 0
     let batterieLadenUhrzeit          = getState(batterieLadenUhrzeitDP).val;
     let batterieLadenUhrzeitStart     = getState(batterieLadenUhrzeitStartDP).val;
-
-    /* Default Werte setzen*/
     let battStatus = getState(inputRegisters.betriebszustandBatterie).val;
 
     _batteryLadePower = getState(tibberDP + 'extra.max_Batterieladung').val;
 
-    if (_batteryLadePower == 0) {
+    if (_batteryLadePower == 0) {    
         _batteryLadePower = _batteryLadePowerMax;
     }
 
@@ -269,8 +268,11 @@ async function processing() {
     let lademenge      = Math.max(Math.ceil((_batteryCapacity * (_batteryTarget - _batsoc) / 100) * (1 / _wr_efficiency)), 0);     //lademenge = Energiemenge bis vollständige Ladung
     let restladezeit   = Math.ceil(lademenge / _batteryLadePower);                                                                 //Ladezeit = Energiemenge bis vollständige Ladung / Ladeleistung WR
 
-    if (restladezeit <= 0) {
+    if (_dc_now < _verbrauchJetzt) {
         restladezeit = 0;
+    }
+
+    if (restladezeit <= 0) {
         lademenge = lademenge_full;
     }
 
@@ -346,7 +348,7 @@ async function processing() {
 
 
         let restLaufzeit = _batsoc * _batteryCapacity / 100;
-        let batlefthrs = aufrunden(2, restLaufzeit / (_baseLoad / Math.sqrt(_lossfactor)));    /// 12800 / 100 * 30  Batterielaufzeit laut SOC          
+        let batlefthrs = aufrunden(2, restLaufzeit / (_baseLoad / Math.sqrt(_lossfactor)));    /// 12800 / 100 * 30  Batterielaufzeit laut SOC und berücksichtige Grundverbrauch        
 
         restLaufzeit = Math.round((restLaufzeit / 1000) * 60);
         setState(tibberDP + 'extra.Batterielaufzeit', getMinHours(restLaufzeit), true);
@@ -748,7 +750,7 @@ async function processing() {
             setState(tibberDP + 'extra.PV_Ueberschuss', get_wh, true);            
 
             if (_debug) {
-                console.warn('pvfc sortiereNachUhrzeitPV ' + JSON.stringify(pvfc));
+            //    console.warn('pvfc sortiereNachUhrzeitPV ' + JSON.stringify(pvfc));
                 console.info('Überschuss get_wh vor entzerren ' + get_wh);
             }
 
@@ -833,7 +835,7 @@ async function processing() {
                     }
 
                     if (_debug) {
-                        console.warn('-->> mit überschuss _max_pwr ' + _max_pwr + '  ' + pvfc[h][0] + ' ' + pvfc[h][1]);
+                        console.warn('-->> mit überschuss _max_pwr ' + _max_pwr + ' pv50 ' + pvfc[h][0] + ' pv90 ' + pvfc[h][1]);
                     }
                     
                     if (_max_pwr > _dc_now - _verbrauchJetzt) {  // wenn das ermittelte wert grösser ist als die realität dann limmitiere, check nochmal besser ist es
@@ -1142,9 +1144,9 @@ function getPvErtrag(pvlimit) {
 
 //  reduzierung lesezugroffe, hole die PV nur wenn sich was geändert hat
 on({id: '0_userdata.0.strom.pvforecast.lastUpdated', change: 'any'}, async function() {  
-    _pvforecastTodayArray       = [];
-    _pvforecastTomorrowArray    = [];
     setTimeout(function() {
+        _pvforecastTodayArray       = [];
+        _pvforecastTomorrowArray    = [];
         holePVDatenAb();
     }, 5000);     // warte 5 sekunden   
 });
@@ -1153,19 +1155,23 @@ async function holePVDatenAb() {
     for (let p = 0; p < 48; p++) {   
         const startTime = getState(pvforecastTodayDP + p + '.startTime').val;
         const endTime   = getState(pvforecastTodayDP + p + '.endTime').val;
-        const power     = getState(pvforecastTodayDP + p + '.power').val;
-        const power90   = getState(pvforecastTodayDP + p + '.power90').val;
+        let power50   = getState(pvforecastTodayDP + p + '.power').val;
+        let power90   = getState(pvforecastTodayDP + p + '.power90').val;
 
-        _pvforecastTodayArray.push([startTime,endTime,power,power90]);
+        // manuelles reduzieren pv
+        power50 = power50 - _power50Reduzierung;
+        power90 = power90 - _power90Reduzierung;
+
+        _pvforecastTodayArray.push([startTime,endTime,power50,power90]);
     }
 
     for (let p = 0; p < 48; p++) {   
         const startTime = getState(pvforecastTomorrowDP + p + '.startTime').val;
         const endTime   = getState(pvforecastTomorrowDP + p + '.endTime').val;
-        const power     = getState(pvforecastTomorrowDP + p + '.power').val;
+        const power50   = getState(pvforecastTomorrowDP + p + '.power').val;
         const power90   = getState(pvforecastTomorrowDP + p + '.power90').val;
 
-        _pvforecastTomorrowArray.push([startTime,endTime,power,power90]);
+        _pvforecastTomorrowArray.push([startTime,endTime,power50,power90]);
     }
 }
 
