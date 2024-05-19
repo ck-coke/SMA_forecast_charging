@@ -272,7 +272,7 @@ async function processing() {
     // Lademenge
     let lademenge_full = Math.ceil((_batteryCapacity * (100 - _batsoc) / 100) * (1 / _wr_efficiency));                             //Energiemenge bis vollständige Ladung
     let lademenge      = Math.max(Math.ceil((_batteryCapacity * (_batteryTarget - _batsoc) / 100) * (1 / _wr_efficiency)), 0);     //lademenge = Energiemenge bis vollständige Ladung
-    let restladezeit   = Math.ceil(lademenge / _batteryLadePower);                                                                 //Ladezeit = Energiemenge bis vollständige Ladung / Ladeleistung WR
+    let restladezeit   = aufrunden(2, (lademenge / _batteryLadePower));                                                            //Ladezeit = Energiemenge bis vollständige Ladung / Ladeleistung WR
 
     if (_tibberNutzenSteuerung && _prognoseNutzenSteuerung) {
         if (restladezeit <= 0) {
@@ -295,7 +295,7 @@ async function processing() {
         console.info('Batt_Status_____________________ ' + battsts + ' = ' + battStatus);
         console.info('Lademenge bis voll______________ ' + lademenge_full + ' Wh');
         console.info('Lademenge_______________________ ' + lademenge + ' Wh');
-        console.info('Restladezeit____________________ ' + aufrunden(2, restladezeit) + ' h');
+        console.info('Restladezeit____________________ ' + restladezeit + ' h');
         console.info('Einspeisung_____________________ ' + aufrunden(2, _einspeisung) + ' W');
 
     }
@@ -393,6 +393,8 @@ async function processing() {
         if (!_snowmode) {    
             if (pvfc.length > 0) {
                 _sundown = pvfc[(pvfc.length - 1)][4];
+            } else {
+                _sundown = nowhour;         
             }
 
             let su = 0;
@@ -504,7 +506,7 @@ async function processing() {
                 if (aufrunden(2, nachlademengeWh - curbatwh) > 0) {
                     for (let i = 0; i < nachladeStunden; i++) {
                         if (_debug) {
-                            console.warn('Nachladezeit: ' + prclow[i][1] + '-' + prclow[i][2] + ' (' + aufrunden(2, nachlademengeWh - curbatwh) + ' Wh)');
+                            console.warn('Nachladezeit: ' + prclow[i][1] + '-' + prclow[i][2] + ' zum Preis ' + prclow[i][0] + ' (' + aufrunden(2, nachlademengeWh - curbatwh) + ' Wh)');
                         }
                         if (compareTime(prclow[i][1], prclow[i][2], 'between')) {
                             tibberPoilow.push(prclow[i]);
@@ -538,7 +540,7 @@ async function processing() {
             console.info('------>>  laufzeit mit tibber höchstpreise: lefthrs ' + lefthrs + ' Batterielaufzeit: batlefthrs ' + batlefthrs +  ' von PV kommt: pvwhToday ' + pvwhToday);
         }
         
-        if (compareTime(_sunupTodayAstro, _sundownAstro, 'between')) {     // wir sind am Tag laut Astro 
+        if (compareTime(_sunupTodayAstro, _sundown, 'between')) {     // wir sind am Tag 
             if (_dc_now > 1 && _dc_now < _verbrauchJetzt) {                            
                 // wenn genug PV am Tag aber gerade nicht genug Sonne aber tibber klein genug
                 if (_debug) {
@@ -556,7 +558,7 @@ async function processing() {
                     macheNix = true;
                 }
             }
-        } else {          // wir sind in der Nacht
+        } else {          // wir sind nach Sonnenuntergang
             // Entladezeit
             if (batlefthrs > 0) {
                 if (batlefthrs >= hrstorun) { 
@@ -604,6 +606,9 @@ async function processing() {
             if (_tibberPreisJetzt <= _start_charge && pvwhTomorrow < (_baseLoad * 24 * _wr_efficiency)) {
                 starteLadungTibber = true;
             }
+            if (_debug) {                                        
+                console.info('pvwhTomorrow ' + pvwhTomorrow + ' ist kleiner als ' + (_baseLoad * 24 * _wr_efficiency));
+            }
         }
 
         // stoppe die Ladung/Entladung
@@ -611,7 +616,7 @@ async function processing() {
             if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) ) {
                 if (_debug) {                                        
                     console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + aufrunden(2, _stop_discharge) + ' ct/kWh oder battSoc = 0 ist ' + _batsoc );
-                    console.warn(' _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' macheNix ' + macheNix + ' _tibber_active_idx ' + _tibber_active_idx);                    
+                    console.info(' _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' macheNix ' + macheNix + ' _tibber_active_idx ' + _tibber_active_idx);                    
                 }
                 _tibber_active_idx = 3;
             }
