@@ -1208,16 +1208,6 @@ function tibber_active_auswertung() {
             break;
         case 3:                             //      _tibber_active_idx = 3;    entladung stoppen wenn preisschwelle erreicht
             _SpntCom = _InitCom_An;
-            
-// PV deckt Verbrauch zu 70 % dann nimm aus der batterie ist vielleicht ne Wolke unterwegs            
-            if (_dc_now >= (_verbrauchJetzt - (_verbrauchJetzt * 0.30)) ) {      
-                if (compareTime(_ladezeitVon, _ladezeitBis, 'between')) {
-                    if (_debug) {
-                        console.warn('Verbrauch zu 70% gedeckt, vielleicht Wolke unterwegs');
-                    }
-                    _SpntCom = _InitCom_Aus;           
-                }
-            } 
             break;
         case 4:                             //      _tibber_active_idx = 4;    ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
             _SpntCom = _InitCom_An;
