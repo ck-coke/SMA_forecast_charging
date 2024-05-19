@@ -21,8 +21,6 @@ const _options = { hour12: false, hour: '2-digit', minute: '2-digit' };
 let _debug = getState(tibberDP + 'debug').val == null ? false : getState(tibberDP + 'debug').val;
 
 //-------------------------------------------------------------------------------------
-
-//-------------------------------------------------------------------------------------
 const _pvPeak                   = 13100;                                // PV-Anlagenleistung in Wp
 const _batteryCapacity          = 12800;                                // Netto Batterie Kapazität in Wh BYD 2.56 pro Modul
 const _surplusLimit             = 0;                                    // PV-Einspeise-Limit in %  . 0 keine Einspeisung
@@ -549,7 +547,7 @@ async function processing() {
             console.info('------>>  laufzeit mit tibber höchstpreise: lefthrs ' + lefthrs + ' Batterielaufzeit: batlefthrs ' + batlefthrs +  ' von PV kommt: pvwhToday ' + pvwhToday);
         }
         
-        if (compareTime(_sunupAstro, _sundownAstro, 'between')) {     // wir sind am Tag laut Astro nur stunde reicht
+        if (compareTime(_sunupTodayAstro, _sundownAstro, 'between')) {     // wir sind am Tag laut Astro nur stunde reicht
             if (_dc_now > 1 && _dc_now < _verbrauchJetzt) {                            
                 // wenn genug PV am Tag aber gerade nicht genug Sonne 
                 if (pvwhToday > (_baseLoad * 24 * _wr_efficiency) && _tibberPreisJetzt < _stop_discharge) {        //  aus berechnung 18972
@@ -577,8 +575,6 @@ async function processing() {
                     entladeZeitenArray.push([0.0,"--:--","--:--"]);  //  initialisiere für Vis
                 }
             } else {
-                _prognoseNutzenSteuerung = false;  // prognoseladung wird in der nacht nicht gebraucht
-
                 if (tibberPoihighNew.length > 0) {                                     // wir haben höchstpreise 
                     for (let d = 0; d < lefthrs; d++) {
                         if (tibberPoihighNew[d] != null) {
@@ -870,11 +866,6 @@ async function processing() {
                     break;                        
                 }
             }
-
-            if ((_tibber_active_idx == 2 || _tibber_active_idx == 22) && !wirdGeladen) {
-                _SpntCom = _InitCom_Aus;
-                wirdGeladen = true;
-            }       
         }
 
         if (_max_pwr > 0) {        // hier muss immer was negatives rauskommen.. sonst keine pv ladung
@@ -1239,3 +1230,4 @@ function tibber_active_auswertung() {
             _SpntCom = _InitCom_Aus;        
     }
 }
+
