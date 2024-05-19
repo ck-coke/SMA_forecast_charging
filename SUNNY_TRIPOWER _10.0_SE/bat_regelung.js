@@ -555,53 +555,54 @@ async function processing() {
                 }
 
                 // Entladezeit  wenn reste im akku
-                if (_batsoc > 1 && _tibberPreisJetzt > _stop_discharge) {      // wenn noch was im akku und PV läuft aber nicht genug liefert          
+                if (batlefthrs > 0 && _tibberPreisJetzt > _stop_discharge) {      // wenn noch was im akku und PV läuft aber nicht genug liefert          
                     _tibber_active_idx = 21;
                 }
             }
 
         } else {          // wir sind in der Nacht
             // Entladezeit
-            if (batlefthrs > 0 && batlefthrs >= hrstorun) { 
-                macheNix = false;
+            if (batlefthrs > 0) {
+                if (batlefthrs >= hrstorun) { 
+                    if (compareTime(nowhour, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
+                        if (_debug) {
+                            console.warn('Entladezeit reicht aus bis zum Sonnaufgang und genug PV');
+                        }
 
-                if (compareTime(nowhour, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
-                    if (_debug) {
-                        console.warn('Entladezeit reicht aus bis zum Sonnaufgang und genug PV');
+                        macheNix = true;
+                        _tibber_active_idx = 22;
+                        entladeZeitenArray.push([0.0,"--:--","--:--"]);  //  initialisiere für Vis
                     }
+                } else {
+                    if (tibberPoihighNew.length > 0) {                                     // wir haben höchstpreise 
+                        for (let d = 0; d < lefthrs; d++) {
+                            if (tibberPoihighNew[d] != null) {
+                                if (tibberPoihighNew[d][0] > _stop_discharge) {                               
+                                    if (_debug) {
+                                        console.info('alle Entladezeiten: ' + tibberPoihighNew[d][1] + '-' + tibberPoihighNew[d][2] + ' Preis ' + tibberPoihighNew[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
+                                    }
 
-                    macheNix = true;
-                    _tibber_active_idx = 22;
-                    entladeZeitenArray.push([0.0,"--:--","--:--"]);  //  initialisiere für Vis
-                }
-            } else {
-                if (tibberPoihighNew.length > 0) {                                     // wir haben höchstpreise 
-                    for (let d = 0; d < lefthrs; d++) {
-                        if (tibberPoihighNew[d] != null) {
-                            if (tibberPoihighNew[d][0] > _stop_discharge) {                               
-                                if (_debug) {
-                                    console.info('alle Entladezeiten: ' + tibberPoihighNew[d][1] + '-' + tibberPoihighNew[d][2] + ' Preis ' + tibberPoihighNew[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
+                                    entladeZeitenArray.push(tibberPoihighNew[d]);    // alle passende höchstpreiszeiten                           
                                 }
+                            }
+                        }
 
-                                entladeZeitenArray.push(tibberPoihighNew[d]);    // alle passende höchstpreiszeiten                           
+                        for (let c = 0; c < entladeZeitenArray.length; c++) {
+                            if (compareTime(entladeZeitenArray[c][1], entladeZeitenArray[c][2], "between")) {
+                                if (_vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
+                                    break;
+                                } else {
+                                    macheNix = true;
+                                    _tibber_active_idx = 2;
+                                }
                             }
                         }
                     }
-
-                    for (let c = 0; c < entladeZeitenArray.length; c++) {
-                        if (compareTime(entladeZeitenArray[c][1], entladeZeitenArray[c][2], "between")) {
-                            if (_vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
-                                break;
-                            } else {
-                                macheNix = true;
-                                _tibber_active_idx = 2;
-                            }
-                        }
-                    }
+                    entladeZeitenArray = sortArrayByCurrentHour(true, entladeZeitenArray, _hhJetzt);                                           
                 }
-                entladeZeitenArray = sortArrayByCurrentHour(true, entladeZeitenArray, _hhJetzt); 
-                setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArray, true);                       
             }
+            
+            setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArray, true); 
 
             if (!macheNix) {
                 //entladung stoppen wenn preisschwelle erreicht aber nicht wenn ladung reicht bis zum nächsten sonnenaufgang
@@ -622,6 +623,7 @@ async function processing() {
         // starte die ladung
         if (starteLadungTibber) {
             let length = Math.ceil(restladezeit);
+            tibberPoilow = doppelteRausAusArray(tibberPoilow);
 
             if (length > tibberPoilow.length) {
                 length = tibberPoilow.length;
@@ -1177,6 +1179,21 @@ function getMinHours(minutes) {
     let h = (mins - m) / 60;
     let HHMM = (h < 10 ? '0' : '') + h.toString() + ':' + (m < 10 ? '0' : '') + m.toString();
     return HHMM;
+}
+
+function doppelteRausAusArray(arr) {
+  let uniqueArray = [];
+  let seen = new Set();
+
+  for (let item of arr) {
+    let serialized = JSON.stringify(item);
+    if (!seen.has(serialized)) {
+      seen.add(serialized);
+      uniqueArray.push(item);
+    }
+  }
+
+  return uniqueArray;
 }
 
 function tibber_active_auswertung() {
