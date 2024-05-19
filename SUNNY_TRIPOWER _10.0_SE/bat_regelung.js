@@ -549,7 +549,7 @@ async function processing() {
         
         if (compareTime(_sunupTodayAstro, _sundownAstro, 'between')) {     // wir sind am Tag laut Astro nur stunde reicht
             if (_dc_now > 1 && _dc_now < _verbrauchJetzt) {                            
-                // wenn genug PV am Tag aber gerade nicht genug Sonne 
+                // wenn genug PV am Tag aber gerade nicht genug Sonne aber tibber klein genug
                 if (pvwhToday > (_baseLoad * 24 * _wr_efficiency) && _tibberPreisJetzt < _stop_discharge) {        //  aus berechnung 18972
                     _tibber_active_idx = 20;                                           
                 }
@@ -614,17 +614,10 @@ async function processing() {
             }
 
             // in der nacht starten setzen
-            if (_tibberPreisJetzt <= _start_charge && pvwhTomorrow >= (_baseLoad * 24 * _wr_efficiency)) {
+            if (_tibberPreisJetzt <= _start_charge && pvwhTomorrow < (_baseLoad * 24 * _wr_efficiency)) {
                 starteLadungTibber = true;
             }
         }
-
-         // hier musst du ran wenn nachts billig preise und am nächsten tag genug pv
-            //_pvforecastTodayArray            dieser bis 0:00 uhr
-            //_pvforecastTomorrowArray          dieser ab 0:00
-
-            // ein if mit ausgabe true false..
-        
 
         // starte die ladung
         if (starteLadungTibber) {
@@ -1204,7 +1197,6 @@ function tibber_active_auswertung() {
         case 21:                            //      _tibber_active_idx = 21;   Entladezeit wenn akku > 0 aber keine entladezeit, aber der Preis hoch genug um zu sparen               
         case 22:                            //      _tibber_active_idx = 22;   Entladezeit reicht aus bis zum Sonnaufgang
             _SpntCom = _InitCom_Aus;
-
             break;
         case 3:                             //      _tibber_active_idx = 3;    entladung stoppen wenn preisschwelle erreicht
             _SpntCom = _InitCom_An;
@@ -1220,4 +1212,3 @@ function tibber_active_auswertung() {
             _SpntCom = _InitCom_Aus;        
     }
 }
-
