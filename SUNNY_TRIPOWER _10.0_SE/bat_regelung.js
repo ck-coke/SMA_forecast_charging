@@ -430,7 +430,7 @@ async function processing() {
         }
 
 
-        if (toSundownhr >= 0 && toSundownhr < 24) {
+        if (compareTime(parseInt(_sunupAstro.slice(0, 2)), parseInt(_sundownAstro.slice(0, 2)), 'between')) {        // Astro stunde reicht
             pvwh = 0;         // initialisiere damit die entladung läuft
             let t = 0;
             if (toSundownhr > 1) {
