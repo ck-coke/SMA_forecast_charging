@@ -272,11 +272,8 @@ async function processing() {
     let restladezeit   = Math.ceil(lademenge / _batteryLadePower);                                                                 //Ladezeit = Energiemenge bis vollständige Ladung / Ladeleistung WR
 
     if (_tibberNutzenSteuerung && _prognoseNutzenSteuerung) {
-        if (_dc_now < _verbrauchJetzt) {
-            restladezeit = 0;
-        }
-
         if (restladezeit <= 0) {
+            restladezeit = 0;
             lademenge = lademenge_full;
         }
     }
@@ -316,9 +313,11 @@ async function processing() {
 
 
         const tibberPvForcast       = getState(tibberPvForcastDP).val;
-        const tibberPoihigh         = sortArrayByCurrentHour(true,  tibberPvForcast, _hhJetzt);  //  hole preise ab
-        const tibberPoihighSorted   = sortArrayByCurrentHour(false, tibberPvForcast, '00');      //  hole preise ab
+        const tibberPoihigh         = sortArrayByCurrentHour(tibberPvForcast, true, _hhJetzt);  //  hole preise ab
+        const tibberPoihighSorted   = sortArrayByCurrentHour(tibberPvForcast, false, '00');      //  hole preise ab
         
+       // console.info('tibberPoihighSorted ' +  JSON.stringify(tibberPoihighSorted));
+
         let poiTemp = [];   
         for (let t = 0; t < 48; t++) { 
             const zeitMM = tibberPoihighSorted[t][1].slice(3, 5);
@@ -422,8 +421,6 @@ async function processing() {
             console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + '. bis zum Sonnenaufgang nach Untergang sind es ' + hrstorun + ' hrstorun und zum nächsten Untergang toSundownhr ' + toSundownhr);
         }        
 
-        restladezeit = toSundownhr;
-
         if (compareTime(_sunupTodayAstro, _sundownAstro, 'between')) {  // Astro stunde 
             pvwhToday = 0;                                                       // initialisiere damit die entladung läuft
             let t = 0;
@@ -508,7 +505,7 @@ async function processing() {
                     for (let i = 0; i < nachladeStunden; i++) {
                         if (compareTime(prclow[i][1], prclow[i][2], 'between')) {
                             tibberPoilow.push(prclow[i]);
-        //                    ladeZeitenArray.push(prclow[i]);
+                         //    ladeZeitenArray.push(prclow[i]);
                             if (_debug) {
                                 console.warn('-->> Bingo nachladezeit');
                             }
@@ -542,7 +539,11 @@ async function processing() {
         if (compareTime(_sunupTodayAstro, _sundownAstro, 'between')) {     // wir sind am Tag laut Astro nur stunde reicht
             if (_dc_now > 1 && _dc_now < _verbrauchJetzt) {                            
                 // wenn genug PV am Tag aber gerade nicht genug Sonne aber tibber klein genug
-                if (pvwhToday > _batteryCapacity - curbatwh && _tibberPreisJetzt <= _stop_discharge) {        
+                if (_debug) {
+                    console.info('pvwhToday ' + pvwhToday + ' berechnung ' + (_baseLoad * toSundownhr * _wr_efficiency));                
+                }
+                if (pvwhToday > (_baseLoad * toSundownhr * _wr_efficiency) && _tibberPreisJetzt <= _stop_discharge) {
+                // if (pvwhToday > _batteryCapacity - curbatwh && _tibberPreisJetzt <= _stop_discharge) {        
                     _tibber_active_idx = 20;          
                     macheNix = true;
                 } 
@@ -591,7 +592,7 @@ async function processing() {
                             }
                         }
                     }
-                    entladeZeitenArray = sortArrayByCurrentHour(true, entladeZeitenArray, _hhJetzt);                                           
+                    entladeZeitenArray = sortArrayByCurrentHour(entladeZeitenArray, true, _hhJetzt);                                           
                 }
             }
             
@@ -623,15 +624,19 @@ async function processing() {
                 length = tibberPoilow.length;
                 if (_debug) {
                     console.info('Starte Ladung mit tibber : ' + JSON.stringify(tibberPoilow));
-                //    console.info('Ladungzeiten: tibberPoilow ' + JSON.stringify(tibberPoilow));
                 }
             }
 
-            for (let i = 0; i < length; i++) {
-                ladeZeitenArray.push(tibberPoilow[i]);
-                if (compareTime(tibberPoilow[i][1], tibberPoilow[i][2], 'between') && _dc_now < _verbrauchJetzt) {
+            for (let g = 0; g < length; g++) {
+                ladeZeitenArray.push(tibberPoilow[g]);
+            }    
+                
+            ladeZeitenArray = sortArrayByCurrentHour(ladeZeitenArray, false, '00');      //  hole preise ab
+
+            for (let i = 0; i < ladeZeitenArray.length; i++) {                    
+                if (compareTime(ladeZeitenArray[i][1], ladeZeitenArray[i][2], 'between') && _dc_now < _verbrauchJetzt) {
                     if (_debug) {
-                        console.info('Starte Ladung: ' + tibberPoilow[i][1] + '-' + tibberPoilow[i][2] + ' Preis ' + tibberPoilow[i][0]);
+                        console.info('Starte Ladung: ' + ladeZeitenArray[i][1] + '-' + ladeZeitenArray[i][2] + ' Preis ' + ladeZeitenArray[i][0]);
                     }
                     _tibber_active_idx = 5;
                     wirdGeladen = true;
@@ -643,15 +648,10 @@ async function processing() {
         //ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
         if (tibberPoilow.length > 0 && restladezeit <= tibberPoilow.length && _tibber_active_idx == 5) {
             if (_debug) {
-                console.info('Stoppe Ladung, tibberPoilow.length ' + tibberPoilow.length);
+                console.info('Stoppe Ladung');
             }
-            _tibber_active_idx = 4;
-            
-        }
-            
-        ladeZeitenArray.sort(function (a, b) {
-            return b[1] - a[1];
-        });
+            _tibber_active_idx = 4;            
+        }    
         
         setState(tibberDP + 'extra.ladeZeitenArray', ladeZeitenArray, true);
 
@@ -795,7 +795,7 @@ async function processing() {
 
             setState(tibberDP + 'extra.pvLadeZeitenArray', pvfc, true);
 
-            if (_dc_now < _verbrauchJetzt && _tibber_active_idx == 0)       {
+            if (_dc_now < _verbrauchJetzt && _tibber_active_idx == 0) {
                 _max_pwr = _mindischrg;
             }           
 
@@ -956,6 +956,14 @@ on({id: [tibberDP + 'extra.tibberNutzenAutomatisch',
 });
 
 
+//  reduzierung lesezugroffe, hole die PV nur wenn sich was geändert hat
+on({id: '0_userdata.0.strom.pvforecast.lastUpdated', change: 'any'}, async function() {  
+    setTimeout(function() {
+        _pvforecastTodayArray       = [];
+        _pvforecastTomorrowArray    = [];
+        holePVDatenAb();
+    }, 5000);     // warte 5 sekunden   
+});
 
 function notLadungCheck() {    
     if (_bydDirectSOC < 5 && _dc_now < _verbrauchJetzt) {
@@ -1051,7 +1059,7 @@ function zeitDifferenzInStunden(zeit1, zeit2, nextDay) {
     return `${differenzStunden}.${(differenzMinuten < 10 ? '0' : '') + differenzMinuten}`;
 }
 
-function sortArrayByCurrentHour(findeIndex, zeiten, currentHour) {
+function sortArrayByCurrentHour(zeiten, toEnd, currentHour) {
     // Sortiere den Array nach der Startzeit
     zeiten.sort((a, b) => {
         const timeA = a[1].split(":").map(Number);
@@ -1068,7 +1076,7 @@ function sortArrayByCurrentHour(findeIndex, zeiten, currentHour) {
 
     let sortedArray = [];
     
-    if (findeIndex) {
+    if (toEnd) {
         // Finde den Index des aktuellen Zeitpunkts
         let startIndex = zeiten.findIndex(item => {
             const time = item[1].split(":").map(Number);
@@ -1107,16 +1115,6 @@ function getPvErtrag(pvlimit) {
     }
     return pvfc;
 }
-
-
-//  reduzierung lesezugroffe, hole die PV nur wenn sich was geändert hat
-on({id: '0_userdata.0.strom.pvforecast.lastUpdated', change: 'any'}, async function() {  
-    setTimeout(function() {
-        _pvforecastTodayArray       = [];
-        _pvforecastTomorrowArray    = [];
-        holePVDatenAb();
-    }, 5000);     // warte 5 sekunden   
-});
 
 async function holePVDatenAb() {
     for (let p = 0; p < 48; p++) {   
@@ -1198,4 +1196,3 @@ function tibber_active_auswertung() {
             _SpntCom = _InitCom_Aus;        
     }
 }
-
