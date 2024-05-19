@@ -21,6 +21,8 @@ const _options = { hour12: false, hour: '2-digit', minute: '2-digit' };
 let _debug = getState(tibberDP + 'debug').val == null ? false : getState(tibberDP + 'debug').val;
 
 //-------------------------------------------------------------------------------------
+
+//-------------------------------------------------------------------------------------
 const _pvPeak                   = 13100;                                // PV-Anlagenleistung in Wp
 const _batteryCapacity          = 12800;                                // Netto Batterie Kapazität in Wh BYD 2.56 pro Modul
 const _surplusLimit             = 0;                                    // PV-Einspeise-Limit in %  . 0 keine Einspeisung
@@ -29,21 +31,23 @@ const _lastPercentageLoadWith   = -500;                                 // letzt
 const _baseLoad                 = 850;                                  // Grundverbrauch in Watt
 const _wr_efficiency            = 0.93;                                 // Batterie- und WR-Effizienz (e.g., 0.9 for Li-Ion, 0.8 for PB)
 const _batteryPowerEmergency    = -4000;                                // Ladeleistung der Batterie in W notladung
-const _mindischrg               = 0;                                    // min entlade W für Ladungerhaltung 
+const _mindischrg               = -1;                                   // min entlade W
 const _batteryLadePowerMax      = 5000;                                 // max Batterie ladung 
+const _lossfactor               = 0.75;                                 // System gesamtverlust in % (Lade+Entlade Effizienz)
 const _pwrAtCom_def             = _batteryLadePowerMax * (253 / 230);   // max power bei 253V = 5500 W
 const _sma_em                   = 'sma-em.0.3015242334';                // Name der SMA EnergyMeter/HM2 Instanz bei installierten SAM-EM Adapter, leer lassen wenn nicht vorhanden
 let _batteryLadePower           = _batteryLadePowerMax;                 // Ladeleistung laufend der Batterie in W
+const _loadfact                 = 1 / _lossfactor;                      // 1,33
+
+// manuelles reduzieren der PV um x Watt
 let _power50Reduzierung         = 0;                                    // manuelles reduzieren der pv prognose pro stunde bewölkt
 let _power90Reduzierung         = 0;                                    // manuelles reduzieren der pv prognose pro stunde ohne wolken
 
 
 // tibber Preis Bereich
-let _snowmode           = false;                                        //manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
-let _start_charge       = 0.1880;                                       //Eigenverbrauchspreis
-const _lossfactor       = 0.75;                                         //System gesamtverlust in % (Lade+Entlade Effizienz), nur für tibber Preisberechnung
-const _loadfact         = 1 / _lossfactor;                              // 1,33
-const _stop_discharge   = aufrunden(4, _start_charge * _loadfact);      // 0.19 * 1.33 = 0.2533 €
+let _snowmode                   = false;                                        // manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
+let _start_charge               = 0.1881;                                       // Eigenverbrauchspreis
+const _stop_discharge           = aufrunden(4, _start_charge * _loadfact);      // 0.19 * 1.33 = 0.2533 €
 
 
 // Fahrzeug mit berücksichtigen in Verbrauchsrechnung EVCC Adapter benötigt
