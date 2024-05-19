@@ -464,6 +464,8 @@ async function processing() {
         let prchigh             = [];
         let ladeZeitenArray     = [];
 
+        let curbatwh   = aufrunden(2, ((_batteryCapacity / 100) * _batsoc));     // batterie ladung 
+
         if (batlefthrs < hrstorun) {
             for (let h = 0; h < tibberPoihigh.length; h++) {
                 if (tibberPoihigh[h][0] <= _start_charge) {
@@ -487,7 +489,6 @@ async function processing() {
 
             chargewh =  aufrunden(2, chargewh);
 
-            let curbatwh   = aufrunden(2, ((_batteryCapacity / 100) * _batsoc));
             let chrglength = aufrunden(2, (Math.max((chargewh - curbatwh) / (_batteryLadePower * _wr_efficiency), 0) * 2));
 
             // neuaufbau tibberPoihigh ohne Nachladestunden
@@ -550,7 +551,7 @@ async function processing() {
         if (compareTime(_sunupTodayAstro, _sundownAstro, 'between')) {     // wir sind am Tag laut Astro nur stunde reicht
             if (_dc_now > 1 && _dc_now < _verbrauchJetzt) {                            
                 // wenn genug PV am Tag aber gerade nicht genug Sonne aber tibber klein genug
-                if (pvwhToday > (_baseLoad * 24 * _wr_efficiency) && _tibberPreisJetzt <= _stop_discharge) {        //  aus berechnung 18972
+                if (pvwhToday > _batteryCapacity - curbatwh && _tibberPreisJetzt <= _stop_discharge) {        
                     _tibber_active_idx = 20;          
                     macheNix = true;
                 } 
@@ -614,8 +615,9 @@ async function processing() {
         // stoppe die Ladung/Entladung
         if (!macheNix) {            
             if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) ) {
-                if (_debug) {
+                if (_debug) {                                        
                     console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + aufrunden(2, _stop_discharge) + ' ct/kWh oder battSoc = 0 ist ' + _batsoc );
+                    console.warn(' _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' macheNix ' + macheNix + ' _tibber_active_idx ' + _tibber_active_idx);                    
                 }
                 _tibber_active_idx = 3;
             }
@@ -832,7 +834,7 @@ async function processing() {
                         if (_debug) {
                             console.warn('-->> breche ab, da nicht genug Sonne ' );
                         }
-                        if (_tibber_active_idx == 2) {   // komme aus der entladung 
+                        if (_tibber_active_idx == 20) {   // komme von oben
                             _SpntCom = _InitCom_Aus;
                         }
                         break;
