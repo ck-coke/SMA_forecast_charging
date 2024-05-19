@@ -539,6 +539,7 @@ async function processing() {
                 console.info('tibberPoihighNew.length '+ tibberPoihighNew.length);
                 console.info('tibberPoilow.length '+ tibberPoilow.length);
           //    console.info('tibberPoihighNew nach filter ' + JSON.stringify(tibberPoihighNew));
+          //    console.info('tibberPoilow nach filter ' + JSON.stringify(tibberPoilow));
             }
 
             if (lefthrs > 0 && lefthrs > tibberPoihighNew.length) {        // limmitiere auf Tibber höchstpreise
@@ -556,7 +557,7 @@ async function processing() {
             }
 
             // Entladezeit
-            if (batlefthrs > 0 && batlefthrs >= hrstorun && pvwh < _baseLoad * 24 * _wr_efficiency) {        //  16200 aus der berechung
+            if (batlefthrs > 0 && batlefthrs >= hrstorun) { 
                 macheNix = false;
 
                 if (compareTime(nowhour, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
@@ -598,12 +599,15 @@ async function processing() {
                                     macheNix = true;
                                     _tibber_active_idx = 2;
                                     _entladung_zeitfenster = true;
-                                }
+                                } 
                             }
                         }
                     }
                 }
             }                        
+            if (_dc_now >= _verbrauchJetzt) {
+                entladeZeitenArray.splice(0, 2);  // lösche die aktuelle entladezeit wenn genug PV
+            }
 
             entladeZeitenArray = sortArrayByCurrentHour(true, entladeZeitenArray, _hhJetzt);
 
@@ -617,6 +621,13 @@ async function processing() {
                     }
                     _tibber_active_idx = 3;
                 }
+
+            // hier musst du ran wenn nachts billig preise und am nächsten tag genug pv
+                //_pvforecastTodayArray            dieser bis 0:00 uhr
+                //_pvforecastTomorrowArray          dieser ab 0:00
+
+                // ein if mit ausgabe true false..
+
 
                 // starte die ladung
                 if (_tibberPreisJetzt <= _start_charge) {
@@ -1170,7 +1181,7 @@ async function holePVDatenAb() {
         const endTime   = getState(pvforecastTomorrowDP + p + '.endTime').val;
         const power50   = getState(pvforecastTomorrowDP + p + '.power').val;
         const power90   = getState(pvforecastTomorrowDP + p + '.power90').val;
-
+      
         _pvforecastTomorrowArray.push([startTime,endTime,power50,power90]);
     }
 }
