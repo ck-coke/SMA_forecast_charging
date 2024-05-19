@@ -428,7 +428,7 @@ async function processing() {
             console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + '. bis zum Sonnenaufgang nach Untergang sind es ' + hrstorun + ' hrstorun und zum nächsten Untergang toSundownhr ' + toSundownhr);
         }
 
-        if (compareTime(_sunupTodayAstro, _sundownAstro, 'between')) {         // Astro stunde 
+        if (compareTime(_sunupTodayAstro, _sundownAstro, 'between')) {  // Astro stunde 
             pvwhToday = 0;                                                       // initialisiere damit die entladung läuft
             let t = 0;
             if (toSundownhr > 1) {
@@ -550,16 +550,17 @@ async function processing() {
         if (compareTime(_sunupTodayAstro, _sundownAstro, 'between')) {     // wir sind am Tag laut Astro nur stunde reicht
             if (_dc_now > 1 && _dc_now < _verbrauchJetzt) {                            
                 // wenn genug PV am Tag aber gerade nicht genug Sonne aber tibber klein genug
-                if (pvwhToday > (_baseLoad * 24 * _wr_efficiency) && _tibberPreisJetzt < _stop_discharge) {        //  aus berechnung 18972
-                    _tibber_active_idx = 20;                                           
-                }
+                if (pvwhToday > (_baseLoad * 24 * _wr_efficiency) && _tibberPreisJetzt <= _stop_discharge) {        //  aus berechnung 18972
+                    _tibber_active_idx = 20;          
+                    macheNix = true;
+                } 
 
                 // Entladezeit  wenn reste im akku
                 if (batlefthrs > 0 && _tibberPreisJetzt > _stop_discharge) {      // wenn noch was im akku und PV läuft aber nicht genug liefert          
                     _tibber_active_idx = 21;
+                    macheNix = true;
                 }
             }
-
         } else {          // wir sind in der Nacht
             // Entladezeit
             if (batlefthrs > 0) {
@@ -603,20 +604,20 @@ async function processing() {
             }
             
             setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArray, true); 
-
-            if (!macheNix) {
-                //entladung stoppen wenn preisschwelle erreicht aber nicht wenn ladung reicht bis zum nächsten sonnenaufgang
-                if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) ) {
-                    if (_debug) {
-                        console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + aufrunden(2, _stop_discharge) + ' ct/kWh oder battSoc = 0 ist ' + _batsoc );
-                    }
-                    _tibber_active_idx = 3;
-                }
-            }
-
+            
             // in der nacht starten setzen
             if (_tibberPreisJetzt <= _start_charge && pvwhTomorrow < (_baseLoad * 24 * _wr_efficiency)) {
                 starteLadungTibber = true;
+            }
+        }
+
+        // stoppe die Ladung/Entladung
+        if (!macheNix) {            
+            if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) ) {
+                if (_debug) {
+                    console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + aufrunden(2, _stop_discharge) + ' ct/kWh oder battSoc = 0 ist ' + _batsoc );
+                }
+                _tibber_active_idx = 3;
             }
         }
 
