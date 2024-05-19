@@ -428,7 +428,7 @@ async function processing() {
             console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + '. bis zum Sonnenaufgang nach Untergang sind es ' + hrstorun + ' hrstorun und zum nächsten Untergang toSundownhr ' + toSundownhr);
         }
 
-        if (compareTime(parseInt(_sunupAstro.slice(0, 2)), parseInt(_sundownAstro.slice(0, 2)), 'between')) {        // Astro stunde reicht
+        if (compareTime(_sunupTodayAstro, _sundownAstro, 'between')) {         // Astro stunde 
             pvwhToday = 0;                                                       // initialisiere damit die entladung läuft
             let t = 0;
             if (toSundownhr > 1) {
