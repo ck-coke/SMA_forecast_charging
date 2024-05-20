@@ -235,8 +235,7 @@ async function processing() {
 
     let macheNix        = false;
     let wirdGeladen     = false;
-    let hhJetztNum      = Number(_hhJetzt);
-
+ 
     _bydDirectSOCMrk = 0;
 
     if (_dc_now < 2) {              // alles was unter 2 W kann weg
@@ -254,7 +253,8 @@ async function processing() {
     setState(pV_Leistung_aktuellDP, dc_now_DP, true);
 
     let pvlimit                         = (_pvPeak / 100 * _surplusLimit);                       //pvlimit = 13100/100*0 = 0
-    let pvfc                            = getPvErtrag(pvlimit);
+    const pvfc                          = getPvErtrag(pvlimit).pvfc;
+    const pvfcAll                       = getPvErtrag(pvlimit).pvfcAll;
     let batterieLadenUhrzeit            = getState(batterieLadenUhrzeitDP).val;
     let batterieLadenUhrzeitStart       = getState(batterieLadenUhrzeitStartDP).val;
     let battStatus                      = getState(inputRegisters.betriebszustandBatterie).val;
@@ -312,16 +312,18 @@ async function processing() {
         if (_tibber_active_idx == 88) { // komme aus notladung
             setState(spntComCheckDP, 888, true);
         }
-        
-        let nowhour         = _hhJetzt + ':00'; // stunde jetzt zur laufzeit     
+
+        const nowhour       = _hhJetzt + ':00'; // stunde jetzt zur laufzeit 
+        const tomorrow      = new Date(_today.getFullYear(), _today.getMonth(), _today.getDate() + 1);  
+
         _tibber_active_idx  = 0;    // initialisiere
 
-
-        const tibberPvForcast       = getState(tibberPvForcastDP).val;
-        const tibberPoihigh         = sortArrayByCurrentHour(tibberPvForcast, true, _hhJetzt);  //  hole preise ab
-        const tibberPoihighSorted   = sortArrayByCurrentHour(tibberPvForcast, false, '00');      //  hole preise ab
+        const tibberPvForcast           = getState(tibberPvForcastDP).val;
+        const ressortArrayByCurrentHour = sortArrayByCurrentHour(tibberPvForcast, _hhJetzt);
+        const tibberPoihigh             = ressortArrayByCurrentHour.notSortedArray;
+        const tibberPoihighSorted       = ressortArrayByCurrentHour.sortedArray;
         
-       // console.info('tibberPoihighSorted ' +  JSON.stringify(tibberPoihighSorted));
+    //    console.info('tibberPoihighSorted ' +  JSON.stringify(tibberPoihigh));
 
         let poiTemp = [];   
         for (let t = 0; t < 48; t++) { 
@@ -338,7 +340,7 @@ async function processing() {
                 }
             }   
         }       
-
+        
         poiTemp.sort(function (a, b) {  // niedrieg preis sort
             return a[0] - b[0];
         });
@@ -375,8 +377,6 @@ async function processing() {
 
         setState(tibberDP + 'extra.PV_Prognose', aufrunden(2, pvwhToday), true);
 
-        const tomorrow = new Date(_today.getFullYear(), _today.getMonth(), _today.getDate() + 1);
-
         _sundownAstro       = getAstroDate('sunsetStart').getHours() + ':' + getAstroDate('sunsetStart').getMinutes().toString().padStart(2, '0');                           // untergang heute  
         _sunupTodayAstro    = getAstroDate('sunriseEnd').getHours() + ':' + getAstroDate('sunriseEnd').getMinutes().toString().padStart(2, '0');                             // aufgang heute
         _sunupAstro         = getAstroDate('sunriseEnd', tomorrow).getHours() + ':' + getAstroDate('sunriseEnd', tomorrow).getMinutes().toString().padStart(2, '0');         // aufgang nächster Tag
@@ -404,7 +404,7 @@ async function processing() {
 
                     const sunupHH = parseInt(_sunup.slice(0, 2));
 
-                    if (hhJetztNum > sunupHH) {
+                    if (Number(_hhJetzt) > sunupHH) {
                         neuberechnen = true;
                     }
                     break;
@@ -596,7 +596,7 @@ async function processing() {
                             }
                         }
                     }
-                    entladeZeitenArray = sortArrayByCurrentHour(entladeZeitenArray, true, _hhJetzt);                                           
+                    entladeZeitenArray = sortArrayByCurrentHour(entladeZeitenArray, _hhJetzt).sortedArray;                                           
                 }
             }
             
@@ -638,7 +638,7 @@ async function processing() {
                 ladeZeitenArray.push(tibberPoilow[g]);
             }    
                 
-            ladeZeitenArray = sortArrayByCurrentHour(ladeZeitenArray, false, '00');      //  hole preise ab
+            ladeZeitenArray = sortArrayByCurrentHour(ladeZeitenArray, '00').notSortedArray;      //  hole preise ab
 
             for (let i = 0; i < ladeZeitenArray.length; i++) {                    
                 if (compareTime(ladeZeitenArray[i][1], ladeZeitenArray[i][2], 'between') && _dc_now < _verbrauchJetzt) {
@@ -732,10 +732,10 @@ async function processing() {
                 }
 
                 if (compareTime(pvfc[k][3], pvfc[k][4], 'between')) {
-                    const nowTime = _today.toLocaleTimeString('de-DE', _options);
-                    const startsplit = nowTime.split(':');
-                    const endsplit = pvfc[k][4].split(':');
-                    const minutescalc = (Number(endsplit[0]) * 60 + Number(endsplit[1])) - (Number(startsplit[0]) * 60 + Number(startsplit[1]));
+                    const nowTime       = _today.toLocaleTimeString('de-DE', _options);
+                    const startsplit    = nowTime.split(':');
+                    const endsplit      = pvfc[k][4].split(':');
+                    const minutescalc   = (Number(endsplit[0]) * 60 + Number(endsplit[1])) - (Number(startsplit[0]) * 60 + Number(startsplit[1]));
                     if (minutescalc < minutes) {
                         minutes = minutescalc;
                     }
@@ -761,7 +761,7 @@ async function processing() {
                 get_wh = lademenge;       //daran liegts damit der unten immer rein geht ????
             }
 
-            get_wh = aufrunden(2, get_wh);     // aufrunden 2 stellen reichen
+            get_wh = aufrunden(2, get_wh);     
 
             if (_debug) {
                 console.info('-->  Verschiebe Einspeiselimit auf pvlimit_calc ' + pvlimit_calc + ' W' + ' mit mindestens ' + min_pwr + ' W  get_wh ' + get_wh + ' restladezeit ' + restladezeit );
@@ -807,12 +807,13 @@ async function processing() {
             }           
 
             for (let h = 0; h < (restladezeit *2); h++) {  // nur wenn überschuss wirklich da ist
-                _SpntCom = _InitCom_An;
-
-                if ((compareTime(pvfc[h][3], pvfc[h][4], 'between')) || (_einspeisung + _powerAC) >= (pvlimit - 100)) {
+ 
+                 if ((compareTime(pvfc[h][3], pvfc[h][4], 'between')) || (_einspeisung + _powerAC) >= (pvlimit - 100)) {
                     _ladezeitVon = pvfc[h][3];
                     _ladezeitBis = pvfc[h][4];
                     
+                    _SpntCom = _InitCom_An;
+
                     if (_debug) {
                         console.warn('-->> Bingo ladezeit' );
                     }
@@ -1066,7 +1067,7 @@ function zeitDifferenzInStunden(zeit1, zeit2, nextDay) {
     return `${differenzStunden}.${(differenzMinuten < 10 ? '0' : '') + differenzMinuten}`;
 }
 
-function sortArrayByCurrentHour(zeiten, toEnd, currentHour) {
+function sortArrayByCurrentHour(zeiten, currentHour) {
     // Sortiere den Array nach der Startzeit
     zeiten.sort((a, b) => {
         const timeA = a[1].split(":").map(Number);
@@ -1081,28 +1082,24 @@ function sortArrayByCurrentHour(zeiten, toEnd, currentHour) {
         return timeA[1] - timeB[1];
     });
 
-    let sortedArray = [];
+    const notSortedArray = zeiten;
+
+    // Finde den Index des aktuellen Zeitpunkts
+    let startIndex = zeiten.findIndex(item => {
+        const time = item[1].split(":").map(Number);
+        return time[0] >= currentHour || (time[0] === currentHour && time[1] >= 30);
+    });
+
+// Schneide den Array ab startIndex und setze ihn an das Ende
+    const sortedArray = zeiten.slice(startIndex).concat(zeiten.slice(0, startIndex));
     
-    if (toEnd) {
-        // Finde den Index des aktuellen Zeitpunkts
-        let startIndex = zeiten.findIndex(item => {
-            const time = item[1].split(":").map(Number);
-            return time[0] >= currentHour || (time[0] === currentHour && time[1] >= 30);
-        });
-
-    // Schneide den Array ab startIndex und setze ihn an das Ende
-        sortedArray = zeiten.slice(startIndex).concat(zeiten.slice(0, startIndex));
-    } else {
-        sortedArray = zeiten;   
-    }
-
-    return sortedArray;
+    return {sortedArray, notSortedArray};
 }
 
 function getPvErtrag(pvlimit) {
     let pvfc = [];
-    let f = 0;
-
+    let pvfcAll = [];
+  
     for (let p = 0; p < 48; p++) { /* 48 = 24h a 30min Fenster*/
         const pvstarttime = _pvforecastTodayArray[p][0];
         const pvendtime   = _pvforecastTodayArray[p][1];               
@@ -1110,29 +1107,38 @@ function getPvErtrag(pvlimit) {
         const pvpower90   = _pvforecastTodayArray[p][3];
 
         if (pvpower90 > (pvlimit + _baseLoad)) {
+            let minutes = 30;
+            pvfcAll.push([pvpower50, pvpower90, minutes, pvstarttime, pvendtime]);
             if (compareTime(pvendtime, null, '<=', null)) {
-                let minutes = 30;
-                if (pvpower50 < pvlimit) {
+                if (pvpower50 < pvlimit) {          
                     minutes = Math.round((100 - (((pvlimit - pvpower50) / ((pvpower90 - pvpower50) / 40)) + 50)) * 18 / 60);
                 }
-                pvfc[f] = [pvpower50, pvpower90, minutes, pvstarttime, pvendtime];
-                f++;
+                pvfc.push([pvpower50, pvpower90, minutes, pvstarttime, pvendtime]);                
             }
         }
     }
-    return pvfc;
+    return {pvfc, pvfcAll};
 }
 
 async function holePVDatenAb() {
     for (let p = 0; p < 48; p++) {   
         const startTime = getState(pvforecastTodayDP + p + '.startTime').val;
         const endTime   = getState(pvforecastTodayDP + p + '.endTime').val;
-        let power50   = getState(pvforecastTodayDP + p + '.power').val;
-        let power90   = getState(pvforecastTodayDP + p + '.power90').val;
+        let power50     = getState(pvforecastTodayDP + p + '.power').val;
+        let power90     = getState(pvforecastTodayDP + p + '.power90').val;
 
         // manuelles reduzieren pv
         power50 = power50 - _power50Reduzierung;
         power90 = power90 - _power90Reduzierung;
+
+       // keine negativen werte 
+        if (power50 < 0) {
+            power50 = 0;
+        }
+
+        if(power90 < 0) {
+            power90 = 0;    
+        }
 
         _pvforecastTodayArray.push([startTime,endTime,power50,power90]);
     }
