@@ -311,12 +311,11 @@ async function processing() {
 
         _tibber_active_idx  = 0;    // initialisiere
 
-        const tibberPvForcast           = getState(tibberPvForcastDP).val;
-        const ressortArrayByCurrentHour = sortArrayByCurrentHour(tibberPvForcast, _hhJetzt);
-        const tibberPoihigh             = ressortArrayByCurrentHour.notSortedArray;
-        const tibberPoihighSorted       = ressortArrayByCurrentHour.sortedArray;
+        const tibberPvForcast       = getState(tibberPvForcastDP).val;
+        const tibberPoihigh         = sortArrayByCurrentHour(tibberPvForcast, true, _hhJetzt);  
+        const tibberPoihighSorted   = sortArrayByCurrentHour(tibberPvForcast, false, '00');      
         
-    //    console.info('tibberPoihighSorted ' +  JSON.stringify(tibberPoihigh));
+       // console.info('tibberPoihighSorted ' +  JSON.stringify(tibberPoihigh));
 
         let poiTemp = [];   
         for (let t = 0; t < 48; t++) { 
@@ -522,7 +521,7 @@ async function processing() {
 
         if (_debug) {
             console.info('tibberPoihighNew.length '+ tibberPoihighNew.length);
-        //    console.info('tibberPoihighNew nach filter ' + JSON.stringify(tibberPoihighNew));
+         //   console.info('tibberPoihighNew nach filter ' + JSON.stringify(tibberPoihighNew));
         }
 
         if (lefthrs > 0 && lefthrs > tibberPoihighNew.length) {        // limmitiere auf Tibber höchstpreise
@@ -534,6 +533,9 @@ async function processing() {
         }
         
         if (compareTime(_sunupTodayAstro, _sundown, 'between')) {     // wir sind am Tag 
+            if (_debug) {
+                console.warn('Tag verarbeitung');
+            }
             if (_dc_now > 1 && _dc_now < _verbrauchJetzt) {                            
                 // wenn genug PV am Tag aber gerade nicht genug Sonne aber tibber klein genug
                 if (_debug) {
@@ -552,6 +554,9 @@ async function processing() {
                 }
             }
         } else {          // wir sind nach Sonnenuntergang
+            if (_debug) {
+                console.warn('Nacht verarbeitung');
+            }
             // Entladezeit
             if (batlefthrs > 0) {
                 if (batlefthrs >= hrstorun) { 
@@ -567,15 +572,13 @@ async function processing() {
                 } else {
                     if (tibberPoihighNew.length > 0) {                                     // wir haben höchstpreise 
                         for (let d = 0; d < lefthrs; d++) {
-                            if (tibberPoihighNew[d] != null) {
-                                if (tibberPoihighNew[d][0] > _stop_discharge) {                               
-                                    if (_debug) {
-                                        console.info('alle Entladezeiten: ' + tibberPoihighNew[d][1] + '-' + tibberPoihighNew[d][2] + ' Preis ' + tibberPoihighNew[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
-                                    }
-
-                                    entladeZeitenArray.push(tibberPoihighNew[d]);    // alle passende höchstpreiszeiten                           
+                            if (tibberPoihighNew[d][0] > _stop_discharge) {                               
+                                if (_debug) {
+                                    console.info('alle Entladezeiten: ' + tibberPoihighNew[d][1] + '-' + tibberPoihighNew[d][2] + ' Preis ' + tibberPoihighNew[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
                                 }
-                            }
+
+                                entladeZeitenArray.push(tibberPoihighNew[d]);    // alle passende höchstpreiszeiten                           
+                            }  
                         }
 
                         for (let c = 0; c < entladeZeitenArray.length; c++) {
@@ -589,7 +592,7 @@ async function processing() {
                             }
                         }
                     }
-                    entladeZeitenArray = sortArrayByCurrentHour(entladeZeitenArray, _hhJetzt).sortedArray;                                           
+                    entladeZeitenArray = sortArrayByCurrentHour(entladeZeitenArray, true, _hhJetzt);                                          
                 }
             }
             
@@ -642,7 +645,7 @@ async function processing() {
                 ladeZeitenArray.push(tibberPoilow[g]);
             }    
                 
-            ladeZeitenArray = sortArrayByCurrentHour(ladeZeitenArray, '00').notSortedArray;      //  hole preise ab
+            ladeZeitenArray = sortArrayByCurrentHour(ladeZeitenArray, false, '00');      
 
             for (let i = 0; i < ladeZeitenArray.length; i++) {                    
                 if (compareTime(ladeZeitenArray[i][1], ladeZeitenArray[i][2], 'between') && _dc_now < _verbrauchJetzt) {
@@ -1072,7 +1075,7 @@ function zeitDifferenzInStunden(zeit1, zeit2, nextDay) {
     return `${differenzStunden}.${(differenzMinuten < 10 ? '0' : '') + differenzMinuten}`;
 }
 
-function sortArrayByCurrentHour(zeiten, currentHour) {
+function sortArrayByCurrentHour(zeiten, toEnd, currentHour) {
     // Sortiere den Array nach der Startzeit
     zeiten.sort((a, b) => {
         const timeA = a[1].split(":").map(Number);
@@ -1087,18 +1090,22 @@ function sortArrayByCurrentHour(zeiten, currentHour) {
         return timeA[1] - timeB[1];
     });
 
-    const notSortedArray = zeiten;
-
-    // Finde den Index des aktuellen Zeitpunkts
-    let startIndex = zeiten.findIndex(item => {
-        const time = item[1].split(":").map(Number);
-        return time[0] >= currentHour || (time[0] === currentHour && time[1] >= 30);
-    });
-
-// Schneide den Array ab startIndex und setze ihn an das Ende
-    const sortedArray = zeiten.slice(startIndex).concat(zeiten.slice(0, startIndex));
+    let sortedArray = [];
     
-    return {sortedArray, notSortedArray};
+    if (toEnd) {
+        // Finde den Index des aktuellen Zeitpunkts
+        let startIndex = zeiten.findIndex(item => {
+            const time = item[1].split(":").map(Number);
+            return time[0] >= currentHour || (time[0] === currentHour && time[1] >= 30);
+        });
+
+    // Schneide den Array ab startIndex und setze ihn an das Ende
+        sortedArray = zeiten.slice(startIndex).concat(zeiten.slice(0, startIndex));
+    } else {
+        sortedArray = zeiten;   
+    }
+
+    return sortedArray;
 }
 
 function getPvErtrag(pvlimit) {
