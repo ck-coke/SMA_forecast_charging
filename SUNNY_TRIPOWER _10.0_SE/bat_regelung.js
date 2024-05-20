@@ -274,6 +274,11 @@ async function processing() {
     let lademenge      = Math.max(Math.ceil((_batteryCapacity * (_batteryTarget - _batsoc) / 100) * (1 / _wr_efficiency)), 0);     //lademenge = Energiemenge bis vollständige Ladung
     let restladezeit   = aufrunden(2, (lademenge / _batteryLadePower));                                                            //Ladezeit = Energiemenge bis vollständige Ladung / Ladeleistung WR
 
+    if (_batteryLadePower == 1) {
+        restladezeit    = 0;
+        lademenge       = lademenge_full;
+    }
+
     setState(tibberDP + 'extra.BatterieRestladezeit', restladezeit, true);
 
     if (_debug) {
@@ -602,7 +607,7 @@ async function processing() {
             if (_tibberPreisJetzt <= _start_charge && _batsoc < 100) {
                 let vergleichepvWh = 0;
                 
-                if (compareTime('00:00', null, "<", null)) {
+                if (compareTime('00:00', null, ">", null)) {
                     vergleichepvWh = pvwhTomorrow;              // vor 00:00 bruachen wir den morgen wert
                 } else {
                     vergleichepvWh = pvwhToday;                 // danach den tageswert
@@ -613,7 +618,7 @@ async function processing() {
                 }
             
                 if (_debug) {                                        
-                    console.info('pvwhTomorrow ' + vergleichepvWh + ' ist kleiner als ' + (_baseLoad * 24 * _wr_efficiency));
+                    console.info('pvwh ' + vergleichepvWh + ' ist kleiner als ' + (_baseLoad * 24 * _wr_efficiency));
                 }
             }
         }
@@ -631,7 +636,7 @@ async function processing() {
 
         // starte die ladung
         if (starteLadungTibber) {
-            let length = Math.ceil(restladezeit);
+            let length = aufrunden(2, restladezeit);
             tibberPoilow = doppelteRausAusArray(tibberPoilow);
 
             if (length > tibberPoilow.length) {
