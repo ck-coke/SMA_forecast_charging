@@ -596,11 +596,22 @@ async function processing() {
             setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArray, true); 
             
             // in der nacht starten setzen
-            if (_tibberPreisJetzt <= _start_charge && pvwhTomorrow < (_baseLoad * 24 * _wr_efficiency)) {
-                starteLadungTibber = true;
-            }
-            if (_debug) {                                        
-                console.info('pvwhTomorrow ' + pvwhTomorrow + ' ist kleiner als ' + (_baseLoad * 24 * _wr_efficiency));
+            if (_tibberPreisJetzt <= _start_charge && _batsoc < 100) {
+                let vergleichepvWh = 0;
+                
+                if (compareTime('00:00', null, "<", null)) {
+                    vergleichepvWh = pvwhTomorrow;              // vor 00:00 bruachen wir den morgen wert
+                } else {
+                    vergleichepvWh = pvwhToday;                 // danach den tageswert
+                }
+                
+                if (vergleichepvWh < (_baseLoad * 24 * _wr_efficiency)) {
+                    starteLadungTibber = true;
+                }
+            
+                if (_debug) {                                        
+                    console.info('pvwhTomorrow ' + vergleichepvWh + ' ist kleiner als ' + (_baseLoad * 24 * _wr_efficiency));
+                }
             }
         }
 
