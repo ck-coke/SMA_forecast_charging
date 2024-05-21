@@ -261,6 +261,10 @@ async function processing() {
 
     _batteryLadePower = getState(tibberDP + 'extra.max_Batterieladung').val;  
 
+    if (_batteryLadePower == undefined) {
+        _batteryLadePower = 1;
+    }
+
     if (_batteryLadePower < 0) {
         _batteryLadePower = _batteryLadePower * -1;
     }
@@ -272,18 +276,20 @@ async function processing() {
     // Lademenge
     let lademenge_full = Math.ceil((_batteryCapacity * (100 - _batsoc) / 100) * (1 / _wr_efficiency));                             //Energiemenge bis vollständige Ladung
     let lademenge      = Math.max(Math.ceil((_batteryCapacity * (_batteryTarget - _batsoc) / 100) * (1 / _wr_efficiency)), 0);     //lademenge = Energiemenge bis vollständige Ladung
+    
+    let restlademenge  = aufrunden(2, (_batteryCapacity - (_batteryCapacity *_batsoc) / 100));   
     let restladezeit   = aufrunden(2, (lademenge / _batteryLadePower));                                                            //Ladezeit = Energiemenge bis vollständige Ladung / Ladeleistung WR
 
     if (_batteryLadePower == 1) {
-        restladezeit    = 0;
-        lademenge       = lademenge_full;
+    //    restladezeit    = 0;
+        restladezeit   = aufrunden(2, (restlademenge / _batteryLadePowerMax));
     }
+    
 
     setState(tibberDP + 'extra.BatterieRestladezeit', restladezeit, true);
 
     if (_debug) {
         console.info('_tick___________________________ ' + _tick);
-        console.info('_batteryLadePower_______________ ' + _batteryLadePower + ' W');
         console.info('pvlimit_________________________ ' + pvlimit + ' W');
         console.info('Verbrauch jetzt_________________ ' + _verbrauchJetzt + ' W');
         console.info('PV Produktion___________________ ' + _dc_now + ' W');
@@ -294,6 +300,7 @@ async function processing() {
         console.info('Lademenge bis voll______________ ' + lademenge_full + ' Wh');
         console.info('Lademenge_______________________ ' + lademenge + ' Wh');
         console.info('Restladezeit____________________ ' + restladezeit + ' h');
+        console.info('Restlademenge___________________ ' + restlademenge + ' Wh');
         console.info('Einspeisung_____________________ ' + aufrunden(2, _einspeisung) + ' W');
 
     }
@@ -481,7 +488,7 @@ async function processing() {
 
             nachlademengeWh =  aufrunden(2, nachlademengeWh);
 
-            let nachladeStunden = aufrunden(2, (Math.max((nachlademengeWh - curbatwh) / (_batteryLadePower * _wr_efficiency), 0) * 2));
+            let nachladeStunden = aufrunden(2, (Math.max((nachlademengeWh - curbatwh) / (_batteryLadePowerMax * _wr_efficiency), 0) * 2));
 
             // neuaufbau tibberPoihigh ohne Nachladestunden, billigstunden
             if (_debug) {
@@ -541,16 +548,13 @@ async function processing() {
         if (lefthrs > 0) {                                     // wir haben höchstpreise 
             for (let d = 0; d < lefthrs; d++) {
                 if (tibberPoihighNew[d][0] > _stop_discharge) {                               
-                    if (_debug) {
-                        console.info('alle Entladezeiten: ' + tibberPoihighNew[d][1] + '-' + tibberPoihighNew[d][2] + ' Preis ' + tibberPoihighNew[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
-                    }
-
+                    //    console.info('alle Entladezeiten: ' + tibberPoihighNew[d][1] + '-' + tibberPoihighNew[d][2] + ' Preis ' + tibberPoihighNew[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
                     entladeZeitenArray.push(tibberPoihighNew[d]);    // alle passende höchstpreiszeiten                           
                 }  
             }
 
-            entladeZeitenArray = sortArrayByCurrentHour(entladeZeitenArray, true, _hhJetzt);
-            setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArray, true); 
+            const entladeZeitenArrayOut = sortHourToSunup(sortArrayByCurrentHour(entladeZeitenArray, true, _hhJetzt), _sunup);   // nur für die darstellung in VIS
+            setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArrayOut, true); 
         }
 
         if (compareTime(_sunupTodayAstro, _sundown, 'between')) {     // wir sind am Tag 
@@ -720,8 +724,8 @@ async function processing() {
 
         let latesttime = 0;
 
-        if ((restladezeit * 2) <= pvfc.length) {          // überschreibe die restladezeit mit mäglichen pv ladezeiten
-            restladezeit = pvfc.length / 2;                          
+        if ((restladezeit * 2) <= pvfc.length && pvfc.length > 1) {          // überschreibe die restladezeit mit mäglichen pv ladezeiten
+            restladezeit = Math.ceil(pvfc.length / 2);                          
         }
 
         setState(tibberDP + 'extra.PV_Abschluss', '--:--', true);
@@ -1080,6 +1084,26 @@ function zeitDifferenzInStunden(zeit1, zeit2, nextDay) {
    // console.error('zeit1 ' + zeit1 + ' zeit2 ' + zeit2 + ' ' + differenzStunden + ' ' + differenzMinuten);
 
     return `${differenzStunden}.${(differenzMinuten < 10 ? '0' : '') + differenzMinuten}`;
+}
+
+function sortHourToSunup(zeiten, sunup) {
+    let arrOut = [];
+
+    for (let p = 0; p < zeiten.length; p++) { /* 48 = 24h a 30min Fenster*/
+        const hh  = zeiten[p][1].split(':')[0];
+        const min = zeiten[p][1].split(':')[1];
+
+        if (min == 0) {
+            arrOut.push(zeiten[p]);
+        }    
+
+        if (hh == sunup.split(':')[0]) {
+            break;
+        }
+
+    }
+
+    return arrOut;
 }
 
 function sortArrayByCurrentHour(zeiten, toEnd, currentHour) {
