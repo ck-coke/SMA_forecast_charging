@@ -253,7 +253,7 @@ async function processing() {
 
     let pvlimit                         = (_pvPeak / 100 * _surplusLimit);      //pvlimit = 13100/100*0 = 0
     const getErtrag                     = getPvErtrag(pvlimit);                   
-    const pvfc                          = getErtrag.pvfc;
+    const pvfc                            = getErtrag.pvfc;
   //  const pvfcAll                       = getErtrag.pvfcAll;
     let batterieLadenUhrzeit            = getState(batterieLadenUhrzeitDP).val;
     let batterieLadenUhrzeitStart       = getState(batterieLadenUhrzeitStartDP).val;
@@ -501,7 +501,7 @@ async function processing() {
             }
 
             if (_debug) {
-                console.info('nach Nachladestunden nachladeStunden ' + nachladeStunden + ' curbatwh ' + curbatwh);
+                console.info('nach Nachladestunden prclow.length ' + nachladeStunden + ' curbatwh ' + curbatwh);
           //    console.info('prclow  Nachladestunden ' + JSON.stringify(prclow));
           //    console.info('prchigh Nachladestunden ' + JSON.stringify(prchigh));
             }
@@ -724,7 +724,7 @@ async function processing() {
 
         let latesttime = 0;
 
-        if ((restladezeit * 2) <= pvfc.length && pvfc.length > 1) {          // überschreibe die restladezeit mit mäglichen pv ladezeiten
+        if ((restladezeit * 2) <= pvfc.length && pvfc.length > 0) {          // überschreibe die restladezeit mit mäglichen pv ladezeiten
             restladezeit = Math.ceil(pvfc.length / 2);                          
         }
 
@@ -830,7 +830,7 @@ async function processing() {
             }           
 
             try {
-                for (let h = 0; h < (restladezeit *2); h++) {  // nur wenn überschuss wirklich da ist
+                for (let h = 0; h < pvfc.length; h++) {                         // pvfc ist sortiert nach uhrzeit
                     if ((compareTime(pvfc[h][3], pvfc[h][4], 'between')) || (_einspeisung + _powerAC) >= (pvlimit - 100)) { 
                         
                         _SpntCom = _InitCom_An;
@@ -839,7 +839,7 @@ async function processing() {
                             console.warn('-->> Bingo ladezeit' );
                         }
                         
-                        if (_dc_now < _verbrauchJetzt) { // kann sein dass die prognose nicht stimmt und wir haben ladezeiten aber draussen regnets
+                        if (_dc_now < _verbrauchJetzt) {                             // kann sein dass die prognose nicht stimmt und wir haben ladezeiten aber draussen regnets
                             if (_debug) {
                                 console.warn('-->> breche ab, da nicht genug Sonne ' );
                             }
@@ -853,7 +853,7 @@ async function processing() {
                             console.warn('-->> mit überschuss _max_pwr ' + _max_pwr + ' pv50 ' + pvfc[h][0] + ' pv90 ' + pvfc[h][1]);
                         }
                         
-                        if (_max_pwr > _dc_now - _verbrauchJetzt) {  // wenn das ermittelte wert grösser ist als die realität dann limmitiere, check nochmal besser ist es
+                        if (_max_pwr > _dc_now - _verbrauchJetzt) {                   // wenn das ermittelte wert grösser ist als die realität dann limmitiere, check nochmal besser ist es
                             _max_pwr = _dc_now - _verbrauchJetzt;
                             if (_debug) {
                                 console.warn('-->> limmitiere auf ' + _max_pwr);
@@ -863,7 +863,7 @@ async function processing() {
                         _max_pwr = _max_pwr * -1;
 
                         if (_lastpwrAtCom != _max_pwr) {
-                            _lastSpntCom = 95;    // damit der WR auf jedenfall daten bekommt
+                            _lastSpntCom = 95;                                          // damit der WR auf jedenfall daten bekommt
                         }
 
                         if (_batsoc < 100) {  // batterie ist nicht voll
@@ -871,10 +871,11 @@ async function processing() {
                         }
 
                         break;                        
-                    }
+                    }                    
                 }
             } catch(err) {
-                console.error('pvfc Problem ' + JSON.stringify(pvfc));
+                console.error('pvfc Problem ' + JSON.stringify(err));
+             //   console.error('pvfc Problem ' + JSON.stringify(pvfc));
             }
         }
 
