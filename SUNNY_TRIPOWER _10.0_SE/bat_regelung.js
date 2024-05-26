@@ -255,7 +255,7 @@ async function processing() {
 
     let pvlimit                         = (_pvPeak / 100 * _surplusLimit);      //pvlimit = 13100/100*0 = 0
     const getErtrag                     = getPvErtrag(pvlimit);                   
-    const pvfc                            = getErtrag.pvfc;
+    const pvfc                          = getErtrag.pvfc;
   //  const pvfcAll                       = getErtrag.pvfcAll;
     let batterieLadenUhrzeit            = getState(batterieLadenUhrzeitDP).val;
     let batterieLadenUhrzeitStart       = getState(batterieLadenUhrzeitStartDP).val;
@@ -398,15 +398,14 @@ async function processing() {
             if (pvfc.length > 0) {
                 _sundown = pvfc[(pvfc.length - 1)][4];
             } 
-
-            let su = 0;
-            for (su = 0; su < 48; su++) {
-                if (_pvforecastTomorrowArray[su][2] >= _baseLoad && compareTime(_sundown, _sunup, 'between')) {
+            
+            for (let su = 0; su < 48; su++) {
+                if (_pvforecastTomorrowArray[su][2] >= _baseLoad && pvfc.length == 0) {
                     _sunup = _pvforecastTomorrowArray[su][0]; 
                     break;
                 }
 
-                if (_pvforecastTodayArray[su][2] >= _baseLoad && compareTime(_sunup, _sundown, 'between')) {
+                if (_pvforecastTodayArray[su][2] >= _baseLoad && pvfc.length > 0) {
                     _sunup = _pvforecastTodayArray[su][0];     
                     break;
                 }
@@ -520,12 +519,12 @@ async function processing() {
         }        // Nachladestunden Ermittlung ende
 
         let entladeZeitenArray  = [];      
-        let tibberPoihighNew    = filterZeit14Uhr(tibberPoihigh);         // sortiert nach preis und stunden grösser jetzt
-        let lefthrs             = batlefthrs *2;                          // Batterielaufzeit laut SOC
+        let tibberPoihighNew    = filterZeit14Uhr(tibberPoihigh, _sunup);   // sortiert nach preis und stunden grösser jetzt und bis zu sunup oder 14 uhr
+        let lefthrs             = Math.ceil(batlefthrs *2);                 // Batterielaufzeit laut SOC
 
         if (_debug) {
             console.info('tibberPoihighNew.length '+ tibberPoihighNew.length);
-         //   console.info('tibberPoihighNew nach filter ' + JSON.stringify(tibberPoihighNew));
+           // console.info('tibberPoihighNew nach filter ' + JSON.stringify(tibberPoihighNew));
         }
 
         if (lefthrs > 0 && lefthrs > tibberPoihighNew.length) {        // limmitiere auf Tibber höchstpreise
@@ -533,13 +532,13 @@ async function processing() {
         }
 
         if (_debug) {
-            console.info('------>>  laufzeit mit tibber höchstpreise: lefthrs ' + lefthrs + ' Batterielaufzeit: batlefthrs ' + batlefthrs +  ' von PV kommt heute: pvwhToday ' + pvwhToday);
+            console.info('------>>  laufzeit mit tibber höchstpreise a 30 min: lefthrs ' + lefthrs + ' Batterielaufzeit: batlefthrs ' + batlefthrs +  ' von PV kommt heute: pvwhToday ' + pvwhToday);
         }
         
         if (lefthrs > 0) {                                     // wir haben höchstpreise 
             for (let d = 0; d < lefthrs; d++) {
                 if (tibberPoihighNew[d][0] > _stop_discharge) {                                                   
-                    //    console.info('alle Entladezeiten: ' + tibberPoihighNew[d][1] + '-' + tibberPoihighNew[d][2] + ' Preis ' + tibberPoihighNew[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
+                        console.info('alle Entladezeiten: ' + tibberPoihighNew[d][1] + '-' + tibberPoihighNew[d][2] + ' Preis ' + tibberPoihighNew[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
                     entladeZeitenArray.push(tibberPoihighNew[d]);                               
                 }  
             }
@@ -547,7 +546,12 @@ async function processing() {
             entladeZeitenArray = sortHourToSunup(sortArrayByCurrentHour(entladeZeitenArray, true, _hhJetzt), _sunup);   // nur für die darstellung in VIS
         }
 
-        if (compareTime(_sunupTodayAstro, _sundown, 'between')) {     // wir sind am Tag 
+        if (_debug) {
+            console.info('pvfc.length ' + pvfc.length + ' _dc_now ' + _dc_now );
+        }
+
+     //   if (compareTime(_sunupTodayAstro, _sundown, 'between') && pvfc.length > 0) {     // wir sind am Tag 
+        if (pvfc.length > 0 && _dc_now != 0) {     // wir sind am Tag 
             if (_debug) {
                 console.warn('Tag verarbeitung');
             }
@@ -600,9 +604,11 @@ async function processing() {
                     }                                                              
                 }
             }
+            if (_debug) {
+                console.info('entladeZeitenArray ' + entladeZeitenArray.length);
+            }
 
             setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArray, true); 
-
 
             // in der nacht starten setzen
             if (_tibberPreisJetzt <= _start_charge && _batsoc < 100) {
@@ -1037,19 +1043,23 @@ async function berechneVerbrauch(pvNow) {
 }
 // ------------------------------------------- functions
 
-function filterZeit14Uhr(arrZeit) {
+function filterZeit14Uhr(arrZeit, sunup) {
     const newArray = [];
     for (let i = 0; i < arrZeit.length; i++) {
         const startTime = parseInt(arrZeit[i][1].split(':')[0]);
         newArray.push(arrZeit[i]);
-        if (startTime == 14) {
+        if (startTime == 14 || startTime == sunup.split(':')[0]) {
             break;    
         }
     }
 
+  //  console.warn(JSON.stringify(newArray));
+
     newArray.sort(function (a, b) {  // niedrieg preis sort
         return b[0] - a[0];
     });
+
+    //console.warn(JSON.stringify(newArray));
 
     return newArray;    
 }
@@ -1084,7 +1094,7 @@ function zeitDifferenzInStunden(zeit1, zeit2, nextDay) {
 function sortHourToSunup(zeiten, sunup) {
     let arrOut = [];
 
-    for (let p = 0; p < zeiten.length; p++) { /* 48 = 24h a 30min Fenster*/
+    for (let p = 0; p < zeiten.length; p++) {             /* 48 = 24h a 30min Fenster*/
         const hh  = zeiten[p][1].split(':')[0];
         const min = zeiten[p][1].split(':')[1];
 
@@ -1097,6 +1107,8 @@ function sortHourToSunup(zeiten, sunup) {
         }
 
     }
+
+    //console.warn('sortHourToSunup ' + JSON.stringify(arrOut));
 
     return arrOut;
 }
@@ -1130,6 +1142,8 @@ function sortArrayByCurrentHour(zeiten, toEnd, currentHour) {
     } else {
         sortedArray = zeiten;   
     }
+
+  // console.warn('sortArrayByCurrentHour ' + JSON.stringify(sortedArray));
 
     return sortedArray;
 }
@@ -1259,3 +1273,4 @@ function tibber_active_auswertung() {
             _SpntCom = _InitCom_Aus;        
     }
 }
+
