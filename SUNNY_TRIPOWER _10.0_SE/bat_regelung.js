@@ -538,7 +538,7 @@ async function processing() {
         if (lefthrs > 0) {                                     // wir haben höchstpreise 
             for (let d = 0; d < lefthrs; d++) {
                 if (tibberPoihighNew[d][0] > _stop_discharge) {                                                   
-                        console.info('alle Entladezeiten: ' + tibberPoihighNew[d][1] + '-' + tibberPoihighNew[d][2] + ' Preis ' + tibberPoihighNew[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
+                  //      console.info('alle Entladezeiten: ' + tibberPoihighNew[d][1] + '-' + tibberPoihighNew[d][2] + ' Preis ' + tibberPoihighNew[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
                     entladeZeitenArray.push(tibberPoihighNew[d]);                               
                 }  
             }
