@@ -394,7 +394,7 @@ async function processing() {
             console.info('Nachtfenster nach Astro : ' + _sundownAstro + ' - ' + _sunupAstro);
         }     
 
-        let sunupToday      = _sunupTodayAstro;
+        let nextDay         = false;
         let sunupTomorrow   = _sunupAstro;
 
         if (!_snowmode) {    
@@ -404,7 +404,7 @@ async function processing() {
 
             for (let su = 0; su < 48; su++) {
                 if (_pvforecastTodayArray[su][2] >= _baseLoad) {   
-                    sunupToday = _pvforecastTodayArray[su][0];     
+                    _sunup = _pvforecastTodayArray[su][0];     
                     break;
                 }
             }
@@ -417,22 +417,21 @@ async function processing() {
             }           
         }
 
-        if (compareTime(nowhour, '00:00', 'between')) {
+        if (_hhJetzt > parseInt(_sunup.slice(0, 2))) {        
             _sunup = sunupTomorrow;
-        } else {
-            _sunup = sunupToday;
-        }
+            nextDay = true;
+        }      
 
         let sundownhr  = _sundown;
         if (compareTime(_sundown, _sunup, 'between')) {
             sundownhr  = nowhour;
         }
 
-        hrstorun          = Math.min(zeitDifferenzInStunden(sundownhr, _sunup, true), 24);
+        hrstorun          = Math.min(zeitDifferenzInStunden(sundownhr, _sunup, nextDay), 24);
         const toSundownhr = Math.min(zeitDifferenzInStunden(nowhour, _sundown, false), 24);
 
         if (_debug) {
-            console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + '. bis zum Sonnenaufgang nach Untergang sind es ' + hrstorun + ' hrstorun und zum nächsten Untergang toSundownhr ' + toSundownhr);
+            console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + '. bis zum nächsten Sonnenaufgang sind es ' + hrstorun + ' hrstorun und zum nächsten Untergang toSundownhr ' + toSundownhr);
         }        
 
         if (compareTime(_sunupTodayAstro, _sundownAstro, 'between')) {  // Astro stunde 
