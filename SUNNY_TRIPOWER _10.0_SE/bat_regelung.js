@@ -545,7 +545,7 @@ async function processing() {
             console.info('------>>  laufzeit mit tibber höchstpreise a 30 min: lefthrs ' + lefthrs + ' Batterielaufzeit: batlefthrs ' + batlefthrs +  ' von PV kommt heute: pvwhToday ' + pvwhToday);
         }
         
-        if (lefthrs > 0 && pvfc.length == 0) {                                     // wir haben höchstpreise und es keine pv prognose mehr
+        if (lefthrs > 0 && _hhJetzt < parseInt(_sunup.slice(0, 2))) {            // wir haben höchstpreise und sonne ist noch nicht aufgegangen
             for (let d = 0; d < lefthrs; d++) {
                 if (tibberPoihighNew[d][0] > _stop_discharge) {                                                   
                     //    console.info('alle Entladezeiten: ' + tibberPoihighNew[d][1] + '-' + tibberPoihighNew[d][2] + ' Preis ' + tibberPoihighNew[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
@@ -839,7 +839,7 @@ async function processing() {
 
             try {
                 for (let h = 0; h < pvfc.length; h++) {                         // pvfc ist sortiert nach uhrzeit
-                    if ((compareTime(pvfc[h][3], pvfc[h][4], 'between')) || (_einspeisung + _powerAC) >= (pvlimit - 100)) { 
+                    if ((compareTime(pvfc[h][3], pvfc[h][4], 'between'))) {
                         _ladezeitVon = pvfc[h][3];
                         _ladezeitBis = pvfc[h][4];
 
