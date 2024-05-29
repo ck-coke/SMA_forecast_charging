@@ -312,8 +312,8 @@ async function processing() {
     _max_pwr                = _mindischrg;      // initialisiere
     _maxchrg                = _mindischrg;      // initialisiere
     
-    if (_dc_now > _verbrauchJetzt && _batsoc < 100) {
-        _max_pwr = (_dc_now - _verbrauchJetzt) * -1;   // vorbelegung zum laden
+    if (_dc_now > _verbrauchJetzt &&_batsoc < 100) {
+        _max_pwr    = (_dc_now - _verbrauchJetzt) * -1;   // vorbelegung zum laden     
     } 
 
     if (_tibberNutzenSteuerung) {
@@ -559,14 +559,14 @@ async function processing() {
         }
 
         if (_debug) {
-            console.info('pvfc.length ' + pvfc.length + ' _dc_now ' + _dc_now );
+            console.info('pvfc.length ' + pvfc.length + ' _dc_now ' + _dc_now + ' pvfc[0] ' + JSON.stringify(pvfc[0]));
         }
-
-     //   if (compareTime(_sunupTodayAstro, _sundown, 'between') && pvfc.length > 0) {     // wir sind am Tag 
-        if (pvfc.length > 0 && _dc_now != 0) {     // wir sind am Tag 
+        
+        if (_dc_now > 0) {              // wenn die PV was produziert sind wir am Tag
             if (_debug) {
-                console.warn('Tag verarbeitung');
+                console.warn('Tag verarbeitung ');
             }
+
             if (_dc_now > 1 && _dc_now < _verbrauchJetzt) {                            
                 // wenn genug PV am Tag aber gerade nicht genug Sonne aber tibber klein genug
                 if (_debug) {
@@ -588,6 +588,7 @@ async function processing() {
             if (_debug) {
                 console.warn('Nacht verarbeitung');
             }
+
             // Entladezeit
             if (batlefthrs > 0) {
                 if (batlefthrs >= hrstorun) { 
@@ -610,12 +611,14 @@ async function processing() {
                                 } else {
                                     macheNix = true;
                                     _tibber_active_idx = 2;
+                                    break;
                                 }
                             }
                         }
                     }                                                              
                 }
             }
+
             if (_debug) {
                 console.info('entladeZeitenArray ' + entladeZeitenArray.length);
             }
@@ -643,8 +646,8 @@ async function processing() {
         setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArray, true); 
 
         // stoppe die Ladung/Entladung
-        if (!macheNix) {            
-            if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0) ) {
+        if (!macheNix) {           
+            if ((_tibberPreisJetzt <= _stop_discharge || _batsoc == 0)) {
                 if (_debug) {                                        
                     console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + aufrunden(2, _stop_discharge) + ' ct/kWh oder battSoc = 0 ist ' + _batsoc );
                     console.info(' _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' macheNix ' + macheNix + ' _tibber_active_idx ' + _tibber_active_idx);                    
@@ -697,7 +700,7 @@ async function processing() {
         
         setState(tibberDP + 'extra.ladeZeitenArray', ladeZeitenArray, true);
 
-        tibber_active_auswertung();
+        tibber_active_auswertung(entladeZeitenArray);
     }
 
     setState(tibberDP + 'extra.tibberProtokoll', _tibber_active_idx, true);
@@ -841,7 +844,7 @@ async function processing() {
 
             try {
                 for (let h = 0; h < pvfc.length; h++) {                         // pvfc ist sortiert nach uhrzeit
-                    if ((compareTime(pvfc[h][3], pvfc[h][4], 'between'))) {
+                    if (compareTime(pvfc[h][3], pvfc[h][4], 'between')) {
                         _ladezeitVon = pvfc[h][3];
                         _ladezeitBis = pvfc[h][4];
 
@@ -855,7 +858,11 @@ async function processing() {
                             if (_debug) {
                                 console.warn('-->> breche ab, da nicht genug Sonne ' );
                             }
-                            if (_tibber_active_idx == 20 || _tibber_active_idx == 21) {   // komme von oben
+                            
+                            if (_tibber_active_idx == 20 || _tibber_active_idx == 21 || _tibber_active_idx == 2) {   // komme von oben
+                                if (_debug) {
+                                    console.warn('-->> komme aber von oben mit _tibber_active_idx ' + _tibber_active_idx);
+                                }
                                 _SpntCom = _InitCom_Aus;
                             }
                             break;
@@ -1240,14 +1247,15 @@ function doppelteRausAusArray(arr) {
   return uniqueArray;
 }
 
-function tibber_active_auswertung() {
+function tibber_active_auswertung(entladeZeitenArray) {
     _max_pwr = _mindischrg;
   
     switch (_tibber_active_idx) {
         case 0:
-    //        if (compareTime(_sundown, _sunup, 'between')) {
-    //            _SpntCom = _InitCom_An;
-    //        }
+            if (_hhJetzt < parseInt(_sunup.slice(0, 2)) && entladeZeitenArray.length > 0) {   // problem beobachten
+          //  if (compareTime(_sundown, _sunup, 'between')) {
+                _SpntCom = _InitCom_An;
+            }
             break;
         case 1:                             //      _tibber_active_idx = 1;    Nachladezeit
             _SpntCom = _InitCom_An;
