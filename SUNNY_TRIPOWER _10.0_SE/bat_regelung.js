@@ -77,6 +77,8 @@ const inputRegisters = {
     powerAC: 'modbus.0.inputRegisters.3.30775_AC-Leistung',
 }
 
+
+
 const bydDirectSOCDP            = 'bydhvs.0.State.SOC';                            // battSOC netto direkt von der Batterie
 
 let _dc_now                     = 0;  
@@ -388,7 +390,7 @@ async function processing() {
         _sunupAstro         = getAstroDate('sunriseEnd', tomorrow).getHours() + ':' + getAstroDate('sunriseEnd', tomorrow).getMinutes().toString().padStart(2, '0');         // aufgang nächster Tag
         
         _sundown       = _sundownAstro; 
-        _sunup         = _sunupAstro;
+        _sunup         = _sunupTodayAstro;
 
         if (_debug) {
             console.info('Nachtfenster nach Astro : ' + _sundownAstro + ' - ' + _sunupAstro);
