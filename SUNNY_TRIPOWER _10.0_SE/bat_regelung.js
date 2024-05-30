@@ -23,7 +23,7 @@ let _debug = getState(tibberDP + 'debug').val == null ? false : getState(tibberD
 //-------------------------------------------------------------------------------------
 const _pvPeak                   = 13100;                                // PV-Anlagenleistung in Wp
 const _batteryCapacity          = 12800;                                // Netto Batterie Kapazität in Wh BYD 2.56 pro Modul
-const _surplusLimit             = 80;                                   // PV-Einspeise-Limit in % zum limittieren der Ladung. hat nix mit Einspeiselimit der PV zu tun
+const _surplusLimit             = 20;                                   // PV-Einspeise-Limit in % zum limittieren der Ladung. hat nix mit Einspeiselimit der PV zu tun
 const _batteryTarget            = 100;                                  // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
 const _lastPercentageLoadWith   = -500;                                 // letzten 5 % laden mit xxx Watt
 const _baseLoad                 = 850;                                  // Grundverbrauch in Watt
