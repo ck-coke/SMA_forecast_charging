@@ -321,7 +321,13 @@ async function processing() {
             setState(spntComCheckDP, 888, true);
         }
 
-        const nowhour       = _hhJetzt + ':00'; // stunde jetzt zur laufzeit 
+        let nowMin = 0;
+        if (_today.getMinutes() > 14 && _today.getMinutes() < 46) {
+            nowMin = 0;    
+        } else {
+            nowMin = 30; 
+        }
+        const nowHour       = _hhJetzt + ':' + nowMin.toString().padStart(2, '0') 
         const tomorrow      = new Date(_today.getFullYear(), _today.getMonth(), _today.getDate() + 1);  
 
         _tibber_active_idx  = 0;    // initialisiere
@@ -424,16 +430,16 @@ async function processing() {
             nextDay = true;
         }      
 
-        let sundownhr  = _sundown;
-        if (compareTime(_sundown, _sunup, 'between')) {
-            sundownhr  = nowhour;
-        }
+   //     let sundownhr  = _sundown;
+   //     if (compareTime(_sundown, _sunup, 'between')) {
+   //         sundownhr  = nowHour;
+   //     }
 
-        hrstorun          = Math.min(zeitDifferenzInStunden(sundownhr, _sunup, nextDay), 24);
-        const toSundownhr = Math.min(zeitDifferenzInStunden(nowhour, _sundown, false), 24);
+        hrstorun          = Number(zeitDifferenzInStunden(nowHour, _sunup, nextDay));
+        const toSundownhr = Number(zeitDifferenzInStunden(nowHour, _sundown, false));
 
         if (_debug) {
-            console.info('Nachtfenster nach Berechnung : ' + sundownhr + ' - ' + _sunup + '. bis zum nächsten Sonnenaufgang sind es ' + hrstorun + ' hrstorun und zum nächsten Untergang toSundownhr ' + toSundownhr);
+            console.info('Nachtfenster nach Berechnung : ' + _sundown + ' - ' + _sunup + '. bis zum nächsten Sonnenaufgang sind es ' + hrstorun + ' hrstorun und zum nächsten Untergang toSundownhr ' + toSundownhr);
         }        
 
         if (compareTime(_sunupTodayAstro, _sundownAstro, 'between')) {  // Astro stunde 
@@ -482,7 +488,7 @@ async function processing() {
                 return a[0] - b[0];
             })
 
-            //nachlademengeWh nach höchstpreisen am Tag
+            //nachlademenge Wh nach höchstpreisen am Tag
             let nachlademengeWh = (prchigh.length) * (_baseLoad / 2) * 1 / _wr_efficiency;
 
             if (hrstorun < 24 && !_snowmode) {
@@ -544,10 +550,11 @@ async function processing() {
         }
 
         if (_debug) {
-            console.info('------>>  laufzeit mit tibber höchstpreise a 30 min: lefthrs ' + lefthrs + ' Batterielaufzeit: batlefthrs ' + batlefthrs +  ' von PV kommt heute: pvwhToday ' + pvwhToday);
+            console.info('------>>  laufzeit mit tibber höchstpreise a 30 min: lefthrs ' + lefthrs + ' Batterielaufzeit: batlefthrs ' + batlefthrs);
+            console.info('------>>  von PV kommt heute: pvwhToday ' + pvwhToday +  ' Strompreis jetzt ' + _tibberPreisJetzt);
         }
         
-        if (lefthrs > 0 && _hhJetzt < parseInt(_sunup.slice(0, 2))) {            // wir haben höchstpreise und sonne ist noch nicht aufgegangen
+        if (lefthrs > 0 && batlefthrs > 0 && _dc_now < _verbrauchJetzt) {            // wir haben höchstpreise und batterie laufzeit
             for (let d = 0; d < lefthrs; d++) {
                 if (tibberPoihighNew[d][0] > _stop_discharge) {                                                   
                     //    console.info('alle Entladezeiten: ' + tibberPoihighNew[d][1] + '-' + tibberPoihighNew[d][2] + ' Preis ' + tibberPoihighNew[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
@@ -592,7 +599,7 @@ async function processing() {
             // Entladezeit
             if (batlefthrs > 0) {
                 if (batlefthrs >= hrstorun) { 
-                    if (compareTime(nowhour, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
+                    if (compareTime(nowHour, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
                         if (_debug) {
                             console.warn('Entladezeit reicht aus bis zum Sonnaufgang und genug PV');
                         }
@@ -700,7 +707,7 @@ async function processing() {
         
         setState(tibberDP + 'extra.ladeZeitenArray', ladeZeitenArray, true);
 
-        tibber_active_auswertung(entladeZeitenArray);
+        tibber_active_auswertung(nowHour);
     }
 
     setState(tibberDP + 'extra.tibberProtokoll', _tibber_active_idx, true);
@@ -723,7 +730,12 @@ async function processing() {
         console.error('-->  PV ' + _dc_now + ' Verbrauch ' + _verbrauchJetzt + ' Restladezeit ' + restladezeit);
     }
 
-    if ((batterieLadenUhrzeitStart && _hhJetzt >= batterieLadenUhrzeit)) {    // laden übersteuern ab bestimmter uhrzeit
+    if (batterieLadenUhrzeitStart && _hhJetzt >= batterieLadenUhrzeit && _dc_now > _verbrauchJetzt)  {    // laden übersteuern ab bestimmter uhrzeit und nur wenn genug pv
+        
+//        if (_hhJetzt = parseInt(_sunup.slice(0, 2))) {
+//            setState(batterieLadenUhrzeitStartDP, false, true);    // wenn die sonne unter gegangen ist dann mach es wieder aus
+//        }
+
         if (_debug) {
             console.warn('-->> übersteuert mit nach Uhrzeit laden');
         }
@@ -851,7 +863,8 @@ async function processing() {
                         _SpntCom = _InitCom_An;
 
                         if (_debug) {
-                            console.warn('-->> Bingo ladezeit' );
+                            console.warn('-->> Bingo ladezeit');
+                            console.info('-->> _power50Reduzierung um ' + _power50Reduzierung + ' _power90Reduzierung um ' + _power90Reduzierung);
                         }
                         
                         if (_dc_now < _verbrauchJetzt) {                             // kann sein dass die prognose nicht stimmt und wir haben ladezeiten aber draussen regnets
@@ -1102,8 +1115,13 @@ function zeitDifferenzInStunden(zeit1, zeit2, nextDay) {
     let differenzInMinuten = zeit2InMinuten - zeit1InMinuten;
 
     // Differenz in Stunden und Minuten aufteilen
-    const differenzStunden = Math.floor(differenzInMinuten / 60);
-    const differenzMinuten = differenzInMinuten % 60;
+    let differenzStunden = Math.floor(differenzInMinuten / 60);
+    let differenzMinuten = differenzInMinuten % 60;
+
+    if (differenzStunden < 0) {
+        differenzStunden = differenzStunden * -1;
+        differenzMinuten = differenzMinuten * -1;
+    }
 
    // console.error('zeit1 ' + zeit1 + ' zeit2 ' + zeit2 + ' ' + differenzStunden + ' ' + differenzMinuten);
 
@@ -1247,15 +1265,27 @@ function doppelteRausAusArray(arr) {
   return uniqueArray;
 }
 
-function tibber_active_auswertung(entladeZeitenArray) {
+function tibber_active_auswertung(nowHour) {
     _max_pwr = _mindischrg;
   
     switch (_tibber_active_idx) {
         case 0:
-            if (_hhJetzt < parseInt(_sunup.slice(0, 2)) && entladeZeitenArray.length > 0) {   // problem beobachten
-          //  if (compareTime(_sundown, _sunup, 'between')) {
+            if (compareTime(nowHour, _sunup, 'between')) {     // problem beobachten
                 _SpntCom = _InitCom_An;
             }
+           
+// PV deckt Verbrauch zu 70 % dann nimm aus der batterie ist vielleicht ne Wolke unterwegs            
+/*
+            if (_dc_now >= (_verbrauchJetzt - (_verbrauchJetzt * 0.30)) ) {      
+                if (compareTime(_ladezeitVon, _ladezeitBis, 'between')) {
+                    if (_debug) {
+                        console.warn('Verbrauch zu 70% gedeckt, vielleicht Wolke unterwegs');
+                    }
+                    _SpntCom = _InitCom_Aus;           
+                }
+            }             
+*/
+
             break;
         case 1:                             //      _tibber_active_idx = 1;    Nachladezeit
             _SpntCom = _InitCom_An;
@@ -1269,18 +1299,6 @@ function tibber_active_auswertung(entladeZeitenArray) {
             break;
         case 3:                             //      _tibber_active_idx = 3;    entladung stoppen wenn preisschwelle erreicht
             _SpntCom = _InitCom_An;
-            
-// PV deckt Verbrauch zu 70 % dann nimm aus der batterie ist vielleicht ne Wolke unterwegs            
-/*
-            if (_dc_now >= (_verbrauchJetzt - (_verbrauchJetzt * 0.30)) ) {      
-                if (compareTime(_ladezeitVon, _ladezeitBis, 'between')) {
-                    if (_debug) {
-                        console.warn('Verbrauch zu 70% gedeckt, vielleicht Wolke unterwegs');
-                    }
-                    _SpntCom = _InitCom_Aus;           
-                }
-            }             
-*/
             break;
         case 4:                             //      _tibber_active_idx = 4;    ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
             _SpntCom = _InitCom_An;
