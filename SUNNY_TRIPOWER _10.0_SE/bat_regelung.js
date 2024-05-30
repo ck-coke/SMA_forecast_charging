@@ -23,7 +23,7 @@ let _debug = getState(tibberDP + 'debug').val == null ? false : getState(tibberD
 //-------------------------------------------------------------------------------------
 const _pvPeak                   = 13100;                                // PV-Anlagenleistung in Wp
 const _batteryCapacity          = 12800;                                // Netto Batterie Kapazität in Wh BYD 2.56 pro Modul
-const _surplusLimit             = 0;                                    // PV-Einspeise-Limit in %  . 0 keine Einspeisung
+const _surplusLimit             = 80;                                   // PV-Einspeise-Limit in % zum limittieren der Ladung. hat nix mit Einspeiselimit der PV zu tun
 const _batteryTarget            = 100;                                  // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
 const _lastPercentageLoadWith   = -500;                                 // letzten 5 % laden mit xxx Watt
 const _baseLoad                 = 850;                                  // Grundverbrauch in Watt
@@ -265,7 +265,7 @@ async function processing() {
 
     _batteryLadePower = getState(tibberDP + 'extra.max_Batterieladung').val;  
 
-    if (_batteryLadePower == undefined) {
+       if (_batteryLadePower == NaN || _batteryLadePower ==null || _batteryLadePower == 0) {
         _batteryLadePower = 1;
     }
 
@@ -289,12 +289,11 @@ async function processing() {
         restladezeit        = aufrunden(2, (restlademenge / _batteryLadePowerMax));
     }
     
-
     setState(tibberDP + 'extra.BatterieRestladezeit', restladezeit, true);
 
     if (_debug) {
-        console.info('_tick___________________________ ' + _tick);
-        console.info('pvlimit_________________________ ' + pvlimit + ' W');
+//        console.info('_tick___________________________ ' + _tick);
+//        console.info('pvlimit_________________________ ' + pvlimit + ' W');
         console.info('Verbrauch jetzt_________________ ' + _verbrauchJetzt + ' W');
         console.info('Einspeisung_____________________ ' + aufrunden(2, _einspeisung) + ' W');
         console.info('PV Produktion___________________ ' + _dc_now + ' W');
@@ -302,12 +301,12 @@ async function processing() {
         console.info('Batt_SOC________________________ ' + _batsoc + ' %');
         const battsts = battStatus == 2291 ? 'Batterie Standby' : battStatus == 3664 ? 'Notladebetrieb' : battStatus == 2292 ? 'Batterie laden' : battStatus == 2293 ? 'Batterie entladen' : 'Aus';
         console.info('Batt_Status_____________________ ' + battsts + ' = ' + battStatus);
-        console.info('Lademenge bis voll______________ ' + lademenge_full + ' Wh');
+//        console.info('Lademenge bis voll______________ ' + lademenge_full + ' Wh');
         console.info('Lademenge_______________________ ' + lademenge + ' Wh');
         console.info('Restladezeit____________________ ' + restladezeit + ' h');
         console.info('Restlademenge___________________ ' + restlademenge + ' Wh');
     }
-    
+
     _SpntCom                = _InitCom_Aus;     // initialisiere AUS
     _max_pwr                = _mindischrg;      // initialisiere
     _maxchrg                = _mindischrg;      // initialisiere
@@ -769,7 +768,7 @@ async function processing() {
 
         setState(tibberDP + 'extra.pvLadeZeitenArray', pvfc, true);
         
-        if (_batsoc < 100 && pvfc.length > 0 ) {     // && _dc_now > _verbrauchJetzt 
+        if (_batsoc < 100 && pvfc.length > 0 ) {    
             let get_wh = 0;
             let get_wh_einzeln = 0;
 
@@ -803,11 +802,16 @@ async function processing() {
             let pvlimit_calc = pvlimit;
             let min_pwr = 0;
 
-            if (lademenge > 0 && lademenge > get_wh) {
-                pvlimit_calc = Math.max((Math.round(pvlimit - ((lademenge - get_wh) / restladezeit))), 0);      //virtuelles reduzieren des pvlimits
-                min_pwr      = Math.max(Math.round((lademenge - get_wh) / restladezeit), 0);
-            //    min_pwr      = min_pwr * -1;                                                                    // muss negativ sein ??
+            if (lademenge > 0 && lademenge > get_wh) {    //
+/*
+                console.error( pvlimit  );
+                console.error( lademenge );
+                console.error( get_wh );
+                console.error( restladezeit );
 
+*/
+                pvlimit_calc = Math.max(Math.round(pvlimit - ( lademenge - get_wh) / restladezeit), 0);      //virtuelles reduzieren des pvlimits
+                min_pwr      = Math.max(Math.round((lademenge - get_wh) / restladezeit), 0);
                 get_wh = lademenge;       
             }
 
@@ -821,7 +825,7 @@ async function processing() {
 
             if (lademenge > 0 && get_wh >= lademenge) {                   
 
-                current_pwr_diff  = aufrunden(2, 100 - pvlimit_calc + _einspeisung);         
+                current_pwr_diff  = aufrunden(2, 100 - pvlimit_calc + _einspeisung);     
 
                 _max_pwr = Math.round(_powerAC + current_pwr_diff);
                 
@@ -844,7 +848,7 @@ async function processing() {
                 console.info('Ausgabe A  :_max_pwr ' + _max_pwr + ' min_pwr ' + min_pwr + ' current_pwr_diff ' + current_pwr_diff);
             }
 
-            _max_pwr = Math.ceil(Math.min(Math.max(_max_pwr, min_pwr), _batteryLadePowerMax));     //abfangen negativer werte, limitiere auf min_pwr orginal
+            _max_pwr = Math.ceil(Math.min(Math.max(Math.max(_max_pwr, _mindischrg), Math.max(min_pwr, _mindischrg)), _batteryLadePowerMax));     //abfangen 0 werte
 
             if (_debug) {
                 console.info('Ausgabe B  :_max_pwr ' + _max_pwr);
@@ -1217,17 +1221,8 @@ async function holePVDatenAb() {
         let power90     = getState(pvforecastTodayDP + p + '.power90').val;
 
         // manuelles reduzieren pv
-        power50 = power50 - _power50Reduzierung;
-        power90 = power90 - _power90Reduzierung;
-
-        // keine negativen werte 
-        if (power50 < 0) {
-            power50 = 0;
-        }
-
-        if(power90 < 0) {
-            power90 = 0;    
-        }
+        power50 = Math.max((power50 - _power50Reduzierung), 0); 
+        power90 = Math.max((power90 - _power90Reduzierung), 0); 
 
         _pvforecastTodayArray.push([startTime.val,endTime.val,power50,power90]);
     }
