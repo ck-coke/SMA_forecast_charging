@@ -83,6 +83,8 @@ const bydDirectSOCDP            = 'bydhvs.0.State.SOC';                         
 
 let _dc_now                     = 0;  
 let _einspeisung                = 0;
+let _battOut                    = 0;
+let _battIn                     = 0;
 let _powerAC                    = 0;
 
 const _InitCom_Aus              = 803;
@@ -273,16 +275,23 @@ async function processing() {
     let batterieLadenUhrzeitStart       = getState(batterieLadenUhrzeitStartDP).val;
     let battStatus                      = getState(inputRegisters.betriebszustandBatterie).val;
 
+    _batteryLadePower                   = _batteryLadePowerMax;
+
+    if (_battIn > 0) {
+        _batteryLadePower =_battIn;  
+    }      
+
+/*
     _batteryLadePower = getState(tibberDP + 'extra.max_Batterieladung').val;  
 
-       if (_batteryLadePower == NaN || _batteryLadePower ==null || _batteryLadePower == 0) {
+    if (_batteryLadePower == NaN || _batteryLadePower ==null || _batteryLadePower == 0) {
         _batteryLadePower = 1;
     }
 
     if (_batteryLadePower < 0) {
         _batteryLadePower = _batteryLadePower * -1;
     }
-
+*/
     _tibberPreisJetzt = getState(tibberPreisJetztDP).val;
     _tomorrow_kW      = getState(tomorrow_kWDP).val;
     _powerAC          = getState(inputRegisters.powerAC).val * -1;
@@ -294,11 +303,11 @@ async function processing() {
     let restlademenge  = aufrunden(2, (_batteryCapacity - (_batteryCapacity *_batsoc) / 100));   
     let restladezeit   = aufrunden(2, (lademenge / _batteryLadePower));                                                            //Ladezeit = Energiemenge bis vollständige Ladung / Ladeleistung WR
 
-    if (_batteryLadePower == 1) {
+ /*   if (_batteryLadePower == 0) {
         _batteryLadePower   = _batteryLadePowerMax;
         restladezeit        = aufrunden(2, (restlademenge / _batteryLadePowerMax));
     }
-    
+*/ 
     setState(tibberDP + 'extra.BatterieRestladezeit', restladezeit, true);
 
     if (_debug) {
@@ -578,7 +587,7 @@ async function processing() {
             console.info('pvfc.length ' + pvfc.length + ' _dc_now ' + _dc_now + ' pvfc[0] ' + JSON.stringify(pvfc[0]));
         }
         
-        if (_dc_now > 0) {              // wenn die PV was produziert sind wir am Tag
+        if (_dc_now > 10) {              // wenn die PV was produziert sind wir am Tag
             if (_debug) {
                 console.warn('Tag verarbeitung ');
             }
@@ -621,10 +630,12 @@ async function processing() {
                 } else {
                     if (entladeZeitenArray.length > 0) {                                     // wir haben höchstpreise                       
                         for (let c = 0; c < entladeZeitenArray.length; c++) {
+                         //   console.warn('entladezeit ' + JSON.stringify(entladeZeitenArray[c]));
                             if (compareTime(entladeZeitenArray[c][1], entladeZeitenArray[c][2], "between")) {
                                 if (_vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
                                     break;
                                 } else {
+                                //    console.warn('entladezeit ' + entladeZeitenArray[c][1]);
                                     macheNix = true;
                                     _tibber_active_idx = 2;
                                     break;
@@ -1073,7 +1084,9 @@ async function berechneVerbrauch(pvNow) {
 
     _einspeisung        = aufrunden(2, getState(inputRegisters.powerOut).val);     // Einspeisung  in W
     const battOut       = await getStateAsync(inputRegisters.battOut);
+    _battOut            = battOut.val;
     const battIn        = await getStateAsync(inputRegisters.battIn);
+    _battIn             = battIn.val;
     const netzbezug     = await getStateAsync(inputRegisters.netzbezug);
 
     _vehicleConsum = 0;
@@ -1089,7 +1102,7 @@ async function berechneVerbrauch(pvNow) {
         }
     }
 
-    const verbrauchJetzt   = 100 + (pvNow + battOut.val + netzbezug.val) - (_einspeisung + battIn.val);          // verbrauch in W , 100W reserve obendruaf _vehicleConsum nicht rein nehmen
+    const verbrauchJetzt   = 100 + (pvNow + _battOut + netzbezug.val) - (_einspeisung + _battIn);          // verbrauch in W , 100W reserve obendruaf _vehicleConsum nicht rein nehmen
     setState(momentan_VerbrauchDP, aufrunden(2, (_verbrauchJetzt - 100 - _vehicleConsum)) /1000, true);                  // für die darstellung können die 100 W wieder raus und fahrzeug auch
 
     return aufrunden(0, verbrauchJetzt);
@@ -1156,9 +1169,7 @@ function sortHourToSunup(zeiten, sunup) {
         const hh  = zeiten[p][1].split(':')[0];
         const min = zeiten[p][1].split(':')[1];
 
-        if (min == 0) {
-            arrOut.push(zeiten[p]);
-        }    
+        arrOut.push(zeiten[p]);
 
         if (hh == sunup.split(':')[0]) {
             break;
@@ -1201,7 +1212,7 @@ function sortArrayByCurrentHour(zeiten, toEnd, currentHour) {
         sortedArray = zeiten;   
     }
 
-  // console.warn('sortArrayByCurrentHour ' + JSON.stringify(sortedArray));
+   //console.warn('sortArrayByCurrentHour ' + JSON.stringify(sortedArray));
 
     return sortedArray;
 }
