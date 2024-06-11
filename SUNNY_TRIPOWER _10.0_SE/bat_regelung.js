@@ -236,9 +236,6 @@ async function processing() {
         setState(spntComCheckDP, Math.floor(Math.random() * 100) + 1, true);               // schreibe irgendwas da rein.. 
         _tick = 0;
     }
-
-    let macheNix        = false;
-    let wirdGeladen     = false;
  
     _bydDirectSOCMrk = 0;
 
@@ -277,7 +274,7 @@ async function processing() {
             _istLadezeit = true;
 
             if (_debug) {
-                console.warn('-->> Bingo ladezeit');
+                console.warn('-->> Bingo ladezeit ');
             }
         }
     }
@@ -331,7 +328,7 @@ async function processing() {
     } 
 
     if (_tibberNutzenSteuerung) {
-        if (_tibber_active_idx == 88) { // komme aus notladung
+         if (_tibber_active_idx == 88) { // komme aus notladung
             setState(spntComCheckDP, 888, true);
         }
 
@@ -527,7 +524,7 @@ async function processing() {
 
         if (_debug) {
             console.info('tibberPoihighNew.length '+ tibberPoihighNew.length);
-           // console.info('tibberPoihighNew nach filter ' + JSON.stringify(tibberPoihighNew));
+          //  console.info('tibberPoihighNew nach filter ' + JSON.stringify(tibberPoihigh));
         }
 
         if (lefthrs > 0 && lefthrs > tibberPoihighNew.length) {        // limmitiere auf Tibber höchstpreise
@@ -557,102 +554,85 @@ async function processing() {
         if (_debug) {
             console.info('pvfc.length ' + pvfc.length + ' _dc_now ' + _dc_now + ' pvfc[0] ' + JSON.stringify(pvfc[0]));
         }
+    
+        if (_debug) {
+            console.warn('Tag verarbeitung ');
+        }
+
+        if (_dc_now < _verbrauchJetzt) {                            
+            // wenn genug PV am Tag aber gerade nicht genug Sonne aber tibber klein genug
+            if (_debug) {
+                console.info('pvwhToday ' + pvwhToday + ' benötigt werden ' + (_baseLoad * toSundownhr * _wr_efficiency));                
+            }
+            
+            // Entladezeit wenn was im akku und preis hoch genug um zu sparen
+            if (batlefthrs > 0 && _tibberPreisJetzt > _stop_discharge) {               
+                _tibber_active_idx = 21;
+            }
+            if (pvwhToday > (_baseLoad * toSundownhr * _wr_efficiency) && _tibberPreisJetzt <= _stop_discharge) {
+            // if (pvwhToday > _batteryCapacity - curbatwh && _tibberPreisJetzt <= _stop_discharge) {        
+                _tibber_active_idx = 20;          
+            } 
+        }          
         
-        if (_dc_now > 10) {              // wenn die PV was produziert sind wir am Tag
-            if (_debug) {
-                console.warn('Tag verarbeitung ');
-            }
 
-            if (_dc_now < _verbrauchJetzt) {                            
-                // wenn genug PV am Tag aber gerade nicht genug Sonne aber tibber klein genug
-                if (_debug) {
-                    console.info('pvwhToday ' + pvwhToday + ' benötigt werden ' + (_baseLoad * toSundownhr * _wr_efficiency));                
-                }
-                
-                // Entladezeit wenn was im akku und preis hoch genug um zu sparen
-                if (batlefthrs > 0 && _tibberPreisJetzt > _stop_discharge) {               
-                    _tibber_active_idx = 21;
-                    macheNix = true;
-                }
-                if (pvwhToday > (_baseLoad * toSundownhr * _wr_efficiency) && _tibberPreisJetzt <= _stop_discharge) {
-                // if (pvwhToday > _batteryCapacity - curbatwh && _tibberPreisJetzt <= _stop_discharge) {        
-                    _tibber_active_idx = 20;          
-                    macheNix = true;
-                } 
-            }          
-        } else {          // wir sind nach Sonnenuntergang
-            if (_debug) {
-                console.warn('Nacht verarbeitung');
-            }
-
-            // Entladezeit
-            if (batlefthrs > 0) {
-                if (batlefthrs >= hrstorun) { 
-                    if (compareTime(nowHour, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
-                        if (_debug) {
-                            console.warn('Entladezeit reicht aus bis zum Sonnaufgang und genug PV');
-                        }
-
-                        macheNix = true;
-                        _tibber_active_idx = 22;
-                        entladeZeitenArray = [];
-                        entladeZeitenArray.push([0.0,"--:--","--:--"]);  //  initialisiere für Vis
+        // Entladezeit
+        if (batlefthrs > 0) {
+            if (batlefthrs >= hrstorun) { 
+                if (compareTime(nowHour, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
+                    if (_debug) {
+                        console.warn('Entladezeit reicht aus bis zum Sonnaufgang und genug PV');
                     }
-                } else {
-                    if (entladeZeitenArray.length > 0) {                                     // wir haben höchstpreise                       
-                        for (let c = 0; c < entladeZeitenArray.length; c++) {
-                         //   console.warn('entladezeit ' + JSON.stringify(entladeZeitenArray[c]));
-                            if (compareTime(entladeZeitenArray[c][1], entladeZeitenArray[c][2], "between")) {
-                                if (_vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
-                                    break;
-                                } else {
-                                //    console.warn('entladezeit ' + entladeZeitenArray[c][1]);
-                                    macheNix = true;
-                                    _tibber_active_idx = 2;
-                                    break;
-                                }
+
+                    _tibber_active_idx = 22;
+                    entladeZeitenArray = [];
+                    entladeZeitenArray.push([0.0,"--:--","--:--"]);  //  initialisiere für Vis
+                }
+            } else {
+                if (entladeZeitenArray.length > 0) {                                     // wir haben höchstpreise                       
+                    for (let c = 0; c < entladeZeitenArray.length; c++) {
+                        if (_debug) {
+                            console.warn('entladezeit ' + JSON.stringify(entladeZeitenArray[c]));
+                        }
+                        if (compareTime(entladeZeitenArray[c][1], entladeZeitenArray[c][2], "between")) {
+                            if (_vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
+                                break;
+                            } else {
+                            //    console.warn('entladezeit ' + entladeZeitenArray[c][1]);
+                                _tibber_active_idx = 2;
+                                break;
                             }
                         }
-                    }                                                              
-                }
-            }
-
-            if (_debug) {
-                console.info('entladeZeitenArray ' + entladeZeitenArray.length);
-            }
-
-            // in der nacht starten setzen
-            if (_tibberPreisJetzt <= _start_charge && _batsoc < 100) {
-                let vergleichepvWh = 0;
-                
-                if (compareTime('00:00', null, ">", null)) {
-                    vergleichepvWh = pvwhTomorrow;              // vor 00:00 bruachen wir den morgen wert
-                } else {
-                    vergleichepvWh = pvwhToday;                 // danach den tageswert
-                }
-                
-                if (vergleichepvWh < (_baseLoad * 24 * _wr_efficiency)) {
-                    starteLadungTibber = true;
-                }
-            
-                if (_debug) {                                        
-                    console.info('pvwh ' + vergleichepvWh + ' ist kleiner als ' + (_baseLoad * 24 * _wr_efficiency));
-                }
+                    }
+                }                                                              
             }
         }
+
+        if (_debug) {
+            console.info('entladeZeitenArray ' + entladeZeitenArray.length);
+        }
+
+        // in der nacht starten setzen
+        if (_tibberPreisJetzt <= _start_charge && _batsoc < 100 && _dc_now < 10) {           // wir sind in der nacht
+            let vergleichepvWh = 0;
+            
+            if (compareTime('00:00', null, ">", null)) {
+                vergleichepvWh = pvwhTomorrow;              // vor 00:00 brauchen wir den morgen wert
+            } else {
+                vergleichepvWh = pvwhToday;                 // danach den tageswert
+            }
+            
+            if (vergleichepvWh < (_baseLoad * 24 * _wr_efficiency)) {
+                starteLadungTibber = true;
+            }
+        
+            if (_debug) {                                        
+                console.info('pvwh ' + vergleichepvWh + ' ist kleiner als ' + (_baseLoad * 24 * _wr_efficiency));
+            }
+        }
+    
 
         setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArrayVis,  true); 
-
-        // stoppe die Ladung/Entladung
-        if (!macheNix) {           
-            if ((_tibberPreisJetzt <= _stop_discharge && entladeZeitenArray.length > 0) || _batsoc == 0) {
-                if (_debug) {                                        
-                    console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + aufrunden(2, _stop_discharge) + ' ct/kWh oder battSoc = 0 ist ' + _batsoc );
-                    console.info(' _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' macheNix ' + macheNix + ' _tibber_active_idx ' + _tibber_active_idx);                    
-                }
-                _tibber_active_idx = 3;
-            }
-        }
 
         // starte die ladung
         if (starteLadungTibber) {
@@ -680,10 +660,18 @@ async function processing() {
                         console.info('Starte Ladung: ' + ladeZeitenArray[i][1] + '-' + ladeZeitenArray[i][2] + ' Preis ' + ladeZeitenArray[i][0]);
                     }
                     _tibber_active_idx = 5;
-                    wirdGeladen = true;
                     break;
                 }
             }
+        }
+
+       // stoppe die Ladung/Entladung
+        if (_tibberPreisJetzt <= _stop_discharge && (entladeZeitenArray.length > 0 || ladeZeitenArray.length > 0)) {
+            if (_debug) {                                        
+                console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + aufrunden(2, _stop_discharge) + ' ct/kWh oder battSoc = 0 ist ' + _batsoc );
+                console.info(' _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' _tibber_active_idx ' + _tibber_active_idx);                    
+            }
+            _tibber_active_idx = 3;
         }
 
         //ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
@@ -696,7 +684,7 @@ async function processing() {
         
         setState(tibberDP + 'extra.ladeZeitenArray', ladeZeitenArray, true);
 
-        tibber_active_auswertung(_istLadezeit);
+        tibber_active_auswertung();
     }
 
     setState(tibberDP + 'extra.tibberProtokoll', _tibber_active_idx, true);
@@ -715,7 +703,7 @@ async function processing() {
 //      _tibber_active_idx = 88;                notladung
 
     if (_debug) {
-        console.error('-->> Verlasse Tibber Sektion mit _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' macheNix ' + macheNix + ' _tibber_active_idx ' + _tibber_active_idx);
+        console.error('-->> Verlasse Tibber Sektion mit _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' _tibber_active_idx ' + _tibber_active_idx);
         console.error('-->  PV ' + _dc_now + ' Verbrauch ' + _verbrauchJetzt + ' Restladezeit ' + restladezeit);
     }
 
@@ -801,13 +789,13 @@ async function processing() {
                 get_wh       = lademenge;       
             }
 
-             /*
+            /* 
                 console.error('pvlimit ' + pvlimit  );
                 console.error('lademenge ' + lademenge );
                 console.error('get_wh ' + get_wh );
                 console.error('restladezeit ' + restladezeit);
                 console.error('restlademenge ' + restlademenge);
-                */
+             */   
 
              
 
@@ -821,7 +809,7 @@ async function processing() {
 
             let current_pwr_diff = 0;
 
-            if (lademenge > 0 && get_wh >= lademenge) {                   
+            if (lademenge > 0 && get_wh >= lademenge && _vehicleConsum < 1) {                   
 
                 current_pwr_diff  = aufrunden(2, 100 - pvlimit_calc + _einspeisung);     
 
@@ -838,7 +826,24 @@ async function processing() {
                         _max_pwr = Math.round(current_pwr_diff);                        
                     }
                 }                
+            } else {
+                _max_pwr = Math.ceil(pvfc[0][0] - pvlimit_calc);  
             }
+
+/*
+// versuch
+
+            let reduz = toSundownhr - 2;
+            if (reduz < 0) {
+                reduz = 1;
+            }
+
+            _max_pwr = Math.round(lademenge / reduz);
+
+
+
+*/
+
 
             if (_debug) {
                 console.info('restladezeit möglich ' + restladezeit + ' _powerAC ' + _powerAC);
@@ -876,9 +881,13 @@ async function processing() {
                     
                     if (_tibber_active_idx == 20 || _tibber_active_idx == 21 || _tibber_active_idx == 2) {   // komme von oben
                         if (_debug) {
-                            console.warn('-->> komme aber von oben mit _tibber_active_idx ' + _tibber_active_idx);
+                            console.warn('-->> komme aber von oben mit _tibber_active_idx ' + _tibber_active_idx + ' mit SOC ' + _batsoc);
                         }
-                        _SpntCom = _InitCom_Aus;
+                        if (_batsoc < 60) {
+                            _SpntCom = _InitCom_An;                                
+                        } else {
+                            _SpntCom = _InitCom_Aus;
+                        }
                     }
                 } else {
 
@@ -898,13 +907,9 @@ async function processing() {
                     if (_lastpwrAtCom != _max_pwr) {
                         _lastSpntCom = 95;                                          // damit der WR auf jedenfall daten bekommt
                     }
-
-                    if (_batsoc < 100) {  // batterie ist nicht voll
-                        wirdGeladen = true;
-                    }
                 }
             }                    
-        }
+        } 
 
         if (_max_pwr > 0) {        // hier muss immer was negatives rauskommen.. sonst keine pv ladung
             _max_pwr = _mindischrg;          
@@ -914,7 +919,7 @@ async function processing() {
     _maxchrg = _max_pwr;
 
 // ---------------------------------------------------- Ende der PV Prognose Sektion
-    if (_batsoc > 90 && wirdGeladen) {              // letzten 10 % langsam laden
+    if (_batsoc > 90 && _battIn > 0) {              // letzten 10 % langsam laden
         if (_maxchrg < _lastPercentageLoadWith) {            
             _maxchrg = _lastPercentageLoadWith;
             if (_debug) {
@@ -1077,15 +1082,18 @@ async function berechneVerbrauch(pvNow) {
 
 function filterZeit14UhrOrSunup(arrZeit, sunup) {
     const newArray = [];
+
+    // console.warn(JSON.stringify(arrZeit));
+
     for (let i = 0; i < arrZeit.length; i++) {
         const startTime = parseInt(arrZeit[i][1].split(':')[0]);
         newArray.push(arrZeit[i]);
-        if (startTime == 14 || startTime == sunup.split(':')[0]) {
+        if (startTime == sunup.split(':')[0]) { // || startTime == 14
             break;    
         }
     }
 
-  //  console.warn(JSON.stringify(newArray));
+    // console.warn(JSON.stringify(newArray));
 
     newArray.sort(function (a, b) {  // niedrieg preis sort
         return b[0] - a[0];
@@ -1170,6 +1178,9 @@ function sortArrayByCurrentHour(zeiten, toEnd, currentHour) {
 
     let sortedArray = [];
     
+    //console.warn('sortArrayByCurrentHour ' + JSON.stringify(sortedArray));
+
+
     if (toEnd) {
         // Finde den Index des aktuellen Zeitpunkts
         let startIndex = zeiten.findIndex(item => {
@@ -1280,27 +1291,21 @@ function tibberPoilowErmittlung(arraySorted) {
 }
 
 
-function tibber_active_auswertung(istLadezeit) {
+function tibber_active_auswertung() {
     _max_pwr = _mindischrg;
   
     switch (_tibber_active_idx) {
-        case 0:
-            if (compareTime(_sunup, null, '<=', null) || !istLadezeit) {
-                _SpntCom = _InitCom_An;
-            }
-           
-// PV deckt Verbrauch zu 70 % dann nimm aus der batterie ist vielleicht ne Wolke unterwegs            
-/*
-            if (_dc_now >= (_verbrauchJetzt - (_verbrauchJetzt * 0.30)) ) {      
-                if (compareTime(_ladezeitVon, _ladezeitBis, 'between')) {
-                    if (_debug) {
-                        console.warn('Verbrauch zu 70% gedeckt, vielleicht Wolke unterwegs');
-                    }
-                    _SpntCom = _InitCom_Aus;           
+        case 0:       
+            if (_dc_now < 10) {
+                const tibPoint =  getState(spntComCheckDP).val;    // und diesen dann nehmennur bei tibber 0 dann macht der das was zueltzt gesendet worden ist
+                if (tibPoint == 0) {
+                    _tibber_active_idx = 3;    
+                } else {
+                    _tibber_active_idx = tibPoint;
                 }
-            }             
-*/
-
+                
+                tibber_active_auswertung();
+            }
             break;
         case 1:                             //      _tibber_active_idx = 1;    Nachladezeit
             _SpntCom = _InitCom_An;
