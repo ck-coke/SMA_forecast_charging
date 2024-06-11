@@ -52,136 +52,127 @@ schedule('2 5,6,8,12,13,15 * * *', function () {
 
 async function requestData(seiteUrl, seite) {
     const url = `${baseUrl}${seiteUrl}`;   
+    
+    httpGet(url, { timeout: 5000, responseType: 'text' }, async (err, response) => {
+        if (err) {
+            console.error(err);
+        } else {
+            const jsonData  = JSON.parse(response.data);
+            const array     = jsonData.forecasts;
+            
+            const list = [];     
 
-    let response;
+            let heute = true;
 
-    try {
-        response = await axios({
-            timeout: 5000,
-            url: url,
-            method: 'get'
-        });
-    } catch {
-        console.warn('too many requests');
-    }
+            for (let i = 0; i < array.length; i++) {
+                const endtime = Date.parse(array[i].period_end);
+                const startTime = new Date(endtime - 1800000);
+                const readpwr = array[i].pv_estimate;
+                const readpwr90 = array[i].pv_estimate90;
+                const watt = Math.round(readpwr * 1000);
 
-    if (response && response.status === 200) {
-
-        //console.warn('response ' + JSON.stringify(response.data));
-
-        const array = response.data.forecasts;
-        const list = [];     
-
-        let heute = true;
-
-        for (let i = 0; i < array.length; i++) {
-            const endtime = Date.parse(array[i].period_end);
-            const startTime = new Date(endtime - 1800000);
-            const readpwr = array[i].pv_estimate;
-            const readpwr90 = array[i].pv_estimate90;
-            const watt = Math.round(readpwr * 1000);
-
-            list[i] = {
-                time: startTime / 1000,
-                watt: watt,
-                watt90: Math.round(readpwr90 * 1000),
-            };
-        }
-
-        const startTime = new Date(list[0].time * 1000);
-        const startDPTime = startTime.toLocaleTimeString('de-DE', options);
-
-        let ind = 0;
-
-        setTimeout(function () {   // warte 5 sekunden falls dp noch nicht angelegt
-            // finde startzeit
-            for (ind = 0; ind < hours * 2; ind++) {
-                const startTimeind = getState(mainObjectToday + '.' + seite + '.' + ind + '.startTime').val;
-                if (startDPTime == startTimeind) {
-                    break;
-                }
+                list[i] = {
+                    time: startTime / 1000,
+                    watt: watt,
+                    watt90: Math.round(readpwr90 * 1000),
+                };
             }
 
-            //console.warn('start ind ' + ind + ' auf seite ' + seite);
+            const startTime = new Date(list[0].time * 1000);
+            const startDPTime = startTime.toLocaleTimeString('de-DE', options);
 
-            let listenDP = -1;    // damit ich auf 0 komme bei ersten lauf
-            let posiA = ind - 1;
-            let schonGebucht = false;
-            
-            let powerWGes = 0;
-            let power90WGes = 0;
+            let ind = 0;
 
-            for (let a = 0; a < hours * 4; a++) {
-                listenDP += 1;
-
-                if (list[listenDP] == undefined) {
-                    break;
-                }
-
-                const start = new Date(list[listenDP].time * 1000);
-                const end = new Date(list[listenDP].time * 1000 + 1800000);
-
-                const startTime = start.toLocaleTimeString('de-DE', options);
-                //const endTime = end.toLocaleTimeString('de-DE', options);
-
-                if (startTime == abbrechenBei) {   // wir brauchen nur bis nachts
-                    if (schonGebucht) {
+            setTimeout(function () {   // warte 5 sekunden falls dp noch nicht angelegt
+                // finde startzeit
+                for (ind = 0; ind < hours * 2; ind++) {
+                    const startTimeind = getState(mainObjectToday + '.' + seite + '.' + ind + '.startTime').val;
+                    if (startDPTime == startTimeind) {
                         break;
                     }
-                    if (!schonGebucht) {
-                        heute = false;
-                        posiA = -1;                     
-                        schonGebucht = true;
+                }
+
+                //console.warn('start ind ' + ind + ' auf seite ' + seite);
+
+                let listenDP = -1;    // damit ich auf 0 komme bei ersten lauf
+                let posiA = ind - 1;
+                let schonGebucht = false;
+                
+                let powerWGes = 0;
+                let power90WGes = 0;
+
+                for (let a = 0; a < hours * 4; a++) {
+                    listenDP += 1;
+
+                    if (list[listenDP] == undefined) {
+                        break;
                     }
+
+                    const start = new Date(list[listenDP].time * 1000);
+                    const end = new Date(list[listenDP].time * 1000 + 1800000);
+
+                    const startTime = start.toLocaleTimeString('de-DE', options);
+                    //const endTime = end.toLocaleTimeString('de-DE', options);
+
+                    if (startTime == abbrechenBei) {   // wir brauchen nur bis nachts
+                        if (schonGebucht) {
+                            break;
+                        }
+                        if (!schonGebucht) {
+                            heute = false;
+                            posiA = -1;                     
+                            schonGebucht = true;
+                        }
+                    }
+
+                    posiA += 1;
+
+                    let stateBaseName1 = `${mainObjectToday}.${name1}.${posiA}.`;
+                    let stateBaseName2 = `${mainObjectToday}.${name2}.${posiA}.`;
+                    let stateBaseNameGes = `${mainObjectToday}.${gesamt}.${posiA}.`;
+
+                    if (!heute) {
+                        stateBaseName1 = `${mainObjectTomorrow}.${name1}.${posiA}.`;
+                        stateBaseName2 = `${mainObjectTomorrow}.${name2}.${posiA}.`;
+                        stateBaseNameGes = `${mainObjectTomorrow}.${gesamt}.${posiA}.`;
+                    }
+
+                    const powerW = list[listenDP].watt / 2;      // es kommen 2 DP pro stunde also teilen
+                    const power90W = list[listenDP].watt90 / 2;
+
+                    if (seite == name1) {
+                        setState(stateBaseName1 + 'power', powerW, true);
+                        setState(stateBaseName1 + 'power90', power90W, true);
+                        
+                        const powerWName2 = getState(stateBaseName2 + 'power').val;
+                        const powerW90Name2 = getState(stateBaseName2 + 'power90').val;
+
+                        powerWGes = powerW + powerWName2;
+                        power90WGes = power90W + powerW90Name2;
+                    }
+
+                    if (seite == name2) {
+                        setState(stateBaseName2 + 'power', powerW, true);
+                        setState(stateBaseName2 + 'power90', power90W, true);
+
+                        const powerWName1 = getState(stateBaseName1 + 'power').val;
+                        const power90WName1 = getState(stateBaseName1 + 'power90').val;
+
+                        powerWGes = powerW + powerWName1;
+                        power90WGes = power90W + power90WName1;
+                    }                             
+
+                    setState(stateBaseNameGes + 'power', parseInt((powerWGes).toFixed(3)), true);
+                    setState(stateBaseNameGes + 'power90', parseInt((power90WGes).toFixed(3)), true);               
                 }
 
-                posiA += 1;
+                genGraphAnlegen(true);    // erzeuge today
+                genGraphAnlegen(false);   // erzeuge tomorrow
 
-                let stateBaseName1 = `${mainObjectToday}.${name1}.${posiA}.`;
-                let stateBaseName2 = `${mainObjectToday}.${name2}.${posiA}.`;
-                let stateBaseNameGes = `${mainObjectToday}.${gesamt}.${posiA}.`;
-
-                if (!heute) {
-                    stateBaseName1 = `${mainObjectTomorrow}.${name1}.${posiA}.`;
-                    stateBaseName2 = `${mainObjectTomorrow}.${name2}.${posiA}.`;
-                    stateBaseNameGes = `${mainObjectTomorrow}.${gesamt}.${posiA}.`;
-                }
-
-                const powerW = list[listenDP].watt / 2;      // es kommen 2 DP pro stunde also teilen
-                const power90W = list[listenDP].watt90 / 2;
-
-                if (seite == name1) {
-                    setState(stateBaseName1 + 'power', powerW, true);
-                    setState(stateBaseName1 + 'power90', power90W, true);
-                    
-                    const powerWName2 = getState(stateBaseName2 + 'power').val;
-                    const powerW90Name2 = getState(stateBaseName2 + 'power90').val;
-
-                    powerWGes = powerW + powerWName2;
-                    power90WGes = power90W + powerW90Name2;
-                }
-
-                if (seite == name2) {
-                    setState(stateBaseName2 + 'power', powerW, true);
-                    setState(stateBaseName2 + 'power90', power90W, true);
-
-                    const powerWName1 = getState(stateBaseName1 + 'power').val;
-                    const power90WName1 = getState(stateBaseName1 + 'power90').val;
-
-                    powerWGes = powerW + powerWName1;
-                    power90WGes = power90W + power90WName1;
-                }                             
-
-                setState(stateBaseNameGes + 'power', parseInt((powerWGes).toFixed(3)), true);
-                setState(stateBaseNameGes + 'power90', parseInt((power90WGes).toFixed(3)), true);               
-            }
-
-            genGraphAnlegen(true);    // erzeuge today
-            genGraphAnlegen(false);   // erzeuge tomorrow
-
-        }, 5000);
-        await setStateAsync(`${mainObject}.lastUpdated`, { val: moment().valueOf(), ack: true });
-    }
+                setState(`${mainObject}.lastUpdated`, { val: moment().valueOf(), ack: true });
+            }, 500);        
+        };
+    });
 }
 
 // --------------------------------------------------------------------
@@ -375,7 +366,9 @@ function genGraphAnlegen(today) {
                 jsonGraphData.push(powerWGesamt);
 
                 if (influxDb) {
-                    influxDdOutput(startTime, powerWGesamt);                
+                    influxDdOutput(_influxDbMeasurementGesamt, startTime, powerWGesamt);
+                    influxDdOutput(_influxDbMeasurementGarten, startTime, powerWName1);
+                    influxDdOutput(_influxDbMeasurementStrasse, startTime, powerWName2);                    
                 }
             }
         }       
@@ -396,11 +389,11 @@ function addLeadingZero(number) {
     return number < 10 ? '0' + number : number;
 }
 
-async function influxDdOutput(startTime, powerW) {
+async function influxDdOutput(influxDbMeasurementDP, startTime, powerW) {
     const stTime = startTime + ':00';
     let currentDate = new Date();
     let formattedDate = currentDate.getFullYear() + '-' + addLeadingZero(currentDate.getMonth() + 1) + '-' + addLeadingZero(currentDate.getDate()) + ' ' + stTime;
-    await addToInfluxDB(moment(formattedDate).valueOf(), powerW);
+    await addToInfluxDB(influxDbMeasurementDP, moment(formattedDate).valueOf(), powerW);
 }
 
 async function genGraph(jsonGraphLabels, jsonGraphData, whichDay) {
@@ -437,7 +430,7 @@ async function genGraph(jsonGraphLabels, jsonGraphData, whichDay) {
     await this.setStateAsync(`${whichDay}.JSONGraph`, { val: JSON.stringify({ 'graphs': [jsonGraph], 'axisLabels': jsonGraphLabels }, null, 2), ack: true });
 }
 
-async function addToInfluxDB(timestamp, value) {
+async function addToInfluxDB(influxDbMeasurement, timestamp, value) {
     try {
         const result = await this.sendToAsync(influxInstance, 'storeState', {
             id: influxDbMeasurement,
