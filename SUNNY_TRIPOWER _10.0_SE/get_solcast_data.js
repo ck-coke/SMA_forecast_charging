@@ -33,17 +33,28 @@ schedule('0 2 * * *', function () {
     initialPV();
 });
 
+schedule({ astro: 'sunrise' }, () => {
+    let url = `${seite2}/forecasts?format=json&api_key=${key_id}`;
+    toLog(`Hole PV ${name2}`, true);
+    requestData(url, name2);
+
+    url = `${seite1}/forecasts?format=json&api_key=${key_id}`;
+    toLog(`Hole PV ${name1}`, true);
+    requestData(url, name1);
+});
+
+
 // 10 request sind frei bei solcast.com
-schedule('1 5,7,9,10 * * *', function () {
+schedule('1 6,7,9,10 * * *', function () {
     const url = `${seite2}/forecasts?format=json&api_key=${key_id}`;
     toLog(`Hole PV ${name2}`, true);
     requestData(url, name2);
 });
 
-schedule('2 5,6,8,12,13,15 * * *', function () {
-    const url2 = `${seite1}/forecasts?format=json&api_key=${key_id}`;
+schedule('2 8,12,13,15 * * *', function () {
+    const url = `${seite1}/forecasts?format=json&api_key=${key_id}`;
     toLog(`Hole PV ${name1}`, true);
-    requestData(url2, name1);
+    requestData(url, name1);
 });
  
 // ------------------------------------------------------------------------------------------------------------------
