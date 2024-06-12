@@ -566,9 +566,10 @@ async function processing() {
             }
             
             // Entladezeit wenn was im akku und preis hoch genug um zu sparen
-            if (batlefthrs > 0 && _tibberPreisJetzt > _stop_discharge) {               
+            if (batlefthrs > 0 && _tibberPreisJetzt > _stop_discharge  && _dc_now > 0) {               
                 _tibber_active_idx = 21;
             }
+            
             if (pvwhToday > (_baseLoad * toSundownhr * _wr_efficiency) && _tibberPreisJetzt <= _stop_discharge) {
             // if (pvwhToday > _batteryCapacity - curbatwh && _tibberPreisJetzt <= _stop_discharge) {        
                 _tibber_active_idx = 20;          
@@ -795,17 +796,13 @@ async function processing() {
                 console.error('get_wh ' + get_wh );
                 console.error('restladezeit ' + restladezeit);
                 console.error('restlademenge ' + restlademenge);
-             */   
-
-             
+             */                
 
             get_wh = aufrunden(2, get_wh);     
 
             if (_debug) {
-                console.info('-->  Verschiebe Einspeiselimit auf pvlimit_calc ' + pvlimit_calc + ' W' + ' mit mindestens ' + min_pwr + ' W  get_wh ' + get_wh + ' restladezeit ' + restladezeit );
+                console.info('-->  Verschiebe Einspeiselimit auf pvlimit_calc ' + pvlimit_calc + ' W' + ' mit mindestens ' + min_pwr + ' W  get_wh ' + get_wh);
             }
-
-            
 
             let current_pwr_diff = 0;
 
@@ -1297,7 +1294,7 @@ function tibber_active_auswertung() {
     switch (_tibber_active_idx) {
         case 0:       
             if (_dc_now < 10) {
-                const tibPoint =  getState(spntComCheckDP).val;    // und diesen dann nehmennur bei tibber 0 dann macht der das was zueltzt gesendet worden ist
+                const tibPoint =  getState(tibberDP + 'extra.tibberProtokoll').val;    // und diesen dann nehmennur bei tibber 0 dann macht der das was zueltzt gesendet worden ist
                 if (tibPoint == 0) {
                     _tibber_active_idx = 3;    
                 } else {
