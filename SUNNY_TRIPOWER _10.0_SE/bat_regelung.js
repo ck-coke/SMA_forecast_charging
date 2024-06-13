@@ -553,9 +553,6 @@ async function processing() {
 
         if (_debug) {
             console.info('pvfc.length ' + pvfc.length + ' _dc_now ' + _dc_now + ' pvfc[0] ' + JSON.stringify(pvfc[0]));
-        }
-    
-        if (_debug) {
             console.warn('Tag verarbeitung ');
         }
 
@@ -577,10 +574,15 @@ async function processing() {
         }          
         
 
+        if (_debug) {
+            console.info('entladeZeitenArray ' + entladeZeitenArray.length);
+         //   console.info('entladeZeitenArray ' + JSON.stringify(entladeZeitenArray));
+        }
+
         // Entladezeit
-        if (batlefthrs > 0) {
+        if (batlefthrs > 0 && _dc_now < _verbrauchJetzt) {
             if (batlefthrs >= hrstorun) { 
-                if (compareTime(nowHour, _sunup, 'between')) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang
+                if (compareTime(nowHour, _sunup, 'between') || _hhJetzt == Number(_sunup.split(':')[0]) ) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang oder sonnenaufgang stunde
                     if (_debug) {
                         console.warn('Entladezeit reicht aus bis zum Sonnaufgang und genug PV');
                     }
@@ -607,10 +609,6 @@ async function processing() {
                     }
                 }                                                              
             }
-        }
-
-        if (_debug) {
-            console.info('entladeZeitenArray ' + entladeZeitenArray.length);
         }
 
         // in der nacht starten setzen
@@ -672,7 +670,9 @@ async function processing() {
                 console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + aufrunden(2, _stop_discharge) + ' ct/kWh oder battSoc = 0 ist ' + _batsoc );
                 console.info(' _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' _tibber_active_idx ' + _tibber_active_idx);                    
             }
-            _tibber_active_idx = 3;
+            if (_tibber_active_idx != 22) {  // aber nicht wenn die ladung bis zum ende reicht
+                _tibber_active_idx = 3;
+            }
         }
 
         //ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
@@ -1147,7 +1147,7 @@ function sortHourToSunup(zeiten, sunup) {
             arrOutOnlyHH.push(zeiten[p]);
         }
 
-        if (hh == sunup.split(':')[0]) {
+        if (hh == sunup.split(':')[0] +1) {              // rechne eine stunde zu sunup damit :30 werte mitgenommen werden können
             break;
         }
 
@@ -1302,6 +1302,9 @@ function tibber_active_auswertung() {
                 }
                 
                 tibber_active_auswertung();
+            }
+            if (!_istLadezeit) {
+                _SpntCom = _InitCom_An;    
             }
             break;
         case 1:                             //      _tibber_active_idx = 1;    Nachladezeit
