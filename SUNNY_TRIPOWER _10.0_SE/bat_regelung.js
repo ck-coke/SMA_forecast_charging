@@ -293,9 +293,8 @@ async function processing() {
     _tomorrow_kW      = getState(tomorrow_kWDP).val;
 
     // Lademenge
-    let lademenge      = Math.max(Math.ceil((_batteryCapacity * (_batteryTarget - _batsoc) / 100) * (1 / _wr_efficiency)), 0);     //lademenge = Energiemenge bis vollständige Ladung 
-    let restlademenge  = aufrunden(2, (_batteryCapacity - (_batteryCapacity * _batsoc) / 100));   
-    let restladezeit   = aufrunden(2, (lademenge / _batteryLadePower));                                                            //Ladezeit = Energiemenge bis vollständige Ladung / Ladeleistung WR
+    let restlademenge      = Math.max(Math.ceil((_batteryCapacity * (_batteryTarget - _batsoc) / 100) * (1 / _wr_efficiency)), 0);     //lademenge = Energiemenge bis vollständige Ladung 
+    let restladezeit   = aufrunden(2, (restlademenge / _batteryLadePower));                                                            //Ladezeit = Energiemenge bis vollständige Ladung / Ladeleistung WR
     let toSundownhr    = 0;
 
     setState(tibberDP + 'extra.BatterieRestladezeit', restladezeit, true);
@@ -310,7 +309,6 @@ async function processing() {
         console.info('Batt_SOC________________________ ' + _batsoc + ' %');
         const battsts = battStatus == 2291 ? 'Batterie Standby' : battStatus == 3664 ? 'Notladebetrieb' : battStatus == 2292 ? 'Batterie laden' : battStatus == 2293 ? 'Batterie entladen' : 'Aus';
         console.info('Batt_Status_____________________ ' + battsts + ' = ' + battStatus);
-        console.info('Lademenge_______________________ ' + lademenge + ' Wh');
         console.info('Restladezeit____________________ ' + restladezeit + ' h');
         console.info('Restlademenge___________________ ' + restlademenge + ' Wh');
     }
@@ -509,7 +507,6 @@ async function processing() {
 
         let entladeZeitenArray      = [];      
         let entladeZeitenArrayVis   = [];    
-        let entladeZeitenArrayAll   = []; 
         let tibberPoihighNew        = filterZeit14UhrOrSunup(tibberPoihigh, _sunup);    // sortiert nach preis und stunden grösser jetzt und bis zu sunup oder 14 uhr
         let lefthrs                 = Math.ceil(batlefthrs *2);                         // Batterielaufzeit laut SOC
 
@@ -534,9 +531,9 @@ async function processing() {
             }  
         }
 
-        entladeZeitenArrayAll   = sortHourToSunup(sortArrayByCurrentHour(entladeZeitenArray, true, _hhJetzt), _sunup);
-        entladeZeitenArray      = entladeZeitenArrayAll.arrOut; 
-        entladeZeitenArrayVis   = entladeZeitenArrayAll.arrOutOnlyHH; 
+        const entladeZeitenArrayAll     = sortHourToSunup(sortArrayByCurrentHour(entladeZeitenArray, true, _hhJetzt), _sunup);
+        entladeZeitenArray              = entladeZeitenArrayAll.arrOut; 
+        entladeZeitenArrayVis           = entladeZeitenArrayAll.arrOutOnlyHH; 
 
       //       console.warn(JSON.stringify(entladeZeitenArray));
 
@@ -595,7 +592,9 @@ async function processing() {
                             }
                         }
                     }
-                }                                                              
+                } else {
+                    _tibber_active_idx = 23;    
+                }                                                             
             }
         }
 
@@ -624,7 +623,7 @@ async function processing() {
         // starte die ladung
         if (starteLadungTibber) {
             if (restladezeit == 0) {
-                restladezeit = lademenge / _batteryLadePowerMax; 
+                restladezeit = restlademenge / _batteryLadePowerMax; 
             }
 
             let length = aufrunden(2, restladezeit);
@@ -673,7 +672,7 @@ async function processing() {
         
         setState(tibberDP + 'extra.ladeZeitenArray', ladeZeitenArray, true);
 
-        tibber_active_auswertung();
+        tibber_active_auswertung(false);
     }
 
     setState(tibberDP + 'extra.tibberProtokoll', _tibber_active_idx, true);
@@ -686,6 +685,7 @@ async function processing() {
 //      _tibber_active_idx = 20;                pv reicht für den Tag und wir sind in zwischenzeit wo nix produziert wird und preis unter schwelle     
 //      _tibber_active_idx = 21;                Entladezeit wenn akku > 0 , der Preis hoch genug um zu sparen
 //      _tibber_active_idx = 22;                Entladezeit reicht aus bis zum Sonnaufgang
+//      _tibber_active_idx = 23;                keine entladezeit da alle Preise unter schwelle aber Batterie hat ladung
 //      _tibber_active_idx = 3;                 entladung stoppen wenn preisschwelle erreicht
 //      _tibber_active_idx = 4;                 ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
 //      _tibber_active_idx = 5;                 starte die ladung
@@ -743,6 +743,7 @@ async function processing() {
         //    console.warn('pvfc ' + JSON.stringify(pvfc));
         }
         
+        // kann evtl. auch weg da nur PV_Ueberschuss errechnet wird, keine weitere verwendung
         if (_batsoc < 100 && pvfc.length > 0 ) {    
             let get_wh = 0;
             let get_wh_einzeln = 0;
@@ -768,6 +769,8 @@ async function processing() {
                 get_wh = get_wh + aufrunden(2, get_wh_einzeln);
             }
 
+            get_wh = aufrunden(2, get_wh);  
+
             setState(tibberDP + 'extra.PV_Ueberschuss', get_wh, true);            
 
             if (_debug) {
@@ -775,16 +778,13 @@ async function processing() {
             }
 
             let pvlimit_calc = pvlimit;
-            let min_pwr = 0;
-            let current_pwr_diff = 0;
+            let min_pwr = 0;           
 
-            if (lademenge > 0 && lademenge > get_wh) {    
-                pvlimit_calc = Math.max(Math.round(pvlimit - ( lademenge - get_wh) / restladezeit), 0);      //virtuelles reduzieren des pvlimits
-                min_pwr      = Math.max(Math.round((lademenge - get_wh) / restladezeit), 0);
-                get_wh       = lademenge;       
+            if (restlademenge > 0 && restlademenge > get_wh) {    
+                pvlimit_calc = Math.max(Math.round(pvlimit - ( restlademenge - get_wh) / restladezeit), 0);      //virtuelles reduzieren des pvlimits
+                min_pwr      = Math.max(Math.round((restlademenge - get_wh) / restladezeit), 0);
+                get_wh       = restlademenge;       
             }
-
-            get_wh = aufrunden(2, get_wh);     
 
             if (_debug) {
                 console.info('-->  Verschiebe Einspeiselimit auf pvlimit_calc ' + pvlimit_calc + ' W' + ' mit mindestens ' + min_pwr + ' W  get_wh ' + get_wh);
@@ -792,13 +792,12 @@ async function processing() {
 
             let toSundownhrReduziert = 0;
 
-            if (lademenge > 0 && get_wh >= lademenge && _vehicleConsum < 1) {                   
+            if (restlademenge > 0 && get_wh >= restlademenge && _vehicleConsum < 1) {                   
 
                 toSundownhrReduziert = toSundownhr;
                 if (toSundownhr > 2) {
                     toSundownhrReduziert = toSundownhr - 2;
                 } 
-
 
                 _max_pwr = Math.max(Math.round(restlademenge / toSundownhrReduziert) - 100, 0);  
                 
@@ -814,7 +813,7 @@ async function processing() {
             if (_debug) {
                 console.info('restladezeit möglich ' + restladezeit);
                 console.info('nach der Begrenzung  :_max_pwr ' + _max_pwr + ' startzeit ' + pvfc[0][3] + ' pvfc[0][0] ' + pvfc[0][0] + ' oder pvfc[0][1] ' + pvfc[0][1] + ' pvlimit_calc ' + pvlimit_calc);
-                console.info('Ausgabe A  :_max_pwr ' + _max_pwr + ' min_pwr ' + min_pwr + ' current_pwr_diff ' + current_pwr_diff);
+                console.info('Ausgabe A  :_max_pwr ' + _max_pwr + ' min_pwr ' + min_pwr);
             }
 
             _max_pwr = Math.ceil(Math.min(Math.max(_max_pwr, min_pwr), _batteryLadePowerMax));     //abfangen 0 werte
@@ -844,17 +843,12 @@ async function processing() {
                     if (_debug) {
                         console.warn('-->> breche ab, da nicht genug Sonne ' );
                     }
-                    
-                    if (_tibber_active_idx == 20 || _tibber_active_idx == 21 || _tibber_active_idx == 2) {   // komme von oben
-                        if (_debug) {
-                            console.warn('-->> komme aber von oben mit _tibber_active_idx ' + _tibber_active_idx + ' mit SOC ' + _batsoc);
-                        }
-                        if (_batsoc < 60) {
-                            _SpntCom = _InitCom_An;                                
-                        } else {
-                            _SpntCom = _InitCom_Aus;
-                        }
-                    }
+
+                    // komme aus tibber laufzeit
+                    tibber_active_auswertung(true);
+                    if (_debug) {
+                        console.warn('-->> komme aber von oben mit _tibber_active_idx ' + _tibber_active_idx + ' mit SOC ' + _batsoc);
+                    }                   
                 } else {
 
                     if (_debug) {
@@ -1263,7 +1257,7 @@ function tibberPoilowErmittlung(arraySorted) {
 }
 
 
-function tibber_active_auswertung() {
+function tibber_active_auswertung(kommeAusPrognose) {
     _max_pwr = _mindischrg;
   
     switch (_tibber_active_idx) {
@@ -1276,7 +1270,7 @@ function tibber_active_auswertung() {
                     _tibber_active_idx = tibPoint;
                 }
                 
-                tibber_active_auswertung();
+                tibber_active_auswertung(false);
             }
             if (!_istLadezeit) {
                 _SpntCom = _InitCom_An;    
@@ -1288,10 +1282,18 @@ function tibber_active_auswertung() {
             break;
         case 2:                             //      _tibber_active_idx = 2;    Entladezeiten
         case 20:                            //      _tibber_active_idx = 20;   pv reicht für den Tag und wir sind in zwischenzeit wo nix produziert wird und preis unter schwelle  
-        case 21:                            //      _tibber_active_idx = 21;   Entladezeit wenn akku > 0 , der Preis hoch genug um zu sparen           
-        case 22:                            //      _tibber_active_idx = 22;   Entladezeit reicht aus bis zum Sonnaufgang
             _SpntCom = _InitCom_Aus;
-            break;
+            break;    
+        case 21:                            //      _tibber_active_idx = 21;   Entladezeit wenn akku > 0 , der Preis hoch genug um zu sparen           
+        case 22:                            //      _tibber_active_idx = 22;   Entladezeit reicht aus bis zum Sonnaufgang        
+            _SpntCom = _InitCom_Aus; 
+            if (kommeAusPrognose && _batsoc < 60) {             //      halte die batterie bei 
+                _SpntCom = _InitCom_An;  
+            } 
+            break;    
+        case 23:                            //      _tibber_active_idx = 23;   keine entladezeit da alle Preise unter schwelle aber Batterie hat ladung
+            _SpntCom = _InitCom_Aus;
+            break;            
         case 3:                             //      _tibber_active_idx = 3;    entladung stoppen wenn preisschwelle erreicht
             _SpntCom = _InitCom_An;
             break;
@@ -1306,4 +1308,3 @@ function tibber_active_auswertung() {
             _SpntCom = _InitCom_Aus;        
     }
 }
-
