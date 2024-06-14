@@ -13,15 +13,18 @@ const name1 = 'garten';         // name dp1  frei wählbar
 const name2 = 'strasse';        // name dp2  frei wählbar
 const gesamt = 'gesamt';        // dp für zusammenrechnen muss in ladenNachPrognose angepasst werden wenn hier geändert
 
+
 const influxDb = true;   // wenn grafana output erwünscht benötigt wird eine influx.0 instanz
-const influxDbMeasurement = 'pvforecast.0.summary.power';
+const _influxDbMeasurementGesamt  = 'pvforecast.0.summary.power';
+const _influxDbMeasurementStrasse = 'pvforecast.0.plants.strasse.power';
+const _influxDbMeasurementGarten  = 'pvforecast.0.plants.garten.power';
+
 const influxInstance = 'influxdb.0';
 
 const mainObject = '0_userdata.0.strom.pvforecast';
 const mainObjectToday = '0_userdata.0.strom.pvforecast.today';
 const mainObjectTomorrow = '0_userdata.0.strom.pvforecast.tomorrow';
 const abbrechenBei = '00:00';   // ab wieviel Uhr kommt nix mehr, kann so bleiben
-// bis hier
 
 
 const baseUrl = "https://api.solcast.com.au/rooftop_sites/";
