@@ -23,7 +23,6 @@ let _debug = getState(tibberDP + 'debug').val == null ? false : getState(tibberD
 //-------------------------------------------------------------------------------------
 const _pvPeak                   = 13170;                                // PV-Anlagenleistung in Wp
 const _batteryCapacity          = 12800;                                // Netto Batterie Kapazität in Wh BYD 2.56 pro Modul
-const _surplusLimit             = 0;                                    // PV-Einspeise-Limit in % zum limittieren der Ladung .hat nix mit Einspeiselimit der PV zu tun
 const _batteryTarget            = 100;                                  // Gewünschtes Ladeziel der Regelung (e.g., 85% for lead-acid, 100% for Li-Ion)
 const _lastPercentageLoadWith   = -500;                                 // letzten 5 % laden mit xxx Watt
 const _baseLoad                 = 850;                                  // Grundverbrauch in Watt
@@ -37,6 +36,7 @@ const _sma_em                   = 'sma-em.0.3015242334';                // Name 
 let   _batteryLadePower         = _batteryLadePowerMax;                 // Ladeleistung laufend der Batterie in W
 const _loadfact                 = 1 / _lossfactor;                      // 1,33
 let   _istLadezeit              = false;                                // ladezeit gefunden merker
+let   _istEntladezeit           = false;                                // Entladezeit gefunden merker
 
 // manuelles reduzieren der PV um x Watt
 let _power50Reduzierung         = 0;                                    // manuelles reduzieren der pv prognose pro stunde bewölkt
@@ -248,20 +248,13 @@ async function processing() {
 
     setState(pV_Leistung_aktuellDP, dc_now_DP, true);
 
-    const pvlimit                       = _pvPeak / 100 * _surplusLimit;    // pvlimit = 13100/100*5 = 655
-    let getErtrag                       = getPvErtrag(pvlimit);             // gib mir den ertrag mit pvlimittierung               
-    let pvfc                            = getErtrag.pvfc;
-
-    getErtrag                           = getPvErtrag(0);                   // gib mir den ertrag ohne limmittierung
-    const pvfcAll                       = getErtrag.pvfc;
-
-    if (pvfc.length < 1) {
-        pvfc                            = pvfcAll;   // keine limitierung    
-    }
+    // fülle den ertragsarray
+    let pvfc                       = getPvErtrag();             // gib mir den ertrag mit pvlimittierung               
 
     setState(tibberDP + 'extra.pvLadeZeitenArray', pvfc, true);
 
     _istLadezeit = false;
+    _istEntladezeit = false;
 
     for (let h = 0; h < pvfc.length; h++) {                         // pvfc ist sortiert nach uhrzeit
         if (compareTime(pvfc[h][3], pvfc[h][4], 'between')) {
@@ -276,7 +269,6 @@ async function processing() {
         }
     }
 
-  //  const pvfcAll                       = getErtrag.pvfcAll;
     let batterieLadenUhrzeit            = getState(batterieLadenUhrzeitDP).val;
     let batterieLadenUhrzeitStart       = getState(batterieLadenUhrzeitStartDP).val;
     let battStatus                      = getState(inputRegisters.betriebszustandBatterie).val;
@@ -299,7 +291,6 @@ async function processing() {
 
     if (_debug) {
 //        console.info('_tick___________________________ ' + _tick);
-//        console.info('pvlimit_________________________ ' + pvlimit + ' W');
         console.info('Verbrauch jetzt_________________ ' + _verbrauchJetzt + ' W');
         console.info('Einspeisung_____________________ ' + aufrunden(2, _einspeisung) + ' W');
         console.info('PV Produktion___________________ ' + _dc_now + ' W');
@@ -378,8 +369,8 @@ async function processing() {
         let sunupTomorrow   = _sunupAstro;
 
         if (!_snowmode) {    
-            if (pvfcAll.length > 0) {
-                _sundown = pvfcAll[(pvfcAll.length - 1)][4];
+            if (pvfc.length > 0) {
+                _sundown = pvfc[(pvfc.length - 1)][4];
             } 
 
             for (let su = 0; su < 48; su++) {
@@ -564,7 +555,7 @@ async function processing() {
                     if (_debug) {
                         console.warn('Entladezeit reicht aus bis zum Sonnaufgang und genug PV');
                     }
-
+                    _istEntladezeit = true;
                     _tibber_active_idx = 22;
                     _entladeZeitenArray = [];
                     _entladeZeitenArray.push([0.0,"--:--","--:--"]);  //  initialisiere für Vis
@@ -580,6 +571,7 @@ async function processing() {
                                 break;
                             } else {
                             //    console.warn('entladezeit ' + _entladeZeitenArray[c][1]);
+                                _istEntladezeit = true;
                                 _tibber_active_idx = 2;
                                 break;
                             }
@@ -722,15 +714,9 @@ async function processing() {
             console.error('--> Starte prognose Nutzen Steuerung ');
         }
         
-        
         if (_tibber_active_idx == 88) {                                        // komme aus notladung
             setState(spntComCheckDP, 888, true);
         }
-
-    //    if (_tibber_active_idx == 0 && _dc_now > 0 && _dc_now < _verbrauchJetzt) { // kann evtl. weg
-    //        _SpntCom = _InitCom_An;
-    //        _max_pwr = _mindischrg;
-    //    }
 
         let latesttime = 0;
 
@@ -740,14 +726,14 @@ async function processing() {
 
         setState(tibberDP + 'extra.PV_Abschluss', '--:--', true);
 
-        if (pvfcAll.length > 0) {            
-            latesttime = pvfcAll[(pvfcAll.length - 1)][4];
+        if (pvfc.length > 0) {            
+            latesttime = pvfc[(pvfc.length - 1)][4];
             setState(tibberDP + 'extra.PV_Abschluss', latesttime, true);
         }
         
         if (_debug && latesttime) {
             console.info('Abschluss PV bis ' + latesttime);
-            console.info('pvfcAll.length ' + pvfcAll.length + ' Restladezeit nach pvfcAll Ermittlung möglich ' + restladezeit);
+            console.info('pvfc.length ' + pvfc.length + ' Restladezeit nach pvfc Ermittlung möglich ' + restladezeit);
         //    console.warn('pvfc ' + JSON.stringify(pvfc));
         }        
    
@@ -775,7 +761,7 @@ async function processing() {
 
             if (_debug) {
                 console.info('restladezeit möglich ' + restladezeit);
-                console.info('nach der Begrenzung  :_max_pwr ' + _max_pwr + ' startzeit ' + pvfc[0][3] + ' pvfc[0][0] ' + pvfc[0][0] + ' oder pvfc[0][1] ' + pvfc[0][1] + ' pvlimit_calc ' + pvlimit_calc);
+                console.info('nach der Begrenzung  :_max_pwr ' + _max_pwr + ' startzeit ' + pvfc[0][3] + ' pvfc[0][0] ' + pvfc[0][0] + ' oder pvfc[0][1] ' + pvfc[0][1]);
             }
 
             _max_pwr = Math.ceil(Math.min(Math.max(_max_pwr, 0), _batteryLadePowerMax));     //abfangen negativ wer werte
@@ -1129,10 +1115,9 @@ function sortArrayByCurrentHour(zeiten, toEnd, currentHour) {
     return sortedArray;
 }
 
-function getPvErtrag(pvlimit) {
+function getPvErtrag() {
     let pvfc = [];
-    let pvfcAll = [];
-  
+ 
     for (let p = 0; p < 48; p++) { /* 48 = 24h a 30min Fenster*/
         const pvstarttime = _pvforecastTodayArray[p][0];
         const pvendtime   = _pvforecastTodayArray[p][1];               
@@ -1141,16 +1126,12 @@ function getPvErtrag(pvlimit) {
 
         if (pvpower90 > _baseLoad) {
             let minutes = 30;
-            pvfcAll.push([pvpower50, pvpower90, minutes, pvstarttime, pvendtime]);
             if (compareTime(pvendtime, null, '<=', null)) {
-                if (pvpower50 < pvlimit) {          
-                    minutes = Math.round((100 - (((pvlimit - pvpower50) / ((pvpower90 - pvpower50) / 40)) + 50)) * 18 / 60);
-                }
                 pvfc.push([pvpower50, pvpower90, minutes, pvstarttime, pvendtime]);                
             }
         }
     }
-    return {pvfc, pvfcAll};
+    return pvfc;
 }
 
 async function holePVDatenAb() {
@@ -1236,9 +1217,15 @@ function tibber_active_auswertung(kommeAusPrognose) {
                 
                 tibber_active_auswertung(false);
             }
+            
             if (!_istLadezeit) {
                 _SpntCom = _InitCom_An;    
+            } else {
+                if (_dc_now < _verbrauchJetzt) {
+                    _SpntCom = _InitCom_Aus;       
+                }
             }
+           
             break;
         case 1:                             //      _tibber_active_idx = 1;    Nachladezeit
             _SpntCom = _InitCom_An;
@@ -1248,12 +1235,18 @@ function tibber_active_auswertung(kommeAusPrognose) {
         case 20:                            //      _tibber_active_idx = 20;   pv reicht für den Tag und wir sind in zwischenzeit wo nix produziert wird und preis unter schwelle  
             _SpntCom = _InitCom_Aus;
             break;    
-        case 21:                            //      _tibber_active_idx = 21;   Entladezeit wenn akku > 0 , der Preis hoch genug um zu sparen           
+        case 21:
+            _SpntCom = _InitCom_An;
+            if (_istEntladezeit) {          //      _tibber_active_idx = 21;   Entladezeit wenn akku > 0 , der Preis hoch genug um zu sparen           
+                _SpntCom = _InitCom_Aus;
+            }
+
+            // if (kommeAusPrognose && _entladeZeitenArray.length > 1 ) {     //      halte die batterie bei  1 = da ist der --:-- drin
+            //     _SpntCom = _InitCom_An;  
+            // } 
+            break;  
         case 22:                            //      _tibber_active_idx = 22;   Entladezeit reicht aus bis zum Sonnaufgang        
-            _SpntCom = _InitCom_Aus; 
-            if (kommeAusPrognose && _entladeZeitenArray.length > 2 ) {             //      halte die batterie bei 
-                _SpntCom = _InitCom_An;  
-            } 
+            _SpntCom = _InitCom_Aus;             
             break;    
         case 23:                            //      _tibber_active_idx = 23;   keine entladezeit da alle Preise unter schwelle aber Batterie hat ladung
             _SpntCom = _InitCom_Aus;
@@ -1272,4 +1265,3 @@ function tibber_active_auswertung(kommeAusPrognose) {
             _SpntCom = _InitCom_Aus;        
     }
 }
-
