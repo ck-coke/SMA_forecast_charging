@@ -315,14 +315,7 @@ async function processing() {
             setState(spntComCheckDP, 888, true);
         }
 
-        let nowMin = 0;
-        if (_today.getMinutes() > 14 && _today.getMinutes() < 46) {
-            nowMin = 0;    
-        } else {
-            nowMin = 30; 
-        }
-        const nowHour               = _hhJetzt + ':' + nowMin.toString().padStart(2, '0')         
-
+        const nowHour               = _hhJetzt + ':' + _today.getMinutes();         
         _tibber_active_idx          = 0;    // initialisiere
 
         const tibberPvForcast       = getState(tibberPvForcastDP).val;
@@ -527,11 +520,7 @@ async function processing() {
         entladeZeitenArrayVis           = entladeZeitenArrayAll.arrOutOnlyHH; 
 
       //       console.warn(JSON.stringify(_entladeZeitenArray));
-
-        if (_debug) {
-            console.info('pvfc.length ' + pvfc.length + ' _dc_now ' + _dc_now + ' pvfc[0] ' + JSON.stringify(pvfc[0]));
-        }
-
+        
         if (_dc_now < _verbrauchJetzt) {                            
             // wenn genug PV am Tag aber gerade nicht genug Sonne aber tibber klein genug
             if (_debug) {
@@ -601,7 +590,6 @@ async function processing() {
                 console.info('pvwh ' + vergleichepvWh + ' ist kleiner als ' + (_baseLoad * 24 * _wr_efficiency));
             }
         }
-    
 
         setState(tibberDP + 'extra.entladeZeitenArray', entladeZeitenArrayVis,  true); 
 
@@ -652,10 +640,6 @@ async function processing() {
                     _tibber_active_idx = 3;
                 }
             }
-        }
-
-        if (_debug) {
-            console.info('tibberPoilow.length ' + tibberPoilow.length + ' _tibber_active_idx ' + _tibber_active_idx);
         }
 
         //ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
@@ -759,12 +743,11 @@ async function processing() {
                 _max_pwr = Math.ceil(pvfc[0][0]);  
             }
 
-            if (_debug) {
-                console.info('restladezeit möglich ' + restladezeit);
-                console.info('nach der Begrenzung  :_max_pwr ' + _max_pwr + ' startzeit ' + pvfc[0][3] + ' pvfc[0][0] ' + pvfc[0][0] + ' oder pvfc[0][1] ' + pvfc[0][1]);
+            if (_debug) {                
+                console.info('nach der Ermittlung _max_pwr ' + _max_pwr);
             }
 
-            _max_pwr = Math.ceil(Math.min(Math.max(_max_pwr, 0), _batteryLadePowerMax));     //abfangen negativ wer werte
+            _max_pwr = Math.ceil(Math.min(Math.max(_max_pwr, 0), _batteryLadePowerMax));     //abfangen negativ werte
 
             // zero werte nicht erlaubt
             if (_max_pwr == 0) {
@@ -772,7 +755,7 @@ async function processing() {
             }
 
             if (_debug) {
-                console.info('Ausgabe B  :_max_pwr ' + _max_pwr);
+                console.info('Ausgabe :_max_pwr ' + _max_pwr);
             }           
 
             const verbrauchJetztOhneAuto = _verbrauchJetzt - _vehicleConsum;
@@ -1236,10 +1219,7 @@ function tibber_active_auswertung(kommeAusPrognose) {
             _SpntCom = _InitCom_Aus;
             break;    
         case 21:
-            _SpntCom = _InitCom_An;
-            if (_istEntladezeit) {          //      _tibber_active_idx = 21;   Entladezeit wenn akku > 0 , der Preis hoch genug um zu sparen           
-                _SpntCom = _InitCom_Aus;
-            }
+            _SpntCom = _InitCom_Aus;
 
             // if (kommeAusPrognose && _entladeZeitenArray.length > 1 ) {     //      halte die batterie bei  1 = da ist der --:-- drin
             //     _SpntCom = _InitCom_An;  
