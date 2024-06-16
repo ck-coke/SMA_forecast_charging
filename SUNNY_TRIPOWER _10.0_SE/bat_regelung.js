@@ -140,7 +140,7 @@ createUserStates(userDataDP, false, [tibberStromDP + 'extra.schwellenwert_Entlad
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.schwellenwert_Ladung', { 'name': 'starte Ladung mit Strom bei Preis von', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'unit': 'ct', 'def': 0 }], function () {
     setState(tibberDP + 'extra.schwellenwert_Ladung', _start_charge, true);
 });
-createUserStates(userDataDP, false, [tibberStromDP + 'extra.max_Batterieladung', { 'name': 'wie viele Wh Überschuss', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'unit': 'W', 'def': 0 }], function () {
+createUserStates(userDataDP, false, [tibberStromDP + 'extra.max_Batterieladung', { 'name': 'max Batterieladung jetzt', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'unit': 'W', 'def': 0 }], function () {
     setState(tibberDP + 'extra.max_Batterieladung', 0, true);
 });
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.Batterielaufzeit', { 'name': 'Batterielaufzeit laut SOC', 'type': 'string', 'read': true, 'write': false, 'role': 'value', 'unit': 'h'}], function () {
