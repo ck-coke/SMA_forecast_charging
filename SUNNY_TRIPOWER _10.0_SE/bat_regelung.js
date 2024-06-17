@@ -293,13 +293,13 @@ async function processing() {
 //        console.info('_tick___________________________ ' + _tick);
         console.info('Verbrauch jetzt_________________ ' + _verbrauchJetzt + ' W');
         console.info('Einspeisung_____________________ ' + aufrunden(2, _einspeisung) + ' W');
-        console.info('PV Produktion___________________ ' + _dc_now + ' W');
-        console.info('Ladeleistung Batterie jetzt_____ ' + _batteryLadePower + ' W');
+        console.info('PV Produktion___________________ ' + _dc_now + ' W');       
         console.info('Batt_SOC________________________ ' + _batsoc + ' %');
         const battsts = battStatus == 2291 ? 'Batterie Standby' : battStatus == 3664 ? 'Notladebetrieb' : battStatus == 2292 ? 'Batterie laden' : battStatus == 2293 ? 'Batterie entladen' : 'Aus';
         console.info('Batt_Status_____________________ ' + battsts + ' = ' + battStatus);
         console.info('Restladezeit____________________ ' + restladezeit + ' h');
         console.info('Restlademenge___________________ ' + restlademenge + ' Wh');
+        console.info('Ladeleistung Batterie jetzt_____ ' + _batteryLadePower + ' W');
     }
 
     _SpntCom                = _InitCom_Aus;     // initialisiere AUS
@@ -446,16 +446,16 @@ async function processing() {
                 nachlademengeWh = nachlademengeWh - (pvwhToday * _wr_efficiency);
             }           
 
-            nachlademengeWh =  aufrunden(2, nachlademengeWh *-1);
+            // hier anschauen
 
-            restlademenge = nachlademengeWh - curbatwh;       
+            nachlademengeWh =  aufrunden(2, nachlademengeWh);
 
             let nachladeStunden = aufrunden(2, (Math.max(restlademenge / (_batteryLadePowerMax * _wr_efficiency), 0) * 2));
 
             // neuaufbau tibberPoihigh ohne Nachladestunden, billigstunden
             if (_debug) {
              //   console.info(JSON.stringify(prclow)); 
-                console.info('in Nachladestunden nachladeStunden ' + nachladeStunden + ' curbatwh ' + curbatwh + ' nachlademengeWh ' + nachlademengeWh + ' prchigh.length ' + prchigh.length);
+                console.info('Nachladestunden ' + nachladeStunden + ' curbatwh ' + curbatwh + ' nachlademengeWh ' + nachlademengeWh + ' prchigh.length ' + prchigh.length);
             }
 
             if (nachladeStunden > prclow.length) {
@@ -463,7 +463,7 @@ async function processing() {
             }
 
             if (_debug) {
-                console.info('nach Nachladestunden prclow.length ' + nachladeStunden + ' restlademenge laut Nachladestunden ' + restlademenge);
+                console.info('nach Nachladestunden prclow.length ' + nachladeStunden + ' restlademenge ' + restlademenge);
           //    console.info('prclow  Nachladestunden ' + JSON.stringify(prclow));
           //    console.info('prchigh Nachladestunden ' + JSON.stringify(prchigh));
             }
@@ -505,7 +505,6 @@ async function processing() {
 
         if (_debug) {
             console.info('------>>  laufzeit mit tibber höchstpreise a 30 min: lefthrs ' + lefthrs + ' Batterielaufzeit: batlefthrs ' + batlefthrs);
-            console.info('------>>  von PV kommt heute: pvwhToday ' + pvwhToday +  ' Strompreis jetzt ' + _tibberPreisJetzt);
         }
         
         for (let d = 0; d < lefthrs; d++) {
@@ -722,11 +721,9 @@ async function processing() {
         }        
    
         if (_batsoc < 100 && pvfc.length > 0 ) {    
-     
-            let toSundownhrReduziert = 0;
+            let toSundownhrReduziert = 0;          
 
             if (restlademenge > 0) {                   
-
                 toSundownhrReduziert = toSundownhr;
                 if (toSundownhr > 2) {
                     toSundownhrReduziert = toSundownhr - 2;
@@ -737,8 +734,6 @@ async function processing() {
                 if (_max_pwr == 0) {
                     _max_pwr= Math.round(restlademenge / toSundownhrReduziert)   
                 }
-
-                
             } else {
                 _max_pwr = Math.ceil(pvfc[0][0]);  
             }
