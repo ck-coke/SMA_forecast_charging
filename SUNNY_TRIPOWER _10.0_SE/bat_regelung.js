@@ -12,8 +12,9 @@ const batterieLadenUhrzeitDP      = userDataDP + '.strom.batterieLadenUhrzeit';
 const batterieLadenUhrzeitStartDP = userDataDP + '.strom.batterieLadenUhrzeitStart';
 const batterieLadenManuellStartDP = userDataDP + '.strom.batterieLadenManuellStart';
 
-const momentan_VerbrauchDP  = userDataDP + '.strom.Momentan_Verbrauch';
-const pV_Leistung_aktuellDP = userDataDP + '.strom.PV_Leistung_aktuell';
+const pvUpdateDP                = userDataDP + '.strom.pvforecast.lastUpdated';
+const momentan_VerbrauchDP      = userDataDP + '.strom.Momentan_Verbrauch';
+const pV_Leistung_aktuellDP     = userDataDP + '.strom.PV_Leistung_aktuell';
 
 const _options = { hour12: false, hour: '2-digit', minute: '2-digit' };
 
@@ -140,13 +141,16 @@ createUserStates(userDataDP, false, [tibberStromDP + 'extra.schwellenwert_Entlad
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.schwellenwert_Ladung', { 'name': 'starte Ladung mit Strom bei Preis von', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'unit': 'ct', 'def': 0 }], function () {
     setState(tibberDP + 'extra.schwellenwert_Ladung', _start_charge, true);
 });
-createUserStates(userDataDP, false, [tibberStromDP + 'extra.max_Batterieladung', { 'name': 'max Batterieladung jetzt', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'unit': 'W', 'def': 0 }], function () {
-    setState(tibberDP + 'extra.max_Batterieladung', 0, true);
+createUserStates(userDataDP, false, [tibberStromDP + 'extra.Batterieladung_jetzt', { 'name': 'Batterieladung jetzt', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'unit': 'W', 'def': 0 }], function () {
+    setState(tibberDP + 'extra.Batterieladung_jetzt', 0, true);
+});
+createUserStates(userDataDP, false, [tibberStromDP + 'extra.Batterieladung_soll', { 'name': 'Batterieladung soll', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'unit': 'W', 'def': 0 }], function () {
+    setState(tibberDP + 'extra.Batterieladung_soll', 0, true);
 });
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.Batterielaufzeit', { 'name': 'Batterielaufzeit laut SOC', 'type': 'string', 'read': true, 'write': false, 'role': 'value', 'unit': 'h'}], function () {
     setState(tibberDP + 'extra.Batterielaufzeit', '00:00', true);
 });
-createUserStates(userDataDP, false, [tibberStromDP + 'extra.BatterieRestladezeit', { 'name': 'Batterierestladezeit laut max_Batterieladung', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0, 'unit': 'h'}], function () {
+createUserStates(userDataDP, false, [tibberStromDP + 'extra.BatterieRestladezeit', { 'name': 'Batterierestladezeit laut Batterieladung_jetzt', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0, 'unit': 'h'}], function () {
     setState(tibberDP + 'extra.BatterieRestladezeit', 0, true);
 });
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenAutomatisch', { 'name': 'mit tibber laden erlauben', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': true }], function () {
@@ -222,7 +226,10 @@ if (_tibberPreisJetzt <= _stop_discharge && _dc_now <= _verbrauchJetzt) {
     _entladung_zeitfenster = true;
 }
 
-holePVDatenAb();      // hole daten ab nach start
+// hole daten ab nach start
+const pvDaten               = await holePVDatenAb();
+_pvforecastTodayArray       = pvDaten.pvforecastTodayArray;
+_pvforecastTomorrowArray    = pvDaten.pvforecastTomorrowArray;
 
 // ab hier Programmcode
 async function processing() {
@@ -230,7 +237,9 @@ async function processing() {
     _tick ++;
 
     if (_tick >= 60) {         // alle 60 ticks reset damit der WR die Daten bekommt, WR ist auf 10 min reset Eingestellt
-        setState(spntComCheckDP, Math.floor(Math.random() * 100) + 1, true);               // schreibe irgendwas da rein.. 
+        const commNow = await getStateAsync(spntComCheckDP);
+        setState(communicationRegisters.fedInSpntCom, commNow);                     // 40151_Kommunikation
+        setState(spntComCheckDP, Math.floor(Math.random() * 100) + 1, true);        // schreibe irgendwas da rein.. 
         _tick = 0;
     }
  
@@ -258,8 +267,8 @@ async function processing() {
 
     for (let h = 0; h < pvfc.length; h++) {                         // pvfc ist sortiert nach uhrzeit
         if (compareTime(pvfc[h][3], pvfc[h][4], 'between')) {
-            _ladezeitVon = pvfc[h][3];
-            _ladezeitBis = pvfc[h][4];
+        //    _ladezeitVon = pvfc[h][3];            
+        //    _ladezeitBis = pvfc[h][4];
 
             _istLadezeit = true;
 
@@ -729,7 +738,7 @@ async function processing() {
                     toSundownhrReduziert = toSundownhr - 2;
                 } 
 
-                _max_pwr = Math.max(Math.round(restlademenge / toSundownhrReduziert) - 100, 0);  
+                _max_pwr = Math.max(Math.round(restlademenge / toSundownhrReduziert), 0);  
                 
                 if (_max_pwr == 0) {
                     _max_pwr= Math.round(restlademenge / toSundownhrReduziert)   
@@ -743,6 +752,8 @@ async function processing() {
             }
 
             _max_pwr = Math.ceil(Math.min(Math.max(_max_pwr, 0), _batteryLadePowerMax));     //abfangen negativ werte
+
+            setState(tibberDP + 'extra.Batterieladung_soll', _max_pwr, true);
 
             // zero werte nicht erlaubt
             if (_max_pwr == 0) {
@@ -799,12 +810,14 @@ async function processing() {
             }                    
         } 
 
+        _max_pwr = _max_pwr - _max_pwr * 0.05;     // 5 % reserve damit kein bezug aus dem netz bei schwankung
+
         if (_max_pwr > 0) {        // hier muss immer was negatives rauskommen.. sonst keine pv ladung
             _max_pwr = _mindischrg;          
         }
     }
 
-    _maxchrg = _max_pwr;
+    _maxchrg = _max_pwr;    
 
 // ---------------------------------------------------- Ende der PV Prognose Sektion
     if (_batsoc > 90 && _battIn > 0) {              // letzten 10 % langsam laden
@@ -832,7 +845,7 @@ async function sendToWR(commWR, pwrAtCom) {
         setState(communicationRegisters.fedInPwrAtCom, pwrAtCom);       // 40149_Wirkleistungvorgabe
         setState(communicationRegisters.fedInSpntCom, commWR);          // 40151_Kommunikation
         setState(spntComCheckDP, commWR, true);                         // check DP für vis        
-        setState(tibberDP + 'extra.max_Batterieladung', pwrAtCom, true);
+        setState(tibberDP + 'extra.Batterieladung_jetzt', pwrAtCom, true);
     }
 
     if (_debug && !_batterieLadenUebersteuernManuell) {
@@ -862,10 +875,12 @@ on({id: [tibberDP + 'extra.tibberNutzenAutomatisch',
 
 
 //  reduzierung lesezugroffe, hole die PV nur wenn sich was geändert hat
-on({id: '0_userdata.0.strom.pvforecast.lastUpdated', change: 'any'}, async function() {  
-    setTimeout(function() { 
-        holePVDatenAb();
-    }, 1000);     // warte 5 sekunden   
+on({id: pvUpdateDP, change: 'ne'}, async function() {      
+   // console.warn('hole pv daten ab'); 
+
+    const pvDaten               = await holePVDatenAb();
+    _pvforecastTodayArray       = pvDaten.pvforecastTodayArray;
+    _pvforecastTomorrowArray    = pvDaten.pvforecastTomorrowArray;
 });
 
 async function vorVerarbeitung() {
@@ -968,8 +983,8 @@ async function berechneVerbrauch(pvJetzt) {
         }
     }
 
-    const verbrauchJetzt   = 100 + (pvJetzt + _battOut + netzbezug.val) - (_einspeisung + _battIn);       // verbrauch in W , 100W reserve obendruaf _vehicleConsum nicht rein nehmen
-    const verbrauchVis = (verbrauchJetzt - 100 - _vehicleConsum);
+    const verbrauchJetzt   = (pvJetzt + _battOut + netzbezug.val) - (_einspeisung + _battIn);       // verbrauch in W , 100W reserve obendruaf _vehicleConsum nicht rein nehmen
+    const verbrauchVis = (verbrauchJetzt - _vehicleConsum);
     setState(momentan_VerbrauchDP, aufrunden(2, verbrauchVis /1000), true);                                // für die darstellung können die 100 W wieder raus und fahrzeug auch
 
     return aufrunden(0, verbrauchJetzt);
@@ -1113,6 +1128,8 @@ function getPvErtrag() {
 }
 
 async function holePVDatenAb() {
+    let pvforecastTodayArray = [];
+
     for (let p = 0; p < 48; p++) {   
         const startTime = await getStateAsync(pvforecastTodayDP + p + '.startTime');
         const endTime   = await getStateAsync(pvforecastTodayDP + p + '.endTime');
@@ -1123,8 +1140,10 @@ async function holePVDatenAb() {
         power50 = Math.max((power50 - _power50Reduzierung), 0); 
         power90 = Math.max((power90 - _power90Reduzierung), 0); 
 
-        _pvforecastTodayArray.push([startTime.val,endTime.val,power50,power90]);
+        pvforecastTodayArray.push([startTime.val,endTime.val,power50,power90]);
     }
+
+    let  pvforecastTomorrowArray = [];
 
     for (let p = 0; p < 48; p++) {   
         const startTime = await getStateAsync(pvforecastTomorrowDP + p + '.startTime');
@@ -1132,8 +1151,10 @@ async function holePVDatenAb() {
         const power50   = getState(pvforecastTomorrowDP + p + '.power').val;
         const power90   = getState(pvforecastTomorrowDP + p + '.power90').val;
       
-        _pvforecastTomorrowArray.push([startTime.val,endTime.val,power50,power90]);
+        pvforecastTomorrowArray.push([startTime.val,endTime.val,power50,power90]);
     }
+
+    return {pvforecastTodayArray, pvforecastTomorrowArray};
 }
 
 function getMinHours(minutes) {
