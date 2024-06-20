@@ -1,5 +1,4 @@
 const moment = require('moment');
-const axios = require('axios'); 
 const options = { hour12: false, hour: '2-digit', minute: '2-digit' };
 
 // zum ändern ab hier
@@ -14,29 +13,31 @@ const name2 = 'strasse';        // name dp2  frei wählbar
 const gesamt = 'gesamt';        // dp für zusammenrechnen muss in ladenNachPrognose angepasst werden wenn hier geändert
 
 
-const influxDb = true;   // wenn grafana output erwünscht benötigt wird eine influx.0 instanz
-const _influxDbMeasurementGesamt  = 'pvforecast.0.summary.power';
-const _influxDbMeasurementStrasse = 'pvforecast.0.plants.strasse.power';
-const _influxDbMeasurementGarten  = 'pvforecast.0.plants.garten.power';
-
-const influxInstance = 'influxdb.0';
-
-const mainObject = '0_userdata.0.strom.pvforecast';
-const mainObjectToday = '0_userdata.0.strom.pvforecast.today';
-const mainObjectTomorrow = '0_userdata.0.strom.pvforecast.tomorrow';
-const abbrechenBei = '00:00';   // ab wieviel Uhr kommt nix mehr, kann so bleiben
+const influxDb                      = true;   // wenn grafana output erwünscht benötigt wird eine influx.0 instanz
+const influxInstance                = 'influxdb.0';
+const _influxDbMeasurementGesamt    = 'pvforecast.0.summary.power';
+const _influxDbMeasurementStrasse   = 'pvforecast.0.plants.strasse.power';
+const _influxDbMeasurementGarten    = 'pvforecast.0.plants.garten.power';
 
 
-const baseUrl = "https://api.solcast.com.au/rooftop_sites/";
-const hours = 24;
+const mainObject            = '0_userdata.0.strom.pvforecast';
+const mainObjectToday       = '0_userdata.0.strom.pvforecast.today';
+const mainObjectTomorrow    = '0_userdata.0.strom.pvforecast.tomorrow';
+const abbrechenBei          = '00:00';   // ab wieviel Uhr kommt nix mehr, kann so bleiben
+
+
+const _baseUrl = "https://api.solcast.com.au/rooftop_sites/";
+const _hours = 24;
 // ------------------------------------------------------------------------------------------------------------------
 
 //  initialisiere einmal in den nacht um 2 Uhr
-schedule('0 2 * * *', function () {
-    initialPV();
-});
+//schedule('0 2 * * *', function () {
+//    initialPV();
+//});
 
 schedule({ astro: 'sunrise' }, () => {
+    initialPV();
+
     let url = `${seite2}/forecasts?format=json&api_key=${key_id}`;
     toLog(`Hole PV ${name2}`, true);
     requestData(url, name2);
@@ -50,13 +51,11 @@ schedule({ astro: 'sunrise' }, () => {
 // 10 request sind frei bei solcast.com
 schedule('1 6,7,9,10 * * *', function () {
     const url = `${seite2}/forecasts?format=json&api_key=${key_id}`;
-    toLog(`Hole PV ${name2}`, true);
     requestData(url, name2);
 });
 
 schedule('2 8,12,13,15 * * *', function () {
     const url = `${seite1}/forecasts?format=json&api_key=${key_id}`;
-    toLog(`Hole PV ${name1}`, true);
     requestData(url, name1);
 });
  
@@ -65,7 +64,7 @@ schedule('2 8,12,13,15 * * *', function () {
 /*************** ab hier nix ändern  ***************************** */
 
 async function requestData(seiteUrl, seite) {
-    const url = `${baseUrl}${seiteUrl}`;   
+    const url = `${_baseUrl}${seiteUrl}`;   
     
     httpGet(url, { timeout: 5000, responseType: 'text' }, async (err, response) => {
         if (err) {
@@ -74,6 +73,8 @@ async function requestData(seiteUrl, seite) {
             const jsonData  = JSON.parse(response.data);
             const array     = jsonData.forecasts;
             
+            //console.warn(JSON.stringify(array));
+
             const list = [];     
 
             let heute = true;
@@ -97,9 +98,9 @@ async function requestData(seiteUrl, seite) {
 
             let ind = 0;
 
-            setTimeout(function () {   // warte 5 sekunden falls dp noch nicht angelegt
+            setTimeout(function () {   // warte falls dp noch nicht angelegt
                 // finde startzeit
-                for (ind = 0; ind < hours * 2; ind++) {
+                for (ind = 0; ind < _hours * 2; ind++) {
                     const startTimeind = getState(mainObjectToday + '.' + seite + '.' + ind + '.startTime').val;
                     if (startDPTime == startTimeind) {
                         break;
@@ -115,7 +116,7 @@ async function requestData(seiteUrl, seite) {
                 let powerWGes = 0;
                 let power90WGes = 0;
 
-                for (let a = 0; a < hours * 4; a++) {
+                for (let a = 0; a < _hours * 4; a++) {
                     listenDP += 1;
 
                     if (list[listenDP] == undefined) {
@@ -123,7 +124,7 @@ async function requestData(seiteUrl, seite) {
                     }
 
                     const start = new Date(list[listenDP].time * 1000);
-                    const end = new Date(list[listenDP].time * 1000 + 1800000);
+                    //const end = new Date(list[listenDP].time * 1000 + 1800000);
 
                     const startTime = start.toLocaleTimeString('de-DE', options);
                     //const endTime = end.toLocaleTimeString('de-DE', options);
@@ -151,8 +152,11 @@ async function requestData(seiteUrl, seite) {
                         stateBaseNameGes = `${mainObjectTomorrow}.${gesamt}.${posiA}.`;
                     }
 
-                    const powerW = list[listenDP].watt / 2;      // es kommen 2 DP pro stunde also teilen
-                    const power90W = list[listenDP].watt90 / 2;
+                    //const powerW = list[listenDP].watt / 2;      // es kommen 2 DP pro stunde also teilen
+                    //const power90W = list[listenDP].watt90 / 2;
+
+                    const powerW = list[listenDP].watt;      
+                    const power90W = list[listenDP].watt90;
 
                     if (seite == name1) {
                         setState(stateBaseName1 + 'power', powerW, true);
@@ -184,6 +188,8 @@ async function requestData(seiteUrl, seite) {
                 genGraphAnlegen(false);   // erzeuge tomorrow
 
                 setState(`${mainObject}.lastUpdated`, { val: moment().valueOf(), ack: true });
+                toLog(`Hole PV ${seite}`, true);
+                
             }, 500);        
         };
     });
@@ -354,7 +360,7 @@ function genGraphAnlegen(today) {
     let powerWGesName2 = 0;
     //let power90WGes = 0;
     
-    for (let posiA = 0; posiA < hours * 2; posiA++) {
+    for (let posiA = 0; posiA < _hours * 2; posiA++) {
     
         let stateBaseNameGes = `${mainObjectGraph}.${gesamt}.${posiA}.`;
         let stateBaseName1 = `${mainObjectGraph}.${name1}.${posiA}.`;
