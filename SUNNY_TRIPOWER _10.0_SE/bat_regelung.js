@@ -3,18 +3,19 @@ const tibberStromDP         = 'strom.tibber.';
 const tibberDP              = userDataDP + '.' + tibberStromDP;
 const pvforecastTodayDP     = userDataDP + '.strom.pvforecast.today.gesamt.';
 const pvforecastTomorrowDP  = userDataDP + '.strom.pvforecast.tomorrow.gesamt.';
-const spntComCheckDP        = userDataDP + '.strom.40151_Kommunikation_Check'; // nochmal ablegen zur kontrolle
+const spntComCheckDP        = userDataDP + '.strom.40151_Kommunikation_Check'; 
 const tomorrow_kWDP         = userDataDP + '.strom.pvforecast.tomorrow.gesamt.tomorrow_kW';
 const tibberPreisJetztDP    = tibberDP + 'extra.tibberPreisJetzt';
 const tibberPvForcastDP     = tibberDP + 'extra.tibberPvForcast';
 
-const batterieLadenUhrzeitDP      = userDataDP + '.strom.batterieLadenUhrzeit';
-const batterieLadenUhrzeitStartDP = userDataDP + '.strom.batterieLadenUhrzeitStart';
-const batterieLadenManuellStartDP = userDataDP + '.strom.batterieLadenManuellStart';
+const batterieLadenUhrzeitDP        = userDataDP + '.strom.batterieLadenUhrzeit';
+const batterieLadenUhrzeitStartDP   = userDataDP + '.strom.batterieLadenUhrzeitStart';
+const batterieLadenManuellStartDP   = userDataDP + '.strom.batterieLadenManuellStart';
 
-const pvUpdateDP                = userDataDP + '.strom.pvforecast.lastUpdated';
-const momentan_VerbrauchDP      = userDataDP + '.strom.Momentan_Verbrauch';
-const pV_Leistung_aktuellDP     = userDataDP + '.strom.PV_Leistung_aktuell';
+const pvUpdateDP                    = userDataDP + '.strom.pvforecast.lastUpdated';
+
+const momentan_VerbrauchDP          = userDataDP + '.strom.Momentan_Verbrauch';
+const pV_Leistung_aktuellDP         = userDataDP + '.strom.PV_Leistung_aktuell';
 
 // debug
 let _debug = getState(tibberDP + 'debug').val == null ? false : getState(tibberDP + 'debug').val;
@@ -40,14 +41,17 @@ let   _istEntladezeit           = false;                                // Entla
 // manuelles reduzieren der PV um x Watt
 let _power50Reduzierung         = 0;                                    // manuelles reduzieren der pv prognose pro stunde bewölkt
 let _power90Reduzierung         = 0;                                    // manuelles reduzieren der pv prognose pro stunde ohne wolken
+let _sundownReduzierung         = 3;                                    // ladedauer verkürzen um x Stunden nach hinten
+
 
 // Klimaanlagesteuerung dazu ist ein Wetteradapter notwendig der die Temperatur liefert
 // die ladezeit wird dann laut verbrauch berechnet
-const _mitKlimaanlage           = false;                                             // soll die Klimaanlage berücksichtig werden
+const _mitKlimaanlage           = true;                                             // soll die Klimaanlage berücksichtig werden
 const _wetterTemperaturDP       = 'openweathermap.0.forecast.day0.temperatureMax';  // beispiel hier openweathermap
 const _klimaVerbrauch           = 1500;                                             // manuell ermitteltes Wert wie viel Watt die Klimaanlage zieht 
-let _klimaLoad                  = 0;                                                
+let _klimaLoad                  = 0;                                                // manuell ermitteltes Wert wie viel Watt die Klimaanlage zieht 
 const _tempWetterSoll           = 23;                                               // referenz Wert ab da soll die klima mit berücksichtig werden
+
 
 // tibber Preis Bereich
 let _snowmode                   = false;                                        // manuelles setzen des Schneemodus, dadurch wird in der Nachladeplanung die PV Prognose ignoriert, z.b. bei Schneebedeckten PV Modulen und der daraus resultierenden falschen Prognose
@@ -65,8 +69,8 @@ let _vehicleConsum      = 0;
 
 let _hhJetzt = getHH();
 
-const communicationRegisters = {
-    fedInSpntCom: 'modbus.0.holdingRegisters.3.40151_Kommunikation', // (802 active, 803 inactive)
+const communicationRegisters = {   
+    fedInSpntCom: 'modbus.0.holdingRegisters.3.40151_Kommunikation',                  
     fedInPwrAtCom: 'modbus.0.holdingRegisters.3.40149_Wirkleistungvorgabe',
 }
 
@@ -83,6 +87,7 @@ const inputRegisters = {
     powerAC: 'modbus.0.inputRegisters.3.30775_AC-Leistung',
 }
 
+// ----------------------------- copy ab hier
 
 const bydDirectSOCDP            = 'bydhvs.0.State.SOC';                            // battSOC netto direkt von der Batterie
 
@@ -345,7 +350,9 @@ async function processing() {
         if (_mitKlimaanlage) {
             let tempWetter = getState(_wetterTemperaturDP).val;
             if (tempWetter >= _tempWetterSoll) {
-                _klimaLoad = _klimaVerbrauch;
+                if (_dc_now < _verbrauchJetzt) {    // wenn pv grösser als der verbrauch ist.. dann nimm die zeiten mit ohne klima
+                    _klimaLoad = _klimaVerbrauch;
+                }
             }
         }
 
@@ -366,6 +373,7 @@ async function processing() {
         }
 
         if (_debug) {            
+            console.info('mit Klimaanlage__________________' + _mitKlimaanlage + ' _klimaLoad '  +_klimaLoad);
             console.info('Bat h verbleibend_____batlefthrs ' + batlefthrs);
             console.info('Erwarte ca______________________ ' + aufrunden(2, pvwhToday / 1000) + ' kWh von PV');
         }
@@ -822,8 +830,16 @@ async function processing() {
             }                    
         } 
 
-        _max_pwr = _max_pwr - _max_pwr * 0.05;     // 5 % reserve damit kein bezug aus dem netz bei schwankung
+        let max_pwrReserve = _max_pwr + _max_pwr * 0.05;    // 5 % reserve damit kein bezug aus dem netz bei schwankung
 
+        if (_dc_now < max_pwrReserve) {
+            _max_pwr = _max_pwr - _max_pwr * 0.05;          // 5 % reserve damit kein bezug aus dem netz bei schwankung
+        }     
+
+        if (_debug) {
+            console.info('nach Berechnung 5% ' + _max_pwr);
+        }
+        
         if (_max_pwr > 0) {        // hier muss immer was negatives rauskommen.. sonst keine pv ladung
             _max_pwr = _mindischrg;          
         }
@@ -1130,7 +1146,7 @@ function getPvErtrag() {
         const pvpower90   = _pvforecastTodayArray[p][3];
 
         if (pvpower90 > (_baseLoad + _klimaLoad)) {
-            let minutes = 30;
+            const minutes = 30;
             if (compareTime(pvendtime, null, '<=', null)) {
                 pvfc.push([pvpower50, pvpower90, minutes, pvstarttime, pvendtime]);                
             }
