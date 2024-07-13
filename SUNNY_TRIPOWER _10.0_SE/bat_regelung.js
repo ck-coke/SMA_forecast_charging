@@ -137,7 +137,7 @@ let _sundownAstro       = '00:00';
 let _sunupTodayAstro    = '00:00';
 let _ladezeitVon        = '00:00';
 let _ladezeitBis        = '00:00';
-
+let _hhJetzt            = getHH();
 
 createUserStates(userDataDP, false, [tibberStromDP + 'debug', { 'name': 'debug', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
     setState(tibberDP + 'debug', _debug, true);
@@ -330,12 +330,12 @@ async function processing() {
     } 
 
     if (_tibberNutzenSteuerung) {
-         if (_tibber_active_idx == 88) { // komme aus notladung
-            setState(spntComCheckDP, 888, true);
-        }
+   //      if (_tibber_active_idx == 88) { // komme aus notladung
+   //         setState(spntComCheckDP, 888, true);
+   //     }
 
         const nowHour               = _hhJetzt + ':' + _today.getMinutes();         
-        _tibber_active_idx          = 0;    // initialisiere
+        _tibber_active_idx          = 0;                                                        // initialisiere
 
         const tibberPvForcast       = getState(tibberPvForcastDP).val;
         const tibberPoihigh         = sortArrayByCurrentHour(tibberPvForcast, true, _hhJetzt);  // sortiert ab jetzt
@@ -350,12 +350,11 @@ async function processing() {
         if (_mitKlimaanlage) {
             let tempWetter = getState(_wetterTemperaturDP).val;
             if (tempWetter >= _tempWetterSoll) {
-                if (_dc_now < _verbrauchJetzt) {    // wenn pv grösser als der verbrauch ist.. dann nimm die zeiten mit ohne klima
+                if (_dc_now < _verbrauchJetzt) {    // wenn pv grösser als der verbrauch ist.. dann nimm die zeiten ohne klima
                     _klimaLoad = _klimaVerbrauch;
                 }
             }
         }
-
 
         let restLaufzeit = _batsoc * _batteryCapacity / 100;
         let batlefthrs = aufrunden(2, restLaufzeit / (_verbrauchJetzt / Math.sqrt(_lossfactor)));    /// 12800 / 100 * 30  Batterielaufzeit laut SOC und berücksichtige Grundverbrauch         
@@ -367,9 +366,11 @@ async function processing() {
         let pvwhToday       = 0;
         let pvwhTomorrow    = 0;
 
-        for (let p = 0; p < hrstorun * 2; p++) {   // *2 weil 48 PV Datenpunkte
-            pvwhToday       = pvwhToday     + _pvforecastTodayArray[p][2] / 2;
-            pvwhTomorrow    = pvwhTomorrow  + _pvforecastTomorrowArray[p][2] / 2;
+        if (_pvforecastTodayArray.length > 0) {
+            for (let p = 0; p < hrstorun * 2; p++) {   // *2 weil 48 PV Datenpunkte
+                pvwhToday       = pvwhToday     + _pvforecastTodayArray[p][2] / 2;
+                pvwhTomorrow    = pvwhTomorrow  + _pvforecastTomorrowArray[p][2] / 2;
+            }
         }
 
         if (_debug) {            
@@ -390,7 +391,7 @@ async function processing() {
         let nextDay         = false;
         let sunupTomorrow   = _sunupAstro;
 
-        if (!_snowmode) {    
+        if (!_snowmode && _pvforecastTodayArray.length > 0) {   
             if (pvfc.length > 0) {
                 _sundown = pvfc[(pvfc.length - 1)][4];
             } 
@@ -428,7 +429,7 @@ async function processing() {
             if (toSundownhr > 0) {                
                 //wieviel kwh kommen in etwa von PV ab jetzt
                 for (t = 0; t < pvfc.length; t++) {                                 
-                    pvwhToday = pvwhToday + pvfc[t][0];                
+                    pvwhToday = pvwhToday + pvfc[t][0];          
                 }
                 pvwhToday = aufrunden(2, (pvwhToday /2));
                 
@@ -440,6 +441,8 @@ async function processing() {
                 }
             }
         }
+
+
 
         if (_debug) {
             console.info('Tibber tibberPoihigh.length ' + tibberPoihigh.length);
@@ -469,22 +472,26 @@ async function processing() {
             })
 
             //nachlademenge Wh nach höchstpreisen am Tag
-            let nachlademengeWh = (prchigh.length) * ((_baseLoad + _klimaLoad) / 2) * 1 / _wr_efficiency;
+            let nachladeMengeWh = (prchigh.length) * ((_baseLoad + _klimaLoad) / 2) * 1 / _wr_efficiency;
 
             if (hrstorun < 24 && !_snowmode) {
-                nachlademengeWh = nachlademengeWh - (pvwhToday * _wr_efficiency);
+                nachladeMengeWh = nachladeMengeWh - (pvwhToday * _wr_efficiency);
             }           
 
             // hier anschauen
 
-            nachlademengeWh =  aufrunden(2, nachlademengeWh);
+            nachladeMengeWh =  aufrunden(2, nachladeMengeWh);
+
+            if (nachladeMengeWh < 0) {
+                nachladeMengeWh = nachladeMengeWh * -1;
+            }
 
             let nachladeStunden = aufrunden(2, (Math.max(restlademenge / (_batteryLadePowerMax * _wr_efficiency), 0) * 2));
 
             // neuaufbau tibberPoihigh ohne Nachladestunden, billigstunden
             if (_debug) {
              //   console.info(JSON.stringify(prclow)); 
-                console.info('Nachladestunden ' + nachladeStunden + ' curbatwh ' + curbatwh + ' nachlademengeWh ' + nachlademengeWh + ' prchigh.length ' + prchigh.length);
+                console.info('Nachladestunden ' + nachladeStunden + ' curbatwh ' + curbatwh + ' nachladeMengeWh ' + nachladeMengeWh + ' prchigh.length ' + prchigh.length);
             }
 
             if (nachladeStunden > prclow.length) {
@@ -497,12 +504,12 @@ async function processing() {
           //    console.info('prchigh Nachladestunden ' + JSON.stringify(prchigh));
             }
             
-            if (nachladeStunden > 0 && prclow.length > 0 && _dc_now <= _verbrauchJetzt) {    // _dc_now > 0    // aber nicht wenn genug sonne in der zeit              
+            if (nachladeStunden > 0 && prclow.length > 0 && pvwhToday < curbatwh) {    // _dc_now > 0    // aber nicht wenn genug sonne in der zeit              
                 // aufbau der zeiten zum nachladen weiter im _tibber_active_idx = 5
-                if (aufrunden(2, nachlademengeWh - curbatwh) > 0) {
+                if (aufrunden(2, nachladeMengeWh - curbatwh) > 0) {
                     for (let i = 0; i < nachladeStunden; i++) {
                         if (_debug) {
-                            console.warn('Nachladezeit: ' + prclow[i][1] + '-' + prclow[i][2] + ' zum Preis ' + prclow[i][0] + ' (' + aufrunden(2, nachlademengeWh - curbatwh) + ' Wh)');
+                            console.warn('Nachladezeit: ' + prclow[i][1] + '-' + prclow[i][2] + ' zum Preis ' + prclow[i][0] + ' (' + aufrunden(2, nachladeMengeWh - curbatwh) + ' Wh)');
                         }
                         if (compareTime(prclow[i][1], prclow[i][2], 'between')) {
                             tibberPoilow.push(prclow[i]);
@@ -549,10 +556,10 @@ async function processing() {
 
       //       console.warn(JSON.stringify(_entladeZeitenArray));
         
-        if (_dc_now < _verbrauchJetzt) {                            
+        if (_dc_now < _verbrauchJetzt && !starteLadungTibber) {                            
             // wenn genug PV am Tag aber gerade nicht genug Sonne aber tibber klein genug
             if (_debug) {
-                console.info('pvwhToday ' + pvwhToday + ' benötigt werden ' + ((_baseLoad + _klimaLoad) * toSundownhr * _wr_efficiency));                
+                console.info('pvwhToday ' + pvwhToday + ' benötigt werden ' + ((_baseLoad + _klimaLoad) * toSundownhr * _wr_efficiency) + ' _dc_now ' + _dc_now);                
             }
             
             // Entladezeit wenn was im akku und preis hoch genug um zu sparen
@@ -564,13 +571,13 @@ async function processing() {
                 _tibber_active_idx = 20;          
             } 
         }          
-        
+                
         // Entladezeit
-        if (batlefthrs > 0 && _dc_now < _verbrauchJetzt) {
+        if (batlefthrs > 0 && _dc_now < _verbrauchJetzt && !starteLadungTibber) { 
             if (batlefthrs >= hrstorun) { 
-                if (compareTime(nowHour, _sunup, 'between') || _hhJetzt == Number(_sunup.split(':')[0]) ) {                    // wenn rest battlaufzeit > als bis zum sonnenaufgang oder sonnenaufgang stunde
+                if (compareTime(nowHour, addMinutesToTime(_sunup, 30), 'between')) {                                // wenn rest battlaufzeit > als bis zum sonnenaufgang oder sonnenaufgang + 30 min
                     if (_debug) {
-                        console.warn('Entladezeit reicht aus bis zum Sonnaufgang und genug PV');
+                        console.warn('Entladezeit reicht aus bis zum Sonnaufgang');
                     }
                     _istEntladezeit = true;
                     _tibber_active_idx = 22;
@@ -578,16 +585,16 @@ async function processing() {
                     _entladeZeitenArray.push([0.0,"--:--","--:--"]);  //  initialisiere für Vis
                 }
             } else {
-                if (_entladeZeitenArray.length > 0) {                                     // wir haben höchstpreise                       
+                if (_entladeZeitenArray.length > 0) {                                                               // wir haben höchstpreise                       
                     for (let c = 0; c < _entladeZeitenArray.length; c++) {
                         if (_debug) {
                             console.warn('entladezeit ' + JSON.stringify(_entladeZeitenArray[c]));
                         }
                         if (compareTime(_entladeZeitenArray[c][1], _entladeZeitenArray[c][2], "between")) {
-                            if (_vehicleConsum > 0) {                        // wenn fahrzeug am laden dann aber nicht aus der batterie laden
+                            if (_vehicleConsum > 0) {                                                               // wenn fahrzeug am laden dann aber nicht aus der batterie laden
                                 break;
                             } else {
-                            //    console.warn('entladezeit ' + _entladeZeitenArray[c][1]);
+                             //   console.warn('entladezeit ' + _entladeZeitenArray[c][1]);
                                 _istEntladezeit = true;
                                 _tibber_active_idx = 2;
                                 break;
@@ -726,10 +733,6 @@ async function processing() {
             console.error('--> Starte prognose Nutzen Steuerung ');
         }
         
-        if (_tibber_active_idx == 88) {                                        // komme aus notladung
-            setState(spntComCheckDP, 888, true);
-        }
-
         let latesttime = 0;
 
         if ((restladezeit * 2) <= pvfc.length && pvfc.length > 0) {          // überschreibe die restladezeit mit möglichen pv ladezeiten
@@ -910,6 +913,13 @@ on({id: pvUpdateDP, change: 'ne'}, async function() {
     _pvforecastTodayArray       = pvDaten.pvforecastTodayArray;
     _pvforecastTomorrowArray    = pvDaten.pvforecastTomorrowArray;
 });
+
+
+schedule({astro: "sunset"},  function () {
+    _pvforecastTodayArray       = [];
+    _pvforecastTomorrowArray    = [];
+});
+  
 
 async function vorVerarbeitung() {
 
@@ -1138,17 +1148,19 @@ function sortArrayByCurrentHour(zeiten, toEnd, currentHour) {
 
 function getPvErtrag() {
     let pvfc = [];
- 
-    for (let p = 0; p < 48; p++) { /* 48 = 24h a 30min Fenster*/
-        const pvstarttime = _pvforecastTodayArray[p][0];
-        const pvendtime   = _pvforecastTodayArray[p][1];               
-        const pvpower50   = _pvforecastTodayArray[p][2];
-        const pvpower90   = _pvforecastTodayArray[p][3];
+    
+    if (_pvforecastTodayArray.length > 0) {
+        for (let p = 0; p < 48; p++) { /* 48 = 24h a 30min Fenster*/
+            const pvstarttime = _pvforecastTodayArray[p][0];
+            const pvendtime   = _pvforecastTodayArray[p][1];               
+            const pvpower50   = _pvforecastTodayArray[p][2];
+            const pvpower90   = _pvforecastTodayArray[p][3];
 
-        if (pvpower90 > (_baseLoad + _klimaLoad)) {
-            const minutes = 30;
-            if (compareTime(pvendtime, null, '<=', null)) {
-                pvfc.push([pvpower50, pvpower90, minutes, pvstarttime, pvendtime]);                
+            if (pvpower90 > (_baseLoad + _klimaLoad)) {
+                const minutes = 30;
+                if (compareTime(pvendtime, null, '<=', null)) {
+                    pvfc.push([pvpower50, pvpower90, minutes, pvstarttime, pvendtime]);                
+                }
             }
         }
     }
@@ -1231,6 +1243,20 @@ function tibberPoilowErmittlung(arraySorted) {
     return tibberPoilow;
 }
 
+function addMinutesToTime(timeStr, minutesToAdd) {
+    let timeParts = timeStr.split(':');
+    let date = new Date();
+    date.setHours(parseInt(timeParts[0], 10));
+    date.setMinutes(parseInt(timeParts[1], 10));
+
+    date.setMinutes(date.getMinutes() + minutesToAdd);
+
+    let newHours = date.getHours().toString().padStart(2, '0');
+    let newMinutes = date.getMinutes().toString().padStart(2, '0');
+
+    // Zurückgeben der neuen Zeit im HH:MM-Format
+    return `${newHours}:${newMinutes}`;
+}
 
 function tibber_active_auswertung(kommeAusPrognose) {
     _max_pwr = _mindischrg;
@@ -1238,7 +1264,7 @@ function tibber_active_auswertung(kommeAusPrognose) {
     switch (_tibber_active_idx) {
         case 0:       
             if (_dc_now < 10) {
-                const tibPoint =  getState(tibberDP + 'extra.tibberProtokoll').val;    // und diesen dann nehmennur bei tibber 0 dann macht der das was zueltzt gesendet worden ist
+                const tibPoint =  getState(tibberDP + 'extra.tibberProtokoll').val;    // und diesen dann nehmen. bei tibber 0 dann macht der das was zueltzt gesendet worden ist
                 if (tibPoint == 0) {
                     _tibber_active_idx = 3;    
                 } else {
