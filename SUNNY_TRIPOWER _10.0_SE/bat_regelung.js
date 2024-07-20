@@ -39,18 +39,21 @@ let   _istLadezeit              = false;                                // ladez
 let   _istEntladezeit           = false;                                // Entladezeit gefunden merker
 
 // manuelles reduzieren der PV um x Watt
-let _power50Reduzierung         = 0;                                    // manuelles reduzieren der pv prognose pro stunde bewölkt
-let _power90Reduzierung         = 0;                                    // manuelles reduzieren der pv prognose pro stunde ohne wolken
-let _sundownReduzierung         = 3;                                    // ladedauer verkürzen um x Stunden nach hinten
-
+let _power50Reduzierung             = 0;                                    // manuelles reduzieren der pv prognose pro stunde bewölkt
+let _power90Reduzierung             = 0;                                    // manuelles reduzieren der pv prognose pro stunde ohne wolken
+let _sundownReduzierung             = 0;                                    // zum rechnen
+const _sundownReduzierungStunden    = 3;                                    // ladedauer verkürzen um x Stunden nach hinten
 
 // Klimaanlagesteuerung dazu ist ein Wetteradapter notwendig der die Temperatur liefert
 // die ladezeit wird dann laut verbrauch berechnet
-const _mitKlimaanlage           = true;                                             // soll die Klimaanlage berücksichtig werden
-const _wetterTemperaturDP       = 'openweathermap.0.forecast.day0.temperatureMax';  // beispiel hier openweathermap
-const _klimaVerbrauch           = 1500;                                             // manuell ermitteltes Wert wie viel Watt die Klimaanlage zieht 
-let _klimaLoad                  = 0;                                                // manuell ermitteltes Wert wie viel Watt die Klimaanlage zieht 
-const _tempWetterSoll           = 23;                                               // referenz Wert ab da soll die klima mit berücksichtig werden
+const   _mitKlimaanlage           = false;                                             // soll die Klimaanlage berücksichtig werden
+const   _wetterTemperaturDP       = 'openweathermap.0.forecast.day0.temperatureMax';  // beispiel hier openweathermap
+const   _klimaVerbrauch           = 1500;                                             // manuell ermitteltes Wert wie viel Watt die Klimaanlage zieht 
+let     _klimaLoad                = 0;                                                // manuell ermitteltes Wert wie viel Watt die Klimaanlage zieht 
+const   _tempWetterSoll           = 23;                                               // referenz Wert ab da soll die klima mit berücksichtig werden
+const   klimaDP                   = 'esphome.0.xxxx.mode'; // DP der klimaanlage zum check ob diese läuft
+let     istKlimaAn                = 0;                                                // läuft die klima bei mir 0 = aus
+const  _reduzierungStundenKlima   = 2;                                                // ladedauer verkürzen um x Stunden nach hinten wenn klima an 
 
 
 // tibber Preis Bereich
@@ -346,8 +349,18 @@ async function processing() {
 
         let tibberPoilow = tibberPoilowErmittlung(tibberPoihighSorted);
                
+
+        
+
         _klimaLoad = 0;
         if (_mitKlimaanlage) {
+
+            istKlimaAn = getState(klimaDP).val;            
+
+            if (istKlimaAn > 0) {
+                _sundownReduzierung = _sundownReduzierungStunden + _reduzierungStundenKlima; // verkürze die ladedauer um x stunden   
+            }
+
             let tempWetter = getState(_wetterTemperaturDP).val;
             if (tempWetter >= _tempWetterSoll) {
                 if (_dc_now < _verbrauchJetzt) {    // wenn pv grösser als der verbrauch ist.. dann nimm die zeiten ohne klima
@@ -472,8 +485,9 @@ async function processing() {
             })
 
             //nachlademenge Wh nach höchstpreisen am Tag
-            let nachladeMengeWh = (prchigh.length) * ((_baseLoad + _klimaLoad) / 2) * 1 / _wr_efficiency;
-
+            
+            let nachladeMengeWh = ((prchigh.length) * ((_baseLoad + _klimaLoad) /2) * 1 / _wr_efficiency);   // ich mag alles in klammern
+            
             if (hrstorun < 24 && !_snowmode) {
                 nachladeMengeWh = nachladeMengeWh - (pvwhToday * _wr_efficiency);
             }           
@@ -504,7 +518,9 @@ async function processing() {
           //    console.info('prchigh Nachladestunden ' + JSON.stringify(prchigh));
             }
             
-            if (nachladeStunden > 0 && prclow.length > 0 && pvwhToday < curbatwh) {    // _dc_now > 0    // aber nicht wenn genug sonne in der zeit              
+            //if (nachladeStunden > 0 && prclow.length > 0 && pvwhToday < curbatwh) {    
+            //   oder
+            if (nachladeStunden > 0 && prclow.length > 0 && nachladeMengeWh - curbatwh > 0  && pvwhTomorrow < (_baseLoad + _klimaLoad) * 24) {                 
                 // aufbau der zeiten zum nachladen weiter im _tibber_active_idx = 5
                 if (aufrunden(2, nachladeMengeWh - curbatwh) > 0) {
                     for (let i = 0; i < nachladeStunden; i++) {
@@ -617,12 +633,12 @@ async function processing() {
                 vergleichepvWh = pvwhToday;                 // danach den tageswert
             }
             
-            if (vergleichepvWh < ((_baseLoad + _klimaLoad) * 24 * _wr_efficiency)) {
+            if (vergleichepvWh < (_baseLoad + _klimaLoad) * 24 * _wr_efficiency) {
                 starteLadungTibber = true;
             }
         
             if (_debug) {                                        
-                console.info('pvwh ' + vergleichepvWh + ' ist kleiner als ' + ((_baseLoad + _klimaLoad) * 24 * _wr_efficiency));
+                console.info('pvwh ' + vergleichepvWh + ' ist kleiner als ' + (_baseLoad + _klimaLoad) * 24 * _wr_efficiency);
             }
         }
 
@@ -750,6 +766,7 @@ async function processing() {
             console.info('Abschluss PV bis ' + latesttime);
             console.info('pvfc.length ' + pvfc.length + ' Restladezeit nach pvfc Ermittlung möglich ' + restladezeit);
         //    console.warn('pvfc ' + JSON.stringify(pvfc));
+            console.info('_sundownReduzierung ' + _sundownReduzierung);
         }        
    
         if (_batsoc < 100 && pvfc.length > 0 ) {    
@@ -771,7 +788,7 @@ async function processing() {
             }
 
             if (_debug) {                
-                console.info('nach der Ermittlung _max_pwr ' + _max_pwr);
+                console.info('nach der Ermittlung _max_pwr ' + _max_pwr + ' toSundownhrReduziert ' + toSundownhrReduziert);
             }
 
             _max_pwr = Math.ceil(Math.min(Math.max(_max_pwr, 0), _batteryLadePowerMax));     //abfangen negativ werte
@@ -849,6 +866,8 @@ async function processing() {
     }
 
     _maxchrg = _max_pwr;    
+
+    
 
 // ---------------------------------------------------- Ende der PV Prognose Sektion
     if (_batsoc > 90 && _battIn > 0) {              // letzten 10 % langsam laden
