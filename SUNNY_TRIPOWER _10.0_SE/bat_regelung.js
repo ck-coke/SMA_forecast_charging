@@ -839,7 +839,7 @@ async function processing() {
                         _max_pwr = _dc_now - verbrauchJetztOhneAuto;
                         
                         if (_tibber_active_idx == 5) {    // sind in der nachledezeit
-                            _max_pwr = _batteryLadePowerMax - _dc_now - verbrauchJetztOhneAuto;
+                            _max_pwr = _batteryLadePowerMax;
                         }   
 
                         if (_debug) {
