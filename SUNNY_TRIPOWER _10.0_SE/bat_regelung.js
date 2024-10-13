@@ -613,7 +613,10 @@ async function processing() {
                     _entladeZeitenArray.push([0.0,"--:--","--:--"]);  //  initialisiere für Vis
                 }
             } else {
-                if (_entladeZeitenArray.length > 0) {                                                               // wir haben höchstpreise                       
+                if (_entladeZeitenArray.length > 0) {  
+                    if (!_nurEntladestunden) {
+                        _entladeZeitenArray = [];    
+                    }                                                            // wir haben höchstpreise                       
                     entladezeitEntscheidung();
                 } else {
                     _tibber_active_idx = 23;    
