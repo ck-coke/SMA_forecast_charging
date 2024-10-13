@@ -553,7 +553,7 @@ async function processing() {
             }
         }        // Nachladestunden Ermittlung ende
 
-        _entladeZeitenArray      = [];      
+        _entladeZeitenArray         = [];      
         let entladeZeitenArrayVis   = [];    
         let tibberPoihighNew        = filterZeit14UhrOrSunup(tibberPoihigh, _sunup);    // sortiert nach preis und stunden grösser jetzt und bis zu sunup oder 14 uhr
         let lefthrs                 = Math.ceil(batlefthrs *2);                         // Batterielaufzeit laut SOC
@@ -577,10 +577,6 @@ async function processing() {
                 _entladeZeitenArray.push(tibberPoihighNew[d]);                               
             }  
         }
-
-        const entladeZeitenArrayAll     = sortHourToSunup(sortArrayByCurrentHour(_entladeZeitenArray, true, _hhJetzt), _sunup);
-        _entladeZeitenArray             = entladeZeitenArrayAll.arrOut; 
-        entladeZeitenArrayVis           = entladeZeitenArrayAll.arrOutOnlyHH; 
 
       //       console.warn(JSON.stringify(_entladeZeitenArray));
         
@@ -615,7 +611,7 @@ async function processing() {
             } else {
                 if (_entladeZeitenArray.length > 0) {  
                     if (!_nurEntladestunden) {
-                        _entladeZeitenArray = [];    
+                        _entladeZeitenArray = []; 
                     }                                                            // wir haben höchstpreise                       
                     entladezeitEntscheidung();
                 } else {
@@ -623,6 +619,10 @@ async function processing() {
                 }                                                             
             }
         }
+
+        const entladeZeitenArrayAll     = sortHourToSunup(sortArrayByCurrentHour(_entladeZeitenArray, true, _hhJetzt), _sunup);
+        _entladeZeitenArray             = entladeZeitenArrayAll.arrOut; 
+        entladeZeitenArrayVis           = entladeZeitenArrayAll.arrOutOnlyHH; 
 
         // in der nacht starten setzen
         if (_tibberPreisJetzt <= _start_charge && _batsoc < 100 && _dc_now < 1) {           // wir sind in der nacht
