@@ -683,7 +683,7 @@ async function processing() {
                     console.warn('Stoppe Entladung, Preis jetzt ' + _tibberPreisJetzt + ' ct/kWh unter Batterieschwelle von ' + aufrunden(2, _stop_discharge) + ' ct/kWh oder battSoc = 0 ist ' + _batsoc );
                     console.info(' _SpntCom ' + _SpntCom + ' _max_pwr ' + _max_pwr + ' _tibber_active_idx ' + _tibber_active_idx);                    
                 }
-                if (_tibber_active_idx != 22) {  // aber nicht wenn die ladung bis zum ende reicht
+                if (_tibber_active_idx != 22 || batlefthrs < hrstorun) {  // aber nicht wenn die ladung bis zum ende reicht
                     _tibber_active_idx = 3;
                 }
             }
