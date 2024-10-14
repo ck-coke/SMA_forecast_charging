@@ -172,9 +172,6 @@ createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenAutomati
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuell', { 'name': 'nutze Tibber Preise manuell', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
     setState(tibberDP + 'extra.tibberNutzenManuell', false, true);
 });
-createUserStates(userDataDP, false, [tibberStromDP + 'extra.nutzeNurEntladezeiten', { 'name': 'nutzenur Entladezeiten', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
-    setState(tibberDP + 'extra.nutzeNurEntladezeiten', false, true);
-});
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberProtokoll', { 'name': 'Tibberprotokoll', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0 }], function () {
     setState(tibberDP + 'extra.tibberProtokoll', 0, true);
 });
@@ -210,6 +207,9 @@ createUserStates(userDataDP, false, ['strom.batterieLadenUhrzeit', { 'name': 'Ba
 });
 
 /*   Zeile entfernen 
+createUserStates(userDataDP, false, [tibberStromDP + 'extra.nutzeNurEntladezeiten', { 'name': 'nutze nur Entladezeiten', 'type': 'boolean', 'read': true, 'write': true, 'role': 'state', 'def': false }], function () {
+    setState(tibberDP + 'extra.nutzeNurEntladezeiten', false, true);
+});
 //            zum einmaligen Erzeugen der Datenpunkte 
 createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuellHH', { 'name': 'nutze Tibber Preise manuell ab Stunde ', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0 }], function () {
     setState(tibberDP + 'extra.tibberNutzenManuellHH', 0, true);
@@ -429,12 +429,14 @@ async function processing() {
                 }
             }
 
-            for (let su = 0; su < 48; su++) {
-                if (_pvforecastTomorrowArray[su][2] >= (_baseLoad + _klimaLoad)) {  
-                    sunupTomorrow = _pvforecastTomorrowArray[su][0]; 
-                    break;
-                }
-            }           
+            if (_pvforecastTomorrowArray.length > 0) {
+                for (let su = 0; su < 48; su++) {
+                    if (_pvforecastTomorrowArray[su][2] >= (_baseLoad + _klimaLoad)) {  
+                        sunupTomorrow = _pvforecastTomorrowArray[su][0]; 
+                        break;
+                    }
+                }           
+            }
         }
 
         if (_hhJetzt > parseInt(_sunup.slice(0, 2))) {        
@@ -573,7 +575,7 @@ async function processing() {
         
         for (let d = 0; d < lefthrs; d++) {
             if (tibberPoihighNew[d][0] > _stop_discharge) {                                                   
-                //    console.info('alle Entladezeiten: ' + tibberPoihighNew[d][1] + '-' + tibberPoihighNew[d][2] + ' Preis ' + tibberPoihighNew[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
+                //console.info('alle Entladezeiten: ' + tibberPoihighNew[d][1] + '-' + tibberPoihighNew[d][2] + ' Preis ' + tibberPoihighNew[d][0] + ' Fahrzeug zieht ' + _vehicleConsum + ' W');
                 _entladeZeitenArray.push(tibberPoihighNew[d]);                               
             }  
         }
@@ -721,7 +723,7 @@ async function processing() {
 //      _tibber_active_idx = 22;                Entladezeit reicht aus bis zum Sonnaufgang
 //      _tibber_active_idx = 23;                keine entladezeit da alle Preise unter schwelle aber Batterie hat ladung
 //      _tibber_active_idx = 3;                 entladung stoppen wenn preisschwelle erreicht
-//      _tibber_active_idx = 33;                wie 3 nur kommt intern aus der ausertung
+//      _tibber_active_idx = 33;                wie 3 nur kommt intern aus der auswertung
 //      _tibber_active_idx = 4;                 ladung stoppen wenn Restladezeit kleiner Billigstromzeitfenster
 //      _tibber_active_idx = 5;                 starte die ladung
 //      _tibber_active_idx = 6;                 Entladung stoppen nutze nur Entladestunden 
@@ -1376,4 +1378,3 @@ function tibber_active_auswertung() {
             _SpntCom = _InitCom_Aus;        
     }
 }
-
