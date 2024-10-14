@@ -116,7 +116,7 @@ function createUserStates(where, force, statesToCreate, callback = undefined) {
     }
 }
 
-function secondstotime(totalSeconds,tage) {
+function secondsToTime(totalSeconds,tage) {
     let days    = Math.floor(totalSeconds / 86400); // 86400 Sekunden in einem Tag
     let hours   = Math.floor((totalSeconds % 86400) / 3600);
     let minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -143,6 +143,12 @@ function getHH() {
     
     if (Number(HHNow < 10)) {
         HHNow = '0' + HHNow;
-    }       
+    }   
+    
     return HHNow;  
 }
+
+function isNumeric(n) {
+    return !isNaN(parseFloat(n)) && isFinite(n);
+}
+
