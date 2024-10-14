@@ -1328,6 +1328,7 @@ function tibber_active_auswertung() {
                 }
                 
                 tibber_active_auswertung();
+                break;
             }
             
             if (!_istLadezeit) {
