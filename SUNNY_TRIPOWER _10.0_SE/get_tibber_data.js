@@ -1,20 +1,19 @@
-const _tibber = 'tibberlink.0.Homes.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.';     // Anpassen!
+const _tibber = 'tibberlink.0.Homes.f2e0e774-4c3f-46e5-914f-4cb3ec0af309.';     // Anpassen!
 
 const _tibberDP1 = '0_userdata.0';
 const _tibberDP2 = 'strom.tibber.';
 const _tibberDP = _tibberDP1 + '.' + _tibberDP2;
-const heute  = 'PricesToday.';
-const morgen = 'PricesTomorrow.';
-const _options = { hour12: false, hour: '2-digit', minute: '2-digit' };
 
+const options = { hour12: false, hour: '2-digit', minute:'2-digit'};
+   
 
 //createUserStates(userDataDP, false, [tibberStromDP + 'extra.tibberNutzenManuellHH', { 'name': 'nutze Tibber Preise manuell ab Stunde ', 'type': 'number', 'read': true, 'write': false, 'role': 'value', 'def': 0 }], function () {
 //    setState(tibberDP + 'extra.tibberNutzenManuellHH', 0, true);
 //});
 
-createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberBestPreisArray', { 'name': 'tibber bester preis als array', 'type':'array', 'read': true, 'write': false, 'role': 'object'}], function () {  });       
-createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberBestPreisArrayLang', { 'name': 'tibber bester preis als array', 'type':'array', 'read': true, 'write': false, 'role': 'object'}], function () {  }); 
-createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberPvForcast', { 'name': 'tibber formattierung für pv prognose', 'type':'array', 'read': true, 'write': false, 'role': 'object'}], function () {  }); 
+createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberBestPreisArray', { 'name': 'tibber bester preis als array', 'type':'array', 'read': true, 'write': false, 'role': 'json'}], function () {  });       
+createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberBestPreisArrayLang', { 'name': 'tibber bester preis als array', 'type':'array', 'read': true, 'write': false, 'role': 'json'}], function () {  }); 
+createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberPvForcast', { 'name': 'tibber formattierung für pv prognose', 'type':'array', 'read': true, 'write': false, 'role': 'json'}], function () {  }); 
 
 createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberBestPreis', { 'name': 'tibber Best Preis', 'type':'number', 'read': true, 'write': false, 'role': 'state', 'def':0 , "unit": "ct" }], function () {      
   setState(_tibberDP + 'extra.tibberBestPreis', 0, true);
@@ -27,118 +26,84 @@ createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberPreisNächsteStun
   setState(_tibberDP + 'extra.tibberPreisNächsteStunde', 0, true);
 }); 
 
-createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberLevelJetzt', { 'name': 'tibber Level', 'type':'string', 'read': true, 'write': false, 'role': 'state' }], function () {        
-  setState(_tibberDP + 'extra.tibberLevelJetzt', 'NORMAL', true);
-}); 
-createUserStates(_tibberDP1, false, [_tibberDP2 + 'extra.tibberLevelNächsteStunde', { 'name': 'tibber next Level', 'type':'string', 'read': true, 'write': false, 'role': 'state' }], function () {        
-  setState(_tibberDP + 'extra.tibberLevelNächsteStunde', 'NORMAL', true);
-}); 
-
-
-if (getHH() > 13) {
-    holePreis(heute,morgen);
-} else {
-    holePreis(heute,heute);
-}
-
-
+holePreis();
 aktualisiereStunde();
 
-function holePreis(preisHeute,preisMorgen) {
+function holePreis() {
     let preise = [];
     let preisePV = [];
     
-    for(let i = 14; i < 24; i++) {      
-        let obj = {};
-        
-        const stateBaseName = _tibberDP2 + i + ".";
-        const idStart = _tibber + preisHeute + i + '.startsAt';
-        const idPreis = _tibber + preisHeute + i + '.total';
-        const startsAt  = getState(idStart).val;
-        const start = new Date(startsAt);        
-        const end = new Date(Date.parse(startsAt)).getTime()+3600000;            
-        const startTime = start.toLocaleTimeString('de-DE', _options);
-        const startDate = start.toLocaleDateString('de-DE');        
-        const endTime = new Date(end).toLocaleTimeString('de-DE', _options);
-        
-        obj.start = start.getHours();
-        const preis =  getState(idPreis).val;
+    const arr1 = JSON.parse(getState(_tibber +'PricesToday.json').val);
+    const arr2 = JSON.parse(getState(_tibber +'PricesTomorrow.json').val);
+    let arrPrice = arr1;
 
-        obj.preis = preis;
-        preise.push(obj);
+    let now = new Date();
 
-        preisePV.push([preis, startTime , startTime.split(':')[0] + ':30']);
-        preisePV.push([preis, startTime.split(':')[0] + ':30', endTime]);
-
-        const level = _tibber + preisHeute + i + '.level';
-        const levelText  = getState(level).val;
-
-        createUserStates('0_userdata.0', false, [stateBaseName + 'startTime', { 'name': 'Gultigkeitsbeginn (Uhrzeit)', 'type':'string', 'read': true, 'write': false, 'role': 'state' }], function () {        
-            setState('0_userdata.0.' + stateBaseName + 'startTime', startTime, true);
-        });
-        createUserStates('0_userdata.0', false, [stateBaseName+ 'startDate', { 'name': 'Gultigkeitsbeginn (Datum)', 'type':'string', 'read': true, 'write': false, 'role': 'state' }], function () {        
-            setState('0_userdata.0.' + stateBaseName + 'startDate', startDate, true);
-        });
-        createUserStates('0_userdata.0', false, [stateBaseName+ 'endTime', { 'name': 'Gultigkeitsende (Uhrzeit)', 'type':'string', 'read': true, 'write': false, 'role': 'state' }], function () {        
-            setState('0_userdata.0.' + stateBaseName + 'endTime', endTime, true);
-        });
-        createUserStates('0_userdata.0', false, [stateBaseName+ 'price', { 'name': 'Preis', 'type':'number', 'read': true, 'write': false, 'role': 'state',  'def':0, "unit": "ct" }], function () {       
-            setState('0_userdata.0.' + stateBaseName + 'price', preis, true);
-        });   
-        createUserStates('0_userdata.0', false, [stateBaseName+ 'level', { 'name': 'Preis Level', 'type':'string', 'read': true, 'write': false, 'role': 'text',  'def': '' }], function () {        
-            setState('0_userdata.0.' + stateBaseName + 'level', levelText, true);
-        });  
+    if (arr2.length > 0) {
+        now.setMinutes(0, 0, 0);
+        const heutePreise = arrPrice.filter(price => new Date(price.startsAt) >= now);
+        arrPrice = heutePreise.concat(arr2);           // füge beide zusammen
+       
+    } else {
+        now.setHours(0, 0, 0, 0);
     }
     
-    for(let i = 0; i < 14; i++) {
+    const next24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+    for (let i = 0; i < arrPrice.length; i++) {
+        const element   = arrPrice[i];
+        const startsAt  = element.startsAt;
+        const start     = new Date(startsAt);
+        const preis     = element.total;
+        const levelText = element.level;
+
         let obj = {};
-        const stateBaseName = _tibberDP2 + i + ".";
-        const idStart = _tibber + preisMorgen + i + '.startsAt';
-        const idPreis = _tibber + preisMorgen + i + '.total';
-        const startsAt  = getState(idStart).val;
-        const start = new Date(startsAt);        
-        const end = new Date(Date.parse(startsAt)).getTime()+3600000;            
-        const startTime = start.toLocaleTimeString('de-DE', _options);
-        const startDate = start.toLocaleDateString('de-DE');        
-        const endTime = new Date(end).toLocaleTimeString('de-DE', _options);
-        
-        obj.start = start.getHours();
-        const preis =  getState(idPreis).val;
-        obj.preis = preis;
-        preise.push(obj);
-    
-        preisePV.push([preis, startTime , startTime.split(':')[0] + ':30']);
-        preisePV.push([preis, startTime.split(':')[0] + ':30', endTime]);
+            
+        if (start >= now && start < next24Hours) {        
+         //    console.warn(`Starts at: ${start}, Total: ${preis}, level: ${levelText}`);
+            const stateBaseName = _tibberDP2 + i + ".";
+                    
+            const end = new Date(Date.parse(startsAt)).getTime()+3600000;            
+            const startTime = start.toLocaleTimeString('de-DE', options);
+            const startDate = start.toLocaleDateString('de-DE');        
+            const endTime = new Date(end).toLocaleTimeString('de-DE', options);
+            
+            obj.start = start.getHours();
 
-        const level = _tibber + preisMorgen + i + '.level';
-        const levelText  = getState(level).val;
+            obj.preis = preis;
+            preise.push(obj);
 
-        createUserStates('0_userdata.0', false, [stateBaseName + 'startTime', { 'name': 'Gultigkeitsbeginn (Uhrzeit)', 'type':'string', 'read': true, 'write': false, 'role': 'state' }], function () {        
-            setState('0_userdata.0.' + stateBaseName + 'startTime', startTime, true);
-        });
-        createUserStates('0_userdata.0', false, [stateBaseName+ 'startDate', { 'name': 'Gultigkeitsbeginn (Datum)', 'type':'string', 'read': true, 'write': false, 'role': 'state' }], function () {        
-            setState('0_userdata.0.' + stateBaseName + 'startDate', startDate, true);
-        });
-        createUserStates('0_userdata.0', false, [stateBaseName+ 'endTime', { 'name': 'Gultigkeitsende (Uhrzeit)', 'type':'string', 'read': true, 'write': false, 'role': 'state' }], function () {        
-            setState('0_userdata.0.' + stateBaseName + 'endTime', endTime, true);
-        });
-        createUserStates('0_userdata.0', false, [stateBaseName+ 'price', { 'name': 'Preis', 'type':'number', 'read': true, 'write': false, 'role': 'state',  'def':0, "unit": "ct" }], function () {      
-            setState('0_userdata.0.' + stateBaseName + 'price', preis, true);
-        });  
-        createUserStates('0_userdata.0', false, [stateBaseName+ 'level', { 'name': 'Preis Level', 'type':'string', 'read': true, 'write': false, 'role': 'text',  'def': '' }], function () {        
-            setState('0_userdata.0.' + stateBaseName + 'level', levelText, true);
-        });  
+            preisePV.push([preis, startTime , startTime.split(':')[0] + ':30']);
+            preisePV.push([preis, startTime.split(':')[0] + ':30', endTime]);
+
+            createUserStates('0_userdata.0', false, [stateBaseName + 'startTime', { 'name': 'Gultigkeitsbeginn (Uhrzeit)', 'type':'string', 'read': true, 'write': false, 'role': 'state' }], function () {        
+                setState('0_userdata.0.' + stateBaseName + 'startTime', startTime, true);
+            });
+            createUserStates('0_userdata.0', false, [stateBaseName+ 'startDate', { 'name': 'Gultigkeitsbeginn (Datum)', 'type':'string', 'read': true, 'write': false, 'role': 'state' }], function () {        
+                setState('0_userdata.0.' + stateBaseName + 'startDate', startDate, true);
+            });
+            createUserStates('0_userdata.0', false, [stateBaseName+ 'endTime', { 'name': 'Gultigkeitsende (Uhrzeit)', 'type':'string', 'read': true, 'write': false, 'role': 'state' }], function () {        
+                setState('0_userdata.0.' + stateBaseName + 'endTime', endTime, true);
+            });
+            createUserStates('0_userdata.0', false, [stateBaseName+ 'price', { 'name': 'Preis', 'type':'number', 'read': true, 'write': false, 'role': 'state',  'def':0, "unit": "ct" }], function () {       
+                setState('0_userdata.0.' + stateBaseName + 'price', preis, true);
+            });   
+            createUserStates('0_userdata.0', false, [stateBaseName+ 'level', { 'name': 'Preis Level', 'type':'string', 'read': true, 'write': false, 'role': 'text',  'def': '' }], function () {        
+                setState('0_userdata.0.' + stateBaseName + 'level', levelText, true);
+            });  
+        }
     }
+   
 
     let preiseSortLang = preise;
     preiseSortLang.sort(function(a, b) {
         return a.start - b.start;
     });
 
-    preisePV = sortArrayByStartTime(preisePV, getHH());
+    const preisePVSort = sortArrayByStartTime(preisePV, getHH());
 
     setState(_tibberDP + 'extra.tibberBestPreisArrayLang', preiseSortLang, true);
-    setState(_tibberDP + 'extra.tibberPvForcast', preisePV, true);
+    setState(_tibberDP + 'extra.tibberPvForcast', preisePVSort, true);
 
     errechneBesteUhrzeit(preise);
     
@@ -151,7 +116,7 @@ function sortArrayByStartTime(array, currentHour) {
         const timeB = b[1].split(":").map(Number);
         
         // Vergleiche Stunden
-        if (timeA[0] !== timeB[0]) {
+        if (timeA[0] != timeB[0]) {
             return timeA[0] - timeB[0];
         }
         
@@ -162,7 +127,7 @@ function sortArrayByStartTime(array, currentHour) {
     // Finde den Index des aktuellen Zeitpunkts
     let startIndex = array.findIndex(item => {
         const time = item[1].split(":").map(Number);
-        return time[0] >= currentHour || (time[0] === currentHour && time[1] >= 30);
+        return time[0] >= currentHour || (time[0] == currentHour && time[1] >= 30);
     });
 
     // Schneide den Array ab startIndex und setze ihn an das Ende
@@ -219,7 +184,6 @@ function aktualisiereStunde() {
     let stunde = Number(getHH());
 
     setState(_tibberDP + 'extra.tibberPreisJetzt' , getState(_tibberDP + stunde + '.price'/*Preis*/).val, true);
-    setState(_tibberDP + 'extra.tibberLevelJetzt' , getState(_tibberDP + stunde + '.level'/*level*/).val, true);
     
     stunde = stunde + 1;
     if (stunde == 24) {
@@ -227,19 +191,12 @@ function aktualisiereStunde() {
     }
 
     setState(_tibberDP + 'extra.tibberPreisNächsteStunde' , getState(_tibberDP + stunde + '.price'/*Preis*/).val, true);
-    setState(_tibberDP + 'extra.tibberLevelNächsteStunde' , getState(_tibberDP + stunde + '.level'/*level*/).val, true);
 }
 
-schedule('*/60 14-23 * * *', function() {
-    holePreis(heute,morgen);     
-});
-
-schedule('*/60 0-14 * * *', function() {
-    holePreis(heute,heute);     
+schedule('0 * * * *', function() {
+    holePreis();     
 });
 
 schedule('1 * * * *', function() {
     aktualisiereStunde();
 });
- 
-  
